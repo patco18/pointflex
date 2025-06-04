@@ -1,14 +1,12 @@
-# backend/app/__init__.py
-
 from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
 
-app = Flask(__name__)
+db = SQLAlchemy()
 
-# Load configurations
-app.config.from_object('config.Config')
-
-# Import routes
-from app.routes import *
-
-# Import models
-from app.models import *
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object('config.Config')
+    db.init_app(app)
+    from app.routes import hello
+    app.register_blueprint(hello.main)
+    return app
