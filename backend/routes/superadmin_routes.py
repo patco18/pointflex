@@ -11,11 +11,20 @@ from models.user import User
 from models.pointage import Pointage
 from models.system_settings import SystemSettings
 from models.audit_log import AuditLog
+from models.invoice import Invoice
+from models.payment import Payment
 from database import db
 from datetime import datetime, timedelta
 import json
 
 superadmin_bp = Blueprint('superadmin', __name__)
+
+# Tarifs mensuels par plan d'abonnement
+PLAN_PRICES = {
+    'basic': 10.0,
+    'premium': 20.0,
+    'enterprise': 50.0,
+}
 
 # ===== GESTION DES ENTREPRISES =====
 
@@ -350,6 +359,24 @@ def extend_subscription(company_id):
         
         # Prolonger l'abonnement
         company.extend_subscription(months)
+
+        # Créer la facture correspondante
+        amount = PLAN_PRICES.get(company.subscription_plan, 10.0) * months
+        invoice = Invoice(
+            company_id=company.id,
+            amount=amount,
+            months=months,
+            description=data.get('reason'),
+            due_date=datetime.utcnow().date(),
+        )
+        db.session.add(invoice)
+
+        log_user_action(
+            action='CREATE_INVOICE',
+            resource_type='Invoice',
+            resource_id=None,
+            details=invoice.to_dict(),
+        )
         
         # Logger l'action
         log_user_action(
@@ -380,7 +407,8 @@ def extend_subscription(company_id):
         
         return jsonify({
             'message': f'Abonnement prolongé de {months} mois',
-            'company': company_dict
+            'company': company_dict,
+            'invoice': invoice.to_dict(),
         }), 200
         
     except Exception as e:
@@ -448,6 +476,75 @@ def toggle_company_status(company_id):
         
     except Exception as e:
         print(f"Erreur lors du changement de statut: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+# ===== FACTURATION =====
+
+@superadmin_bp.route('/companies/<int:company_id>/invoices', methods=['GET'])
+@require_superadmin
+def get_company_invoices(company_id):
+    """Liste les factures d'une entreprise"""
+    try:
+        Company.query.get_or_404(company_id)
+        invoices = Invoice.query.filter_by(company_id=company_id).order_by(Invoice.created_at.desc()).all()
+        return jsonify({'invoices': [inv.to_dict() for inv in invoices]}), 200
+    except Exception as e:
+        print(f"Erreur lors de la récupération des factures: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@superadmin_bp.route('/companies/<int:company_id>/payments', methods=['GET'])
+@require_superadmin
+def get_company_payments(company_id):
+    """Liste les paiements d'une entreprise"""
+    try:
+        Company.query.get_or_404(company_id)
+        payments = Payment.query.filter_by(company_id=company_id).order_by(Payment.created_at.desc()).all()
+        return jsonify({'payments': [p.to_dict() for p in payments]}), 200
+    except Exception as e:
+        print(f"Erreur lors de la récupération des paiements: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@superadmin_bp.route('/invoices/<int:invoice_id>/pay', methods=['POST'])
+@require_superadmin
+def pay_invoice(invoice_id):
+    """Enregistre le paiement d'une facture"""
+    try:
+        invoice = Invoice.query.get_or_404(invoice_id)
+        if invoice.status == 'paid':
+            return jsonify(message='Facture déjà payée'), 400
+
+        data = request.get_json() or {}
+        amount = data.get('amount', invoice.amount)
+        method = data.get('method', 'manual')
+
+        payment = Payment(
+            invoice_id=invoice.id,
+            company_id=invoice.company_id,
+            amount=amount,
+            payment_method=method,
+        )
+        db.session.add(payment)
+
+        invoice.mark_paid()
+
+        log_user_action(
+            action='PAY_INVOICE',
+            resource_type='Invoice',
+            resource_id=invoice.id,
+            details={'amount': amount, 'method': method},
+        )
+
+        db.session.commit()
+
+        return jsonify({
+            'invoice': invoice.to_dict(),
+            'payment': payment.to_dict()
+        }), 200
+    except Exception as e:
+        print(f"Erreur lors de l'enregistrement du paiement: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 
