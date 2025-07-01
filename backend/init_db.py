@@ -6,6 +6,7 @@ Crée les tables et les données de démonstration
 
 import os
 import sys
+from datetime import time
 from werkzeug.security import generate_password_hash
 
 # Ajouter le répertoire parent au path pour importer les modules
@@ -38,26 +39,29 @@ def init_database():
         
         # Créer les paramètres système
         print("⚙️  Création des paramètres système...")
-        system_settings = SystemSettings(
-            max_companies_basic=10,
-            max_companies_premium=50,
-            max_employees_basic=10,
-            max_employees_premium=50,
-            max_employees_enterprise=-1,  # Illimité
-            default_attendance_radius=100.0,
-            max_late_tolerance_minutes=15,
-            enable_geofencing=True,
-            enable_mission_mode=True
-        )
-        db.session.add(system_settings)
+        
+        # Paramètres des plans d'abonnement
+        SystemSettings.set_setting('subscription', 'max_companies_basic', 10)
+        SystemSettings.set_setting('subscription', 'max_companies_premium', 50)
+        SystemSettings.set_setting('subscription', 'max_employees_basic', 10)
+        SystemSettings.set_setting('subscription', 'max_employees_premium', 50)
+        SystemSettings.set_setting('subscription', 'max_employees_enterprise', -1)  # Illimité
+        
+        # Paramètres de géolocalisation
+        SystemSettings.set_setting('geolocation', 'default_attendance_radius', 100.0)
+        SystemSettings.set_setting('attendance', 'max_late_tolerance_minutes', 15)
+        
+        # Fonctionnalités activées
+        SystemSettings.set_setting('features', 'enable_geofencing', True)
+        SystemSettings.set_setting('features', 'enable_mission_mode', True)
         
         # Créer l'utilisateur SuperAdmin
         print("👑 Création du SuperAdmin...")
         superadmin = User(
             email='superadmin@pointflex.com',
             password_hash=generate_password_hash('superadmin123'),
-            first_name='Super',
-            last_name='Admin',
+            nom='Admin',
+            prenom='Super',
             role='superadmin',
             is_active=True,
             company_id=None
@@ -75,9 +79,9 @@ def init_database():
             is_active=True,
             office_latitude=48.8566,  # Paris
             office_longitude=2.3522,
-            attendance_radius=100.0,
-            work_start_time='09:00',
-            late_tolerance_minutes=15
+            office_radius=100,
+            work_start_time=time(9, 0),  # 09:00
+            late_threshold=15
         )
         db.session.add(demo_company)
         db.session.flush()  # Pour obtenir l'ID
@@ -87,8 +91,8 @@ def init_database():
         admin = User(
             email='admin@pointflex.com',
             password_hash=generate_password_hash('admin123'),
-            first_name='Admin',
-            last_name='Entreprise',
+            nom='Entreprise',
+            prenom='Admin',
             role='admin',
             is_active=True,
             company_id=demo_company.id
@@ -100,8 +104,8 @@ def init_database():
         employee = User(
             email='employee@pointflex.com',
             password_hash=generate_password_hash('employee123'),
-            first_name='Jean',
-            last_name='Dupont',
+            nom='Dupont',
+            prenom='Jean',
             role='employee',
             is_active=True,
             company_id=demo_company.id
