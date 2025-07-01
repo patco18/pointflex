@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  frontend:
+    build: .
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - pointflex-dev
+
+  backend:
+    build: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - FLASK_DEBUG=1
+      - DATABASE_URL=sqlite:///instance/pointflex.db
+    volumes:
+      - ./backend:/app
+      - ./backend/instance:/app/instance
+    networks:
+      - pointflex-dev
+
+networks:
+  pointflex-dev:
+    driver: bridge

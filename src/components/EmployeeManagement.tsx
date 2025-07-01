@@ -1,0 +1,336 @@
+import React, { useState } from 'react'
+import { adminService } from '../services/api'
+import { useAuth } from '../contexts/AuthContext'
+import { useApi, useAsyncAction } from '../hooks/useApi'
+import Modal from './shared/Modal'
+import LoadingSpinner from './shared/LoadingSpinner'
+import StatusBadge from './shared/StatusBadge'
+import DataTable from './shared/DataTable'
+import { 
+  Users, Plus, Edit, Trash2, Mail, Phone, Building, 
+  Briefcase, UserCheck, Shield, Save
+} from 'lucide-react'
+
+interface Employee {
+  id: number
+  email: string
+  nom: string
+  prenom: string
+  role: string
+  is_active: boolean
+  employee_number: string
+  phone: string
+  department_name?: string
+  service_name?: string
+  position_name?: string
+  manager_name?: string
+  company_name?: string
+  created_at: string
+}
+
+interface EmployeeForm {
+  email: string
+  nom: string
+  prenom: string
+  role: string
+  password: string
+  phone: string
+  department_id: string
+  service_id: string
+  position_id: string
+  manager_id: string
+}
+
+const COUNTRIES = [
+  { code: 'FR', name: 'France' },
+  { code: 'BE', name: 'Belgique' },
+  { code: 'CH', name: 'Suisse' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'US', name: 'États-Unis' },
+  { code: 'GB', name: 'Royaume-Uni' },
+  { code: 'DE', name: 'Allemagne' },
+  { code: 'ES', name: 'Espagne' },
+  { code: 'IT', name: 'Italie' }
+]
+
+export default function EmployeeManagement() {
+  const { isAdmin, isSuperAdmin } = useAuth()
+  const [searchTerm, setSearchTerm] = useState('')
+  const [roleFilter, setRoleFilter] = useState('all')
+  const [showModal, setShowModal] = useState(false)
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
+  
+  const [form, setForm] = useState<EmployeeForm>({
+    email: '', nom: '', prenom: '', role: 'employee', password: '',
+    phone: '', department_id: '', service_id: '', position_id: '', manager_id: ''
+  })
+
+  const { data: employees = [], loading, refetch } = useApi(() => adminService.getEmployees())
+  const { data: orgData } = useApi(() => adminService.getOrganizationData())
+  const { loading: saving, execute } = useAsyncAction()
+
+  const filteredEmployees = employees.filter((emp: Employee) => {
+    const matchesSearch = !searchTerm || 
+      emp.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.email.toLowerCase().includes(searchTerm.toLowerCase())
+    const matchesRole = roleFilter === 'all' || emp.role === roleFilter
+    return matchesSearch && matchesRole
+  })
+
+  const columns = [
+    {
+      key: 'name',
+      label: 'Employé',
+      render: (_, emp: Employee) => (
+        <div className="flex items-center">
+          <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
+            <Users className="h-5 w-5 text-gray-600" />
+          </div>
+          <div className="ml-4">
+            <div className="text-sm font-medium">{emp.prenom} {emp.nom}</div>
+            <div className="text-sm text-gray-500">#{emp.employee_number}</div>
+          </div>
+        </div>
+      )
+    },
+    {
+      key: 'contact',
+      label: 'Contact',
+      render: (_, emp: Employee) => (
+        <div>
+          <div className="flex items-center"><Mail className="h-4 w-4 mr-2 text-gray-400" />{emp.email}</div>
+          {emp.phone && <div className="flex items-center mt-1"><Phone className="h-4 w-4 mr-2 text-gray-400" />{emp.phone}</div>}
+        </div>
+      )
+    },
+    {
+      key: 'role',
+      label: 'Rôle',
+      render: (_, emp: Employee) => (
+        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+          emp.role === 'admin' ? 'bg-purple-100 text-purple-800' :
+          emp.role === 'manager' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+        }`}>
+          <Shield className="h-3 w-3 mr-1" />
+          {emp.role}
+        </span>
+      )
+    },
+    {
+      key: 'status',
+      label: 'Statut',
+      render: (_, emp: Employee) => <StatusBadge status={emp.is_active ? 'active' : 'inactive'} />
+    }
+  ]
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    await execute(async () => {
+      if (editingEmployee) {
+        await adminService.updateEmployee(editingEmployee.id, form)
+      } else {
+        await adminService.createEmployee(form)
+      }
+      setShowModal(false)
+      resetForm()
+      refetch()
+    }, editingEmployee ? 'Employé mis à jour' : 'Employé créé')
+  }
+
+  const handleDelete = async (emp: Employee) => {
+    if (!confirm(`Supprimer ${emp.prenom} ${emp.nom} ?`)) return
+    await execute(async () => {
+      await adminService.deleteEmployee(emp.id)
+      refetch()
+    }, 'Employé supprimé')
+  }
+
+  const startEdit = (emp: Employee) => {
+    setEditingEmployee(emp)
+    setForm({
+      email: emp.email, nom: emp.nom, prenom: emp.prenom, role: emp.role,
+      password: '', phone: emp.phone || '', department_id: '', service_id: '',
+      position_id: '', manager_id: ''
+    })
+    setShowModal(true)
+  }
+
+  const resetForm = () => {
+    setForm({
+      email: '', nom: '', prenom: '', role: 'employee', password: '',
+      phone: '', department_id: '', service_id: '', position_id: '', manager_id: ''
+    })
+    setEditingEmployee(null)
+  }
+
+  const actions = (emp: Employee) => (
+    <div className="flex space-x-2">
+      <button onClick={() => startEdit(emp)} className="text-blue-600 hover:text-blue-900">
+        <Edit className="h-4 w-4" />
+      </button>
+      <button onClick={() => handleDelete(emp)} className="text-red-600 hover:text-red-900">
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  )
+
+  if (!isAdmin) {
+    return (
+      <div className="card text-center">
+        <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">Accès restreint</h3>
+        <p className="text-gray-600">Seuls les administrateurs peuvent gérer les employés.</p>
+      </div>
+    )
+  }
+
+  if (loading) return <LoadingSpinner size="lg" text="Chargement des employés..." />
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Gestion des Employés</h1>
+          <p className="text-gray-600">Gérez les employés de votre entreprise</p>
+        </div>
+        <button onClick={() => { resetForm(); setShowModal(true) }} className="btn-primary">
+          <Plus className="h-4 w-4 mr-2" />
+          Nouvel Employé
+        </button>
+      </div>
+
+      <div className="card">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div></div>
+          <div>
+            <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="input-field">
+              <option value="all">Tous les rôles</option>
+              <option value="admin">Administrateur</option>
+              <option value="manager">Manager</option>
+              <option value="employee">Employé</option>
+            </select>
+          </div>
+          <div className="text-sm text-gray-600 flex items-end">
+            {filteredEmployees.length} employé{filteredEmployees.length > 1 ? 's' : ''} trouvé{filteredEmployees.length > 1 ? 's' : ''}
+          </div>
+        </div>
+      </div>
+
+      <DataTable
+        data={filteredEmployees}
+        columns={columns}
+        searchTerm={searchTerm}
+        onSearchChange={setSearchTerm}
+        emptyMessage="Aucun employé trouvé"
+        actions={actions}
+      />
+
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title={editingEmployee ? 'Modifier l\'employé' : 'Nouvel employé'}
+        size="lg"
+      >
+        <form onSubmit={handleSubmit}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Prénom *</label>
+              <input
+                type="text" required value={form.prenom}
+                onChange={(e) => setForm(prev => ({ ...prev, prenom: e.target.value }))}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+              <input
+                type="text" required value={form.nom}
+                onChange={(e) => setForm(prev => ({ ...prev, nom: e.target.value }))}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+              <input
+                type="email" required value={form.email}
+                onChange={(e) => setForm(prev => ({ ...prev, email: e.target.value }))}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+              <input
+                type="tel" value={form.phone}
+                onChange={(e) => setForm(prev => ({ ...prev, phone: e.target.value }))}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rôle</label>
+              <select
+                value={form.role}
+                onChange={(e) => setForm(prev => ({ ...prev, role: e.target.value }))}
+                className="input-field"
+              >
+                <option value="employee">Employé</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Administrateur</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Mot de passe {!editingEmployee && '*'}
+              </label>
+              <input
+                type="password" required={!editingEmployee} value={form.password}
+                onChange={(e) => setForm(prev => ({ ...prev, password: e.target.value }))}
+                className="input-field"
+                placeholder={editingEmployee ? 'Laisser vide pour ne pas changer' : ''}
+              />
+            </div>
+            {orgData && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Département</label>
+                  <select
+                    value={form.department_id}
+                    onChange={(e) => setForm(prev => ({ ...prev, department_id: e.target.value, service_id: '' }))}
+                    className="input-field"
+                  >
+                    <option value="">Aucun département</option>
+                    {orgData.departments?.map((dept: any) => (
+                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Service</label>
+                  <select
+                    value={form.service_id}
+                    onChange={(e) => setForm(prev => ({ ...prev, service_id: e.target.value }))}
+                    className="input-field"
+                    disabled={!form.department_id}
+                  >
+                    <option value="">Aucun service</option>
+                    {orgData.services?.filter((s: any) => s.department_id === parseInt(form.department_id)).map((service: any) => (
+                      <option key={service.id} value={service.id}>{service.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="flex justify-end space-x-3 mt-6 pt-6 border-t">
+            <button type="button" onClick={() => setShowModal(false)} className="btn-secondary" disabled={saving}>
+              Annuler
+            </button>
+            <button type="submit" className="btn-primary" disabled={saving}>
+              {saving ? <LoadingSpinner size="sm" /> : <><Save className="h-4 w-4 mr-2" />{editingEmployee ? 'Mettre à jour' : 'Créer'}</>}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  )
+}
