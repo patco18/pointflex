@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { profileService } from '../services/api'
 import { 
   Shield, 
   Save,
@@ -40,10 +41,9 @@ export default function AdminProfile() {
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
-    
+
     try {
-      // TODO: Implement profile update API call
-      // await profileService.updateProfile(profileForm)
+      await profileService.updateProfile(profileForm)
       toast.success('Profil mis à jour avec succès!')
       setEditMode(false)
     } catch (error) {
@@ -63,11 +63,10 @@ export default function AdminProfile() {
 
     setLoading(true)
     try {
-      // TODO: Implement password change API call
-      // await profileService.changePassword({
-      //   current_password: passwordForm.current_password,
-      //   new_password: passwordForm.new_password
-      // })
+      await profileService.changePassword({
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password
+      })
       toast.success('Mot de passe modifié avec succès!')
       setPasswordForm({
         current_password: '',
@@ -83,18 +82,17 @@ export default function AdminProfile() {
 
   const exportUserData = async () => {
     try {
-      // TODO: Implement data export API call
-      // const response = await profileService.exportUserData()
-      // const blob = new Blob([response.data], { type: 'application/json' })
-      // const url = window.URL.createObjectURL(blob)
-      // const a = document.createElement('a')
-      // a.href = url
-      // a.download = `mes_donnees_${new Date().toISOString().split('T')[0]}.json`
-      // a.click()
-      // window.URL.revokeObjectURL(url)
+      const response = await profileService.exportUserData()
+      const blob = new Blob([response.data], { type: 'application/json' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `mes_donnees_${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      window.URL.revokeObjectURL(url)
       toast.success('Données exportées avec succès!')
     } catch (error) {
-      toast.error('Erreur lors de l\'export des données')
+      toast.error("Erreur lors de l'export des données")
     }
   }
 
