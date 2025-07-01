@@ -112,3 +112,29 @@ def change_password():
         print(f"Erreur lors du changement de mot de passe: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
+
+@profile_bp.route('/export', methods=['GET'])
+@jwt_required()
+def export_profile_data():
+    """Exporte les données de l'utilisateur et ses pointages."""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify(message="Utilisateur non trouvé"), 401
+
+        from models.pointage import Pointage
+
+        pointages = Pointage.query.filter_by(user_id=current_user.id).order_by(
+            Pointage.date_pointage
+        ).all()
+
+        export_data = {
+            'user': current_user.to_dict(include_sensitive=True),
+            'pointages': [p.to_dict() for p in pointages]
+        }
+
+        return jsonify(export_data), 200
+
+    except Exception as e:
+        print(f"Erreur lors de l'export du profil: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
