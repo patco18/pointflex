@@ -9,6 +9,8 @@ from .office import Office
 from .pointage import Pointage
 from .system_settings import SystemSettings
 from .audit_log import AuditLog
+from .invoice import Invoice
+from .payment import Payment
 
 __all__ = [
     'User',
@@ -16,5 +18,7 @@ __all__ = [
     'Office',
     'Pointage',
     'SystemSettings',
-    'AuditLog'
+    'AuditLog',
+    'Invoice',
+    'Payment'
 ]

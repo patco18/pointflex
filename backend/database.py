@@ -17,6 +17,8 @@ def init_db():
         from models.system_settings import SystemSettings
         from models.audit_log import AuditLog
         from models.office import Office
+        from models.invoice import Invoice
+        from models.payment import Payment
         
         # Créer toutes les tables
         db.create_all()
