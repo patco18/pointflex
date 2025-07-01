@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { api } from '../services/api'
+import { api, authService, healthService } from '../services/api'
 import { UserRole } from '../types/roles'
 import toast from 'react-hot-toast'
 
@@ -47,7 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Vérifier l'état du serveur
   const checkServerHealth = async () => {
     try {
-      // Simuler une vérification de santé réussie
+      await healthService.check()
       setServerStatus('online')
       return true
     } catch (error) {
@@ -88,18 +88,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setAuthToken(token)
         try {
           console.log('Vérification du token avec /auth/me...')
-          // Simuler une réponse réussie
-          const mockUser: User = {
-            id: 1,
-            email: 'superadmin@pointflex.com',
-            nom: 'Super',
-            prenom: 'Admin',
-            role: 'superadmin' as UserRole,
-            company_id: undefined,
-            company_name: undefined
-          }
-          setUser(mockUser)
-          console.log('Utilisateur connecté:', mockUser)
+          const resp = await authService.me()
+          setUser(resp.data.user)
+          console.log('Utilisateur connecté:', resp.data.user)
         } catch (error) {
           console.error('Échec de validation du token:', error)
           localStorage.removeItem('token')
@@ -130,55 +121,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Le serveur backend n\'est pas accessible')
       }
 
-      // Simuler une connexion réussie
-      let mockUser: User
-      
-      if (email === 'superadmin@pointflex.com' && password === 'superadmin123') {
-        mockUser = {
-          id: 1,
-          email: 'superadmin@pointflex.com',
-          nom: 'Super',
-          prenom: 'Admin',
-          role: 'superadmin' as UserRole,
-          company_id: undefined,
-          company_name: undefined
-        }
-      } else if (email === 'admin@pointflex.com' && password === 'admin123') {
-        mockUser = {
-          id: 2,
-          email: 'admin@pointflex.com',
-          nom: 'Administrateur',
-          prenom: 'Principal',
-          role: 'admin_rh' as UserRole,
-          company_id: 1,
-          company_name: 'Entreprise Démo'
-        }
-      } else if (email === 'employee@pointflex.com' && password === 'employee123') {
-        mockUser = {
-          id: 3,
-          email: 'employee@pointflex.com',
-          nom: 'Employé',
-          prenom: 'Test',
-          role: 'employee' as UserRole,
-          company_id: 1,
-          company_name: 'Entreprise Démo'
-        }
-      } else {
-        throw new Error('Identifiants incorrects')
-      }
-      
-      const mockToken = 'mock-jwt-token-' + Date.now()
-      
-      // Sauvegarder le token
-      localStorage.setItem('token', mockToken)
+      const resp = await authService.login(email, password)
+      const { token, user } = resp.data
+      localStorage.setItem('token', token)
       console.log('Token sauvegardé dans localStorage')
-      
-      // Configurer axios avec le token
-      setAuthToken(mockToken)
-      
-      // Définir l'utilisateur
-      setUser(mockUser)
-      console.log('Connexion réussie pour:', mockUser.email, 'Rôle:', mockUser.role)
+      setAuthToken(token)
+      setUser(user)
+      console.log('Connexion réussie pour:', user.email, 'Rôle:', user.role)
       
     } catch (error: any) {
       console.error('Erreur de connexion:', error)
