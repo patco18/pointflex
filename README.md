@@ -83,6 +83,19 @@ npm install
 npm run dev
 ```
 
+### Tests
+
+#### Backend
+```bash
+cd backend
+pytest
+```
+
+#### Frontend
+```bash
+npm test
+```
+
 ## 🔐 Comptes de Démonstration
 
 ### SuperAdmin (Contrôle total)
