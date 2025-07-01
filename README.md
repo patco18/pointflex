@@ -144,6 +144,12 @@ Company (Entreprises)
 - `GET /api/attendance` - Historique pointages
 - `GET /api/attendance/stats` - Statistiques personnelles
 
+#### Profil
+- `GET /api/profile` - Informations profil
+- `PUT /api/profile` - Mettre à jour le profil
+- `PUT /api/profile/password` - Changer le mot de passe
+- `GET /api/profile/export` - Exporter les données utilisateur
+
 ## 🔧 Configuration
 
 ### Paramètres Entreprise
