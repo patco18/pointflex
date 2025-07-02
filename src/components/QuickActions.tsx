@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { attendanceService } from '../services/api'
 import { 
   Clock, 
   Users, 
@@ -48,6 +49,17 @@ export default function QuickActions() {
     } finally {
       setLoading(null)
     }
+  }
+
+  const downloadCalendar = async () => {
+    const resp = await attendanceService.downloadICal()
+    const url = window.URL.createObjectURL(new Blob([resp.data]))
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'attendance.ics')
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
   }
 
   // Actions SuperAdmin
@@ -103,6 +115,16 @@ export default function QuickActions() {
         toast.success('Système opérationnel - Tous les services fonctionnent')
       },
       badge: 'OK'
+    },
+    {
+      id: 'download-calendar',
+      title: 'Exporter calendrier',
+      description: 'iCal des pointages',
+      icon: Download,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      hoverColor: 'hover:bg-indigo-100',
+      onClick: downloadCalendar
     }
   ]
 
@@ -146,6 +168,16 @@ export default function QuickActions() {
         window.location.href = '/geofencing'
         toast.info('Configuration du géofencing')
       }
+    },
+    {
+      id: 'download-calendar',
+      title: 'Exporter calendrier',
+      description: 'iCal des pointages',
+      icon: Download,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      hoverColor: 'hover:bg-indigo-100',
+      onClick: downloadCalendar
     }
   ]
 
@@ -189,6 +221,16 @@ export default function QuickActions() {
         window.location.href = '/history'
         toast.info('Affichage de votre historique')
       }
+    },
+    {
+      id: 'download-calendar',
+      title: 'Exporter calendrier',
+      description: 'iCal des pointages',
+      icon: Download,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-50',
+      hoverColor: 'hover:bg-indigo-100',
+      onClick: downloadCalendar
     }
   ]
 

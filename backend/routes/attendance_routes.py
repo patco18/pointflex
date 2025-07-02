@@ -2,7 +2,7 @@
 Routes de pointage
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 from flask_jwt_extended import jwt_required
 from middleware.auth import get_current_user
 from middleware.audit import log_user_action
@@ -352,6 +352,60 @@ def get_attendance_stats():
         
     except Exception as e:
         print(f"Erreur lors de la récupération des statistiques: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+@attendance_bp.route('/calendar', methods=['GET'])
+@jwt_required()
+def download_calendar():
+    """Génère un fichier iCalendar avec les pointages de l'utilisateur"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify(message="Utilisateur non trouvé"), 401
+
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        query = Pointage.query.filter_by(user_id=current_user.id)
+
+        if start_date:
+            start_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage >= start_obj)
+        if end_date:
+            end_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage <= end_obj)
+
+        records = query.order_by(Pointage.date_pointage).all()
+
+        lines = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//PointFlex//Attendance Calendar//FR",
+            "CALSCALE:GREGORIAN",
+        ]
+
+        for p in records:
+            start_dt = datetime.combine(p.date_pointage, p.heure_arrivee)
+            end_dt = datetime.combine(p.date_pointage, p.heure_depart or p.heure_arrivee)
+            lines.extend([
+                "BEGIN:VEVENT",
+                f"UID:{p.id}@pointflex",
+                f"DTSTAMP:{p.created_at.strftime('%Y%m%dT%H%M%SZ')}",
+                f"DTSTART:{start_dt.strftime('%Y%m%dT%H%M%S')}",
+                f"DTEND:{end_dt.strftime('%Y%m%dT%H%M%S')}",
+                f"SUMMARY:{'Mission' if p.type == 'mission' else 'Présence bureau'}",
+                f"DESCRIPTION:Statut {p.statut}",
+                "END:VEVENT",
+            ])
+
+        lines.append("END:VCALENDAR")
+        ics_data = "\r\n".join(lines) + "\r\n"
+        response = Response(ics_data, mimetype='text/calendar')
+        response.headers['Content-Disposition'] = 'attachment; filename=attendance.ics'
+        return response
+
+    except Exception as e:
+        print(f"Erreur generation calendrier: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
 
 def calculate_distance(lat1, lon1, lat2, lon2):
