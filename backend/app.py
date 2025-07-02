@@ -1,6 +1,7 @@
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
+from flask_sse import sse
 import os
 
 # Import configuration
@@ -37,6 +38,10 @@ def create_app():
     
     # Initialize database
     db.init_app(app)
+
+    # SSE configuration
+    app.config['REDIS_URL'] = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')
+    app.register_blueprint(sse, url_prefix='/stream')
     
     # Initialize middleware
     init_auth_middleware(app, jwt)
