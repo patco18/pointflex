@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Bell, X, CheckCircle, AlertTriangle, Info, Clock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { notificationService } from '../services/api'
+import { useNotificationStream } from '../hooks/useNotificationStream'
 
 interface Notification {
   id: string
@@ -39,6 +40,21 @@ export default function RealtimeNotifications() {
 
     loadNotifications()
   }, [])
+
+  useNotificationStream(user?.id, (data: any) => {
+    setNotifications(prev => [
+      ...prev,
+      {
+        id: String(data.id),
+        type: 'info' as const,
+        title: 'Notification',
+        message: data.message,
+        timestamp: new Date(data.created_at),
+        read: false,
+      },
+    ])
+    setUnreadCount(prev => prev + 1)
+  })
 
   const markAsRead = (id: string) => {
     setNotifications(prev => 
