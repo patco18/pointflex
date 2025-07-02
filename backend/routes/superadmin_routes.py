@@ -371,6 +371,7 @@ def extend_subscription(company_id):
             due_date=datetime.utcnow().date(),
         )
         db.session.add(invoice)
+        db.session.flush()  # ensure defaults like dates are populated
 
         log_user_action(
             action='CREATE_INVOICE',
