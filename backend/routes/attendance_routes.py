@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from middleware.auth import get_current_user
 from middleware.audit import log_user_action
+from utils.notification_utils import send_notification
 from models.pointage import Pointage
 from models.user import User
 from models.office import Office
@@ -38,6 +39,7 @@ def office_checkin():
         ).first()
         
         if existing_pointage:
+            send_notification(current_user.id, "Pointage déjà enregistré pour aujourd'hui")
             return jsonify(message="Vous avez déjà pointé aujourd'hui"), 409
         
         # Récupérer les bureaux de l'entreprise
@@ -119,7 +121,11 @@ def office_checkin():
         )
         
         db.session.commit()
-        
+
+        send_notification(current_user.id, "Pointage bureau enregistré")
+        if pointage.statut == 'retard':
+            send_notification(current_user.id, "Vous êtes en retard")
+
         return jsonify({
             'message': 'Pointage bureau enregistré avec succès',
             'pointage': pointage.to_dict()
@@ -154,6 +160,7 @@ def mission_checkin():
         ).first()
         
         if existing_pointage:
+            send_notification(current_user.id, "Pointage déjà enregistré pour aujourd'hui")
             return jsonify(message="Vous avez déjà pointé aujourd'hui"), 409
         
         # Créer le pointage mission
@@ -184,7 +191,11 @@ def mission_checkin():
         )
         
         db.session.commit()
-        
+
+        send_notification(current_user.id, "Pointage mission enregistré")
+        if pointage.statut == 'retard':
+            send_notification(current_user.id, "Vous êtes en retard")
+
         return jsonify({
             'message': 'Pointage mission enregistré avec succès',
             'pointage': pointage.to_dict()
@@ -192,6 +203,51 @@ def mission_checkin():
         
     except Exception as e:
         print(f"Erreur lors du pointage mission: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+@attendance_bp.route('/checkout', methods=['POST'])
+@jwt_required()
+def checkout():
+    """Enregistre l'heure de départ de l'utilisateur"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify(message="Utilisateur non trouvé"), 401
+
+        today = date.today()
+        pointage = Pointage.query.filter_by(
+            user_id=current_user.id,
+            date_pointage=today
+        ).first()
+
+        if not pointage:
+            send_notification(current_user.id, "Aucun pointage d'arrivée trouvé pour aujourd'hui")
+            return jsonify(message="Pas de pointage d'arrivée pour aujourd'hui"), 404
+
+        if pointage.heure_depart:
+            return jsonify(message="Heure de départ déjà enregistrée"), 409
+
+        pointage.heure_depart = datetime.utcnow().time()
+
+        log_user_action(
+            action='CHECKOUT',
+            resource_type='Pointage',
+            resource_id=pointage.id,
+            details={'checkout_time': pointage.heure_depart.strftime('%H:%M')}
+        )
+
+        db.session.commit()
+
+        send_notification(current_user.id, "Heure de départ enregistrée")
+
+        return jsonify({
+            'message': 'Heure de départ enregistrée',
+            'pointage': pointage.to_dict()
+        }), 200
+
+    except Exception as e:
+        print(f"Erreur lors du checkout: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 

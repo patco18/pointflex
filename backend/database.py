@@ -19,6 +19,7 @@ def init_db():
         from models.office import Office
         from models.invoice import Invoice
         from models.payment import Payment
+        from models.notification import Notification
         
         # Créer toutes les tables
         db.create_all()

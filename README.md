@@ -37,6 +37,7 @@ Application SaaS complète de gestion des pointages avec architecture multi-tena
 - **Pointage Mission** : Validation par numéro d'ordre
 - Calcul automatique des retards
 - Horodatage précis et sécurisé
+- Notification en cas de retard ou de pointage
 
 ### 📊 Analytics & Reporting
 - Statistiques globales (SuperAdmin)

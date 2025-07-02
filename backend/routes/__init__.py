@@ -9,6 +9,7 @@ from .admin_routes import admin_bp
 from .attendance_routes import attendance_bp
 from .profile_routes import profile_bp
 from .health_routes import health_bp
+from .notification_routes import notification_bp
 
 __all__ = [
     'auth_bp',
@@ -16,5 +17,6 @@ __all__ = [
     'admin_bp', 
     'attendance_bp',
     'profile_bp',
-    'health_bp'
+    'health_bp',
+    'notification_bp'
 ]
