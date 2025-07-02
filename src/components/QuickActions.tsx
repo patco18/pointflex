@@ -20,6 +20,7 @@ import {
   CheckCircle,
   TrendingUp,
   DollarSign
+  LogOut
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -62,6 +63,33 @@ export default function QuickActions() {
     document.body.appendChild(link)
     link.click()
     link.remove()
+  }
+
+  const checkout = async () => {
+    await attendanceService.checkout()
+    toast.success("Heure de d\u00e9part enregistr\u00e9e")
+  }
+
+  const downloadCalendarAction: QuickAction = {
+    id: 'download-calendar',
+    title: 'Exporter calendrier',
+    description: 'iCal des pointages',
+    icon: Download,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-50',
+    hoverColor: 'hover:bg-indigo-100',
+    onClick: downloadCalendar
+  }
+
+  const checkoutAction: QuickAction = {
+    id: 'checkout',
+    title: 'Fin de journ\u00e9e',
+    description: 'Enregistrer votre d\u00e9part',
+    icon: LogOut,
+    color: 'text-red-600',
+    bgColor: 'bg-red-50',
+    hoverColor: 'hover:bg-red-100',
+    onClick: checkout
   }
 
   // Actions SuperAdmin
@@ -118,16 +146,8 @@ export default function QuickActions() {
       },
       badge: 'OK'
     },
-    {
-      id: 'download-calendar',
-      title: 'Exporter calendrier',
-      description: 'iCal des pointages',
-      icon: Download,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50',
-      hoverColor: 'hover:bg-indigo-100',
-      onClick: downloadCalendar
-    }
+    downloadCalendarAction,
+    checkoutAction
   ]
 
   // Actions Admin
@@ -171,16 +191,8 @@ export default function QuickActions() {
         toast.info('Configuration du géofencing')
       }
     },
-    {
-      id: 'download-calendar',
-      title: 'Exporter calendrier',
-      description: 'iCal des pointages',
-      icon: Download,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50',
-      hoverColor: 'hover:bg-indigo-100',
-      onClick: downloadCalendar
-    }
+    downloadCalendarAction,
+    checkoutAction
   ]
 
   // Actions Employé
@@ -224,16 +236,8 @@ export default function QuickActions() {
         toast.info('Affichage de votre historique')
       }
     },
-    {
-      id: 'download-calendar',
-      title: 'Exporter calendrier',
-      description: 'iCal des pointages',
-      icon: Download,
-      color: 'text-indigo-600',
-      bgColor: 'bg-indigo-50',
-      hoverColor: 'hover:bg-indigo-100',
-      onClick: downloadCalendar
-    }
+    downloadCalendarAction,
+    checkoutAction
   ]
 
   // Sélectionner les actions selon le rôle

@@ -162,7 +162,7 @@ export const attendanceService = {
 
   checkout: async () => {
     try {
-      console.log('📤 Enregistrement de la sortie...')
+
       return await api.post('/attendance/checkout')
     } catch (error) {
       console.error('Checkout service error:', error)
