@@ -599,6 +599,18 @@ export const profileService = {
   },
 }
 
+// Service pour les notifications utilisateur
+export const notificationService = {
+  list: async () => {
+    try {
+      return await api.get('/notifications')
+    } catch (error) {
+      console.error('List notifications service error:', error)
+      throw error
+    }
+  }
+}
+
 // Service de vérification de la santé du serveur
 export const healthService = {
   check: async () => {
