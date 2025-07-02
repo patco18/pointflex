@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useNavigate } from 'react-router-dom'
 import { attendanceService } from '../services/api'
 import { 
   Clock, 
@@ -38,6 +39,7 @@ interface QuickAction {
 
 export default function QuickActions() {
   const { user, isSuperAdmin, isAdmin, isEmployee } = useAuth()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState<string | null>(null)
 
   const handleAction = async (actionId: string, action: () => void) => {
@@ -73,7 +75,7 @@ export default function QuickActions() {
       bgColor: 'bg-blue-50',
       hoverColor: 'hover:bg-blue-100',
       onClick: () => {
-        window.location.href = '/superadmin/companies'
+        navigate('/superadmin/companies')
         toast.success('Redirection vers la gestion des entreprises')
       }
     },
@@ -86,7 +88,7 @@ export default function QuickActions() {
       bgColor: 'bg-purple-50',
       hoverColor: 'hover:bg-purple-100',
       onClick: () => {
-        window.location.href = '/superadmin'
+        navigate('/superadmin')
         toast.info('Affichage des statistiques globales')
       }
     },
@@ -99,7 +101,7 @@ export default function QuickActions() {
       bgColor: 'bg-green-50',
       hoverColor: 'hover:bg-green-100',
       onClick: () => {
-        window.location.href = '/superadmin/billing'
+        navigate('/superadmin/billing')
         toast.success('Accès à la facturation')
       }
     },
@@ -139,7 +141,7 @@ export default function QuickActions() {
       bgColor: 'bg-blue-50',
       hoverColor: 'hover:bg-blue-100',
       onClick: () => {
-        window.location.href = '/admin/employees'
+        navigate('/admin/employees')
         toast.success('Redirection vers la gestion des employés')
       }
     },
@@ -152,7 +154,7 @@ export default function QuickActions() {
       bgColor: 'bg-green-50',
       hoverColor: 'hover:bg-green-100',
       onClick: () => {
-        window.location.href = '/reports'
+        navigate('/reports')
         toast.success('Génération du rapport d\'équipe')
       }
     },
@@ -165,7 +167,7 @@ export default function QuickActions() {
       bgColor: 'bg-orange-50',
       hoverColor: 'hover:bg-orange-100',
       onClick: () => {
-        window.location.href = '/geofencing'
+        navigate('/geofencing')
         toast.info('Configuration du géofencing')
       }
     },
@@ -192,7 +194,7 @@ export default function QuickActions() {
       bgColor: 'bg-blue-50',
       hoverColor: 'hover:bg-blue-100',
       onClick: () => {
-        window.location.href = '/checkin'
+        navigate('/checkin')
         toast.success('Redirection vers le pointage')
       }
     },
@@ -205,7 +207,7 @@ export default function QuickActions() {
       bgColor: 'bg-purple-50',
       hoverColor: 'hover:bg-purple-100',
       onClick: () => {
-        window.location.href = '/checkin'
+        navigate('/checkin')
         toast.info('Sélectionnez l\'onglet Mission')
       }
     },
@@ -218,7 +220,7 @@ export default function QuickActions() {
       bgColor: 'bg-green-50',
       hoverColor: 'hover:bg-green-100',
       onClick: () => {
-        window.location.href = '/history'
+        navigate('/history')
         toast.info('Affichage de votre historique')
       }
     },
