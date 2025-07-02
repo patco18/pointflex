@@ -159,6 +159,16 @@ export const attendanceService = {
       throw error
     }
   },
+
+  checkout: async () => {
+    try {
+      console.log('📤 Enregistrement de la sortie...')
+      return await api.post('/attendance/checkout')
+    } catch (error) {
+      console.error('Checkout service error:', error)
+      throw error
+    }
+  },
 }
 
 // Services SuperAdmin

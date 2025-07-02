@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import CheckIn from './pages/CheckIn'
+import Checkout from './pages/Checkout'
 import Profile from './pages/Profile'
 import History from './pages/History'
 import Settings from './pages/Settings'
@@ -155,6 +156,13 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <CheckIn />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/checkout" element={
+            <ProtectedRoute>
+              <Layout>
+                <Checkout />
               </Layout>
             </ProtectedRoute>
           } />
