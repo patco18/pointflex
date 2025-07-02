@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../hooks/usePermissions'
-import { useAsyncAction } from '../hooks/useApi'
+import { useApi, useAsyncAction } from '../hooks/useApi'
+import { superAdminService } from '../services/api'
 import { 
   Building, 
   Plus, 
@@ -146,62 +146,9 @@ export default function CompanyManagement() {
     admin_password: ''
   })
 
-  // Données simulées pour la démonstration
-  const [companies, setCompanies] = useState<Company[]>([
-    {
-      id: 1,
-      name: 'Entreprise Démo',
-      email: 'contact@entreprise-demo.com',
-      phone: '+33 1 23 45 67 89',
-      address: '123 Rue de la Démo, 75001 Paris',
-      city: 'Paris',
-      country: 'FR',
-      industry: 'tech',
-      website: 'www.entreprise-demo.com',
-      tax_id: 'FR12345678900',
-      subscription_plan: 'premium',
-      subscription_status: 'active',
-      max_employees: 50,
-      is_active: true,
-      is_suspended: false,
-      created_at: '2023-01-01T00:00:00Z',
-      updated_at: '2023-01-01T00:00:00Z',
-      admin_email: 'admin@entreprise-demo.com',
-      admin_name: 'Jean Dupont',
-      admin_phone: '+33 6 12 34 56 78',
-      current_employee_count: 35,
-      subscription_days_remaining: 45,
-      is_subscription_expired: false,
-      is_subscription_expiring_soon: false
-    },
-    {
-      id: 2,
-      name: 'TechCorp Solutions',
-      email: 'info@techcorp.com',
-      phone: '+33 1 98 76 54 32',
-      address: '456 Avenue de la Tech, 69000 Lyon',
-      city: 'Lyon',
-      country: 'FR',
-      industry: 'tech',
-      website: 'www.techcorp.com',
-      tax_id: 'FR98765432100',
-      subscription_plan: 'enterprise',
-      subscription_status: 'active',
-      max_employees: 200,
-      is_active: true,
-      is_suspended: false,
-      created_at: '2023-02-15T00:00:00Z',
-      updated_at: '2023-02-15T00:00:00Z',
-      admin_email: 'admin@techcorp.com',
-      admin_name: 'Marie Martin',
-      admin_phone: '+33 6 98 76 54 32',
-      current_employee_count: 150,
-      subscription_days_remaining: 90,
-      is_subscription_expired: false,
-      is_subscription_expiring_soon: false
-    }
-  ])
-  const [loading, setLoading] = useState(false)
+  // Chargement des entreprises depuis l'API
+  const { data: companyResp, loading, refetch } = useApi(() => superAdminService.getCompanies())
+  const companies: Company[] = companyResp?.companies || []
   const { loading: saving, execute } = useAsyncAction()
 
   // Filtrer les entreprises
@@ -279,9 +226,10 @@ export default function CompanyManagement() {
         is_subscription_expiring_soon: false
       }
       
-      setCompanies([...companies, newCompany])
+      await superAdminService.createCompany(companyForm)
       setShowModal(false)
       resetForm()
+      refetch()
     }, 'Entreprise créée avec succès')
   }
 
@@ -291,36 +239,11 @@ export default function CompanyManagement() {
     if (!editingCompany) return
     
     await execute(async () => {
-      // Simuler la mise à jour d'une entreprise
-      const updatedCompanies = companies.map(company => {
-        if (company.id === editingCompany.id) {
-          return {
-            ...company,
-            name: companyForm.name,
-            email: companyForm.email,
-            phone: companyForm.phone,
-            address: companyForm.address,
-            city: companyForm.city,
-            country: companyForm.country,
-            industry: companyForm.industry,
-            website: companyForm.website,
-            tax_id: companyForm.tax_id,
-            notes: companyForm.notes,
-            subscription_plan: companyForm.subscription_plan,
-            max_employees: companyForm.max_employees,
-            admin_email: companyForm.admin_email,
-            admin_name: `${companyForm.admin_prenom} ${companyForm.admin_nom}`,
-            admin_phone: companyForm.admin_phone,
-            updated_at: new Date().toISOString()
-          }
-        }
-        return company
-      })
-      
-      setCompanies(updatedCompanies)
+      await superAdminService.updateCompany(editingCompany.id, companyForm)
       setEditingCompany(null)
       setShowModal(false)
       resetForm()
+      refetch()
     }, 'Entreprise mise à jour avec succès')
   }
 
@@ -331,8 +254,8 @@ export default function CompanyManagement() {
     }
 
     await execute(async () => {
-      // Simuler la suppression d'une entreprise
-      setCompanies(companies.filter(company => company.id !== companyId))
+      await superAdminService.deleteCompany(companyId)
+      refetch()
     }, 'Entreprise supprimée avec succès')
   }
 
@@ -343,20 +266,12 @@ export default function CompanyManagement() {
     
     if (company.is_suspended || reason) {
       await execute(async () => {
-        // Simuler la suspension/réactivation d'une entreprise
-        const updatedCompanies = companies.map(c => {
-          if (c.id === company.id) {
-            return {
-              ...c,
-              is_suspended: !c.is_suspended,
-              suspension_reason: !c.is_suspended ? reason || '' : undefined,
-              subscription_status: !c.is_suspended ? 'suspended' : 'active'
-            }
-          }
-          return c
+        await superAdminService.toggleCompanyStatus(company.id, {
+          suspend: !company.is_suspended,
+          reason: reason || '',
+          notify_admin: true
         })
-        
-        setCompanies(updatedCompanies)
+        refetch()
       }, `Entreprise ${company.is_suspended ? 'réactivée' : 'suspendue'} avec succès`)
     }
   }
@@ -367,32 +282,9 @@ export default function CompanyManagement() {
     
     if (months > 0) {
       await execute(async () => {
-        // Simuler la prolongation d'un abonnement
-        const updatedCompanies = companies.map(c => {
-          if (c.id === company.id) {
-            const currentEndDate = c.subscription_end ? new Date(c.subscription_end) : new Date()
-            const newEndDate = new Date(currentEndDate)
-            newEndDate.setMonth(newEndDate.getMonth() + months)
-            
-            return {
-              ...c,
-              subscription_end: newEndDate.toISOString(),
-              subscription_days_remaining: (c.subscription_days_remaining || 0) + (months * 30),
-              is_subscription_expired: false,
-              is_subscription_expiring_soon: false,
-              subscription_status: 'active',
-              is_suspended: false,
-              suspension_reason: undefined
-            }
-          }
-          return c
-        })
-        
-        setCompanies(updatedCompanies)
-        
-        // Mettre à jour les statistiques globales
-        // Cette action devrait déclencher une mise à jour des revenus dans le dashboard SuperAdmin
-        toast.success(`Abonnement prolongé de ${months} mois. Les revenus ont été mis à jour.`)
+        await superAdminService.extendSubscription(company.id, { months })
+        toast.success(`Abonnement prolongé de ${months} mois.`)
+        refetch()
       }, `Abonnement prolongé de ${months} mois`)
     }
   }

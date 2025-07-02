@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../hooks/usePermissions'
+import { useApi } from '../hooks/useApi'
+import { adminService } from '../services/api'
 import { 
   Users, 
   Building, 
@@ -33,38 +35,48 @@ export default function AdminDashboard() {
   const { user } = useAuth()
   const { permissions } = usePermissions()
   const [activeTab, setActiveTab] = useState<'overview' | 'employees' | 'attendance' | 'offices' | 'organization' | 'geofencing' | 'settings'>('overview')
-  
-  // Statistiques simulées pour la démonstration
-  const mockStats = {
-    total_employees: 45,
-    active_employees: 42,
-    departments: 5,
-    services: 12,
-    today_present: 38,
-    today_late: 4,
-    today_absent: 3,
-    avg_hours_week: 38.5,
-    avg_late_month: 2.3,
-    offices: 3,
-    attendance_rate: 94.5,
-    retention_rate: 97.2,
-    growth_rate: 12.5
+
+  const { data: statsResp } = useApi(() => adminService.getCompanyStats())
+  const stats = statsResp?.stats || {
+    total_employees: 0,
+    active_employees: 0,
+    departments: 0,
+    services: 0,
+    today_present: 0,
+    today_late: 0,
+    today_absent: 0,
+    avg_hours_week: 0,
+    avg_late_month: 0,
+    offices: 0,
+    attendance_rate: 0,
+    retention_rate: 0,
+    growth_rate: 0
   }
-  
-  // Données simulées pour les graphiques
-  const generateAttendanceData = () => {
-    return Array.from({ length: 7 }, (_, i) => {
-      const date = subDays(new Date(), 6 - i)
-      return {
-        date: format(date, 'dd/MM', { locale: fr }),
-        present: Math.floor(Math.random() * 10) + 30,
-        late: Math.floor(Math.random() * 5),
-        absent: Math.floor(Math.random() * 3)
+
+  const { data: attendanceResp } = useApi(() => adminService.getCompanyAttendance())
+  const attendanceChartData = (() => {
+    const dataMap: Record<string, { present: number; late: number; absent: number }> = {}
+    const today = new Date()
+    for (let i = 6; i >= 0; i--) {
+      const d = subDays(today, i)
+      const key = format(d, 'yyyy-MM-dd')
+      dataMap[key] = { present: 0, late: 0, absent: 0 }
+    }
+
+    attendanceResp?.records.forEach((r: any) => {
+      const key = r.date_pointage
+      if (dataMap[key]) {
+        if (r.statut === 'present') dataMap[key].present += 1
+        else if (r.statut === 'retard') dataMap[key].late += 1
+        else dataMap[key].absent += 1
       }
     })
-  }
-  
-  const attendanceChartData = generateAttendanceData()
+
+    return Object.entries(dataMap).map(([key, value]) => ({
+      date: format(new Date(key), 'dd/MM', { locale: fr }),
+      ...value
+    }))
+  })()
   
   // Vérifier si l'utilisateur a les permissions nécessaires
   if (!permissions.canManageCompanySettings && !permissions.canManageTeam) {
@@ -111,7 +123,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900">Départements</h3>
                   <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                    {mockStats.departments}
+                    {stats.departments}
                   </span>
                 </div>
                 
@@ -135,7 +147,7 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-lg font-semibold text-gray-900">Services</h3>
                   <span className="text-sm bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-                    {mockStats.services}
+                    {stats.services}
                   </span>
                 </div>
                 
@@ -218,8 +230,8 @@ export default function AdminDashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Employés</p>
-                    <p className="text-2xl font-bold text-gray-900">{mockStats.total_employees}</p>
-                    <p className="text-xs text-purple-600">{mockStats.active_employees} actifs</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.total_employees}</p>
+                    <p className="text-xs text-purple-600">{stats.active_employees} actifs</p>
                   </div>
                 </div>
               </div>
@@ -231,8 +243,8 @@ export default function AdminDashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Structure</p>
-                    <p className="text-2xl font-bold text-gray-900">{mockStats.departments}</p>
-                    <p className="text-xs text-blue-600">{mockStats.services} services</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.departments}</p>
+                    <p className="text-xs text-blue-600">{stats.services} services</p>
                   </div>
                 </div>
               </div>
@@ -244,7 +256,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Présence</p>
-                    <p className="text-2xl font-bold text-gray-900">{mockStats.today_present}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.today_present}</p>
                     <p className="text-xs text-green-600">Présents aujourd'hui</p>
                   </div>
                 </div>
@@ -257,7 +269,7 @@ export default function AdminDashboard() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm font-medium text-gray-600">Bureaux</p>
-                    <p className="text-2xl font-bold text-gray-900">{mockStats.offices}</p>
+                    <p className="text-2xl font-bold text-gray-900">{stats.offices}</p>
                     <p className="text-xs text-yellow-600">Sites actifs</p>
                   </div>
                 </div>
@@ -346,7 +358,7 @@ export default function AdminDashboard() {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold text-blue-900">{mockStats.attendance_rate}%</div>
+                  <div className="text-3xl font-bold text-blue-900">{stats.attendance_rate}%</div>
                   <div className="text-sm text-blue-700">
                     <span className="flex items-center">
                       <TrendingUp className="h-4 w-4 mr-1" />
@@ -358,7 +370,7 @@ export default function AdminDashboard() {
                 <div className="mt-4 w-full bg-blue-200 rounded-full h-2">
                   <div 
                     className="h-2 rounded-full bg-blue-600"
-                    style={{ width: `${mockStats.attendance_rate}%` }}
+                    style={{ width: `${stats.attendance_rate}%` }}
                   />
                 </div>
               </div>
@@ -372,7 +384,7 @@ export default function AdminDashboard() {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold text-green-900">{mockStats.retention_rate}%</div>
+                  <div className="text-3xl font-bold text-green-900">{stats.retention_rate}%</div>
                   <div className="text-sm text-green-700">
                     <span className="flex items-center">
                       <TrendingUp className="h-4 w-4 mr-1" />
@@ -384,7 +396,7 @@ export default function AdminDashboard() {
                 <div className="mt-4 w-full bg-green-200 rounded-full h-2">
                   <div 
                     className="h-2 rounded-full bg-green-600"
-                    style={{ width: `${mockStats.retention_rate}%` }}
+                    style={{ width: `${stats.retention_rate}%` }}
                   />
                 </div>
               </div>
@@ -398,7 +410,7 @@ export default function AdminDashboard() {
                 </div>
                 
                 <div className="flex items-center justify-between">
-                  <div className="text-3xl font-bold text-purple-900">+{mockStats.growth_rate}%</div>
+                  <div className="text-3xl font-bold text-purple-900">+{stats.growth_rate}%</div>
                   <div className="text-sm text-purple-700">
                     <span className="flex items-center">
                       <Target className="h-4 w-4 mr-1" />
@@ -410,7 +422,7 @@ export default function AdminDashboard() {
                 <div className="mt-4 w-full bg-purple-200 rounded-full h-2">
                   <div 
                     className="h-2 rounded-full bg-purple-600"
-                    style={{ width: `${(mockStats.growth_rate / 15) * 100}%` }}
+                    style={{ width: `${(stats.growth_rate / 15) * 100}%` }}
                   />
                 </div>
               </div>
@@ -522,11 +534,11 @@ export default function AdminDashboard() {
               </div>
               <div className="flex items-center space-x-2">
                 <Users className="h-4 w-4" />
-                <span className="text-sm">{mockStats.total_employees} employés</span>
+                <span className="text-sm">{stats.total_employees} employés</span>
               </div>
               <div className="flex items-center space-x-2">
                 <Globe className="h-4 w-4" />
-                <span className="text-sm">{mockStats.offices} bureaux</span>
+                <span className="text-sm">{stats.offices} bureaux</span>
               </div>
             </div>
           </div>

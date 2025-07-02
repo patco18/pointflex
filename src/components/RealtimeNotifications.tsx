@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { Bell, X, CheckCircle, AlertTriangle, Info, Clock } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { notificationService } from '../services/api'
 
 interface Notification {
   id: string
@@ -18,28 +19,25 @@ export default function RealtimeNotifications() {
   const [unreadCount, setUnreadCount] = useState(0)
 
   useEffect(() => {
-    // Générer quelques notifications de démonstration
-    const demoNotifications: Notification[] = [
-      {
-        id: '1',
-        type: 'success',
-        title: 'Pointage enregistré',
-        message: 'Votre pointage a été enregistré avec succès',
-        timestamp: new Date(Date.now() - 5 * 60 * 1000),
-        read: false
-      },
-      {
-        id: '2',
-        type: 'info',
-        title: 'Rappel',
-        message: 'N\'oubliez pas de pointer votre départ',
-        timestamp: new Date(Date.now() - 30 * 60 * 1000),
-        read: true
+    const loadNotifications = async () => {
+      try {
+        const resp = await notificationService.list()
+        const loaded = resp.data.notifications.map((n: any) => ({
+          id: String(n.id),
+          type: 'info' as const,
+          title: 'Notification',
+          message: n.message,
+          timestamp: new Date(n.created_at),
+          read: n.is_read,
+        }))
+        setNotifications(loaded)
+        setUnreadCount(loaded.filter(n => !n.read).length)
+      } catch (e) {
+        console.error('Erreur chargement notifications:', e)
       }
-    ]
+    }
 
-    setNotifications(demoNotifications)
-    setUnreadCount(demoNotifications.filter(n => !n.read).length)
+    loadNotifications()
   }, [])
 
   const markAsRead = (id: string) => {
