@@ -98,6 +98,7 @@ pytest
 #### Frontend
 ```bash
 npm test
+npm run lint  # analyse le code avec ESLint
 ```
 
 ## 🔐 Comptes de Démonstration
