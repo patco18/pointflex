@@ -13,6 +13,7 @@ from models.system_settings import SystemSettings
 from models.audit_log import AuditLog
 from models.invoice import Invoice
 from models.payment import Payment
+from services.stripe_service import create_checkout_session, verify_webhook
 from database import db
 from datetime import datetime, timedelta
 import json
@@ -547,6 +548,59 @@ def pay_invoice(invoice_id):
         print(f"Erreur lors de l'enregistrement du paiement: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
+
+
+@superadmin_bp.route('/invoices/<int:invoice_id>/stripe-session', methods=['POST'])
+@require_superadmin
+def create_stripe_session(invoice_id):
+    """Create a Stripe Checkout session for an invoice."""
+    try:
+        invoice = Invoice.query.get_or_404(invoice_id)
+        if invoice.status == 'paid':
+            return jsonify(message='Facture déjà payée'), 400
+
+        data = request.get_json() or {}
+        success_url = data.get('success_url', 'https://example.com/success')
+        cancel_url = data.get('cancel_url', 'https://example.com/cancel')
+
+        session = create_checkout_session(invoice, success_url, cancel_url)
+
+        return jsonify({'session_id': session.id, 'checkout_url': session.url}), 200
+    except Exception as e:
+        print(f"Erreur lors de la création de session Stripe: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@superadmin_bp.route('/stripe/webhook', methods=['POST'])
+def stripe_webhook():
+    """Handle Stripe webhook events."""
+    payload = request.data
+    sig_header = request.headers.get('Stripe-Signature', '')
+
+    try:
+        event = verify_webhook(payload, sig_header)
+    except Exception as e:
+        print(f"Webhook signature verification failed: {e}")
+        return jsonify(message='Invalid payload'), 400
+
+    if event['type'] == 'checkout.session.completed':
+        session_data = event['data']['object']
+        invoice_id = session_data.get('metadata', {}).get('invoice_id')
+        transaction_id = session_data.get('payment_intent')
+        invoice = Invoice.query.get(invoice_id)
+        if invoice and invoice.status != 'paid':
+            payment = Payment(
+                invoice_id=invoice.id,
+                company_id=invoice.company_id,
+                amount=invoice.amount,
+                payment_method='stripe',
+                transaction_id=transaction_id,
+            )
+            db.session.add(payment)
+            invoice.mark_paid()
+            db.session.commit()
+
+    return jsonify({'status': 'success'}), 200
 
 # ===== STATISTIQUES GLOBALES =====
 
