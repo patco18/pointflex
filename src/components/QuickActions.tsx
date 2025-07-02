@@ -16,7 +16,8 @@ import {
   Phone,
   AlertTriangle,
   CheckCircle,
-  TrendingUp
+  TrendingUp,
+  DollarSign
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -75,6 +76,19 @@ export default function QuickActions() {
       onClick: () => {
         window.location.href = '/superadmin'
         toast.info('Affichage des statistiques globales')
+      }
+    },
+    {
+      id: 'billing',
+      title: 'Facturation',
+      description: 'Voir les factures et paiements',
+      icon: DollarSign,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50',
+      hoverColor: 'hover:bg-green-100',
+      onClick: () => {
+        window.location.href = '/superadmin/billing'
+        toast.success('Accès à la facturation')
       }
     },
     {

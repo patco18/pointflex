@@ -221,6 +221,34 @@ export const superAdminService = {
     }
   },
 
+  // ===== FACTURATION =====
+  getCompanyInvoices: async (companyId: number) => {
+    try {
+      return await api.get(`/superadmin/companies/${companyId}/invoices`)
+    } catch (error) {
+      console.error('Get invoices service error:', error)
+      throw error
+    }
+  },
+
+  getCompanyPayments: async (companyId: number) => {
+    try {
+      return await api.get(`/superadmin/companies/${companyId}/payments`)
+    } catch (error) {
+      console.error('Get payments service error:', error)
+      throw error
+    }
+  },
+
+  payInvoice: async (invoiceId: number, data: { amount?: number; method?: string }) => {
+    try {
+      return await api.post(`/superadmin/invoices/${invoiceId}/pay`, data)
+    } catch (error) {
+      console.error('Pay invoice service error:', error)
+      throw error
+    }
+  },
+
   // ===== NOUVEAUX SERVICES POUR LA CONFIGURATION SYSTÈME =====
   
   getSystemSettings: async () => {
