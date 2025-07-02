@@ -44,10 +44,14 @@ class Pointage(db.Model):
     
     def __init__(self, **kwargs):
         """Initialisation avec calcul automatique du statut"""
+        # S'assurer que les valeurs par défaut sont appliquées
+        kwargs.setdefault('heure_arrivee', datetime.utcnow().time())
+        kwargs.setdefault('date_pointage', datetime.utcnow().date())
+
         super(Pointage, self).__init__(**kwargs)
-        
+
         # Calculer le statut si pas défini
-        if not hasattr(self, 'statut') or not self.statut:
+        if not getattr(self, 'statut', None):
             self.calculate_status()
     
     def calculate_status(self):
