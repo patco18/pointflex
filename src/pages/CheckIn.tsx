@@ -41,6 +41,8 @@ export default function CheckIn() {
     } catch (error: any) {
       if (error.message.includes('Géolocalisation')) {
         toast.error('Veuillez autoriser l\'accès à votre position')
+      } else if (error.response?.data?.message) {
+        toast.error(error.response.data.message)
       } else {
         toast.error('Erreur lors du pointage bureau')
       }
