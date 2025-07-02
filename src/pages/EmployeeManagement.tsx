@@ -333,7 +333,13 @@ export default function EmployeeManagement() {
   const loadOrganizationData = async () => {
     try {
       const response = await adminService.getOrganizationData()
-      setOrganizationData(response.data)
+      // Ensure all keys exist to avoid undefined access
+      setOrganizationData({
+        departments: response.data.departments || [],
+        services: response.data.services || [],
+        positions: response.data.positions || [],
+        managers: response.data.managers || []
+      })
     } catch (error) {
       console.error('Erreur lors du chargement des données organisationnelles:', error)
     }

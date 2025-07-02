@@ -140,8 +140,14 @@ export default function OrganizationManagement() {
       const [orgDataResponse] = await Promise.all([
         adminService.getOrganizationData()
       ])
-      
-      setOrganizationData(orgDataResponse.data)
+
+      // Normalize missing keys to avoid undefined errors
+      setOrganizationData({
+        departments: orgDataResponse.data.departments || [],
+        services: orgDataResponse.data.services || [],
+        positions: orgDataResponse.data.positions || [],
+        managers: orgDataResponse.data.managers || []
+      })
       
       if (activeTab === 'departments') {
         const deptResponse = await adminService.getDepartments()
