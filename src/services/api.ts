@@ -563,6 +563,21 @@ export const adminService = {
       console.error('Update company settings service error:', error)
       throw error
     }
+  },
+
+  downloadAttendancePdf: async (params?: { startDate?: string; endDate?: string }) => {
+    try {
+      return await api.get('/admin/attendance-report/pdf', {
+        params: {
+          start_date: params?.startDate,
+          end_date: params?.endDate
+        },
+        responseType: 'blob'
+      })
+    } catch (error) {
+      console.error('Download attendance pdf service error:', error)
+      throw error
+    }
   }
 }
 
