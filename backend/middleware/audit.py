@@ -56,13 +56,14 @@ def log_user_action(action, resource_type, resource_id=None, details=None,
             ip_address=request_info['ip_address'],
             user_agent=request_info['user_agent']
         )
-        
-        db.session.commit()
+
+        # La validation est déléguée à la transaction appelante
+        # pour éviter de perturber la session en cours.
         
     except Exception as e:
         print(f"Erreur lors de l'audit: {e}")
-        # Ne pas faire échouer la requête à cause d'une erreur d'audit
-        db.session.rollback()
+        # En cas d'erreur d'audit, on n'annule pas la transaction principale
+        # pour ne pas perdre les modifications métiers.
 
 def audit_model_changes(model_class):
     """Décorateur pour auditer automatiquement les changements de modèle"""
