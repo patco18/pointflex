@@ -149,6 +149,16 @@ export const attendanceService = {
       throw error
     }
   },
+
+  downloadICal: async () => {
+    try {
+      console.log('📅 Téléchargement du calendrier...')
+      return await api.get('/attendance/calendar', { responseType: 'blob' })
+    } catch (error) {
+      console.error('Download calendar service error:', error)
+      throw error
+    }
+  },
 }
 
 // Services SuperAdmin
