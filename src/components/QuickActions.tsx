@@ -19,7 +19,7 @@ import {
   AlertTriangle,
   CheckCircle,
   TrendingUp,
-  DollarSign
+  DollarSign,
   LogOut
 } from 'lucide-react'
 import toast from 'react-hot-toast'
