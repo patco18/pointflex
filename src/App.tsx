@@ -18,6 +18,7 @@ import OfficeManagementPage from './pages/OfficeManagementPage'
 import OrganizationManagement from './pages/OrganizationManagement'
 import AdvancedFeatures from './pages/AdvancedFeatures'
 import RoleManagementPage from './pages/RoleManagementPage'
+import BillingManagement from './pages/BillingManagement'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
@@ -64,6 +65,13 @@ function App() {
             <ProtectedRoute requiredRole="superadmin">
               <Layout>
                 <CompanyManagement />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/billing" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <BillingManagement />
               </Layout>
             </ProtectedRoute>
           } />

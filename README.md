@@ -28,6 +28,9 @@ Application SaaS complète de gestion des pointages avec architecture multi-tena
 - Plans d'abonnement (Basic, Premium, Enterprise)
 - Limites configurables par entreprise
 - Gestion des statuts d'abonnement
+- Prolongation d'abonnement avec génération de facture
+- Suivi des factures et des paiements
+- Interface de facturation côté frontend pour consulter et régler les factures
 
 ### 📍 Pointage Intelligent
 - **Pointage Bureau** : Géolocalisation avec rayon configurable
