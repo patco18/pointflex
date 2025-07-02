@@ -376,101 +376,34 @@ export const adminService = {
   // Nouveaux services pour la gestion des départements, services et postes
   getDepartments: async () => {
     try {
-      return {
-        data: {
-          departments: [
-            {
-              id: 1,
-              name: 'Ressources Humaines',
-              description: 'Gestion des ressources humaines',
-              manager_name: 'Marie Dubois',
-              budget: 100000,
-              is_active: true,
-              employee_count: 5,
-              service_count: 2,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            },
-            {
-              id: 2,
-              name: 'Développement',
-              description: 'Équipe de développement logiciel',
-              manager_name: 'Jean Martin',
-              budget: 200000,
-              is_active: true,
-              employee_count: 10,
-              service_count: 2,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            },
-            {
-              id: 3,
-              name: 'Marketing',
-              description: 'Équipe marketing et communication',
-              manager_name: 'Sophie Lefebvre',
-              budget: 150000,
-              is_active: true,
-              employee_count: 7,
-              service_count: 0,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            }
-          ]
-        }
-      }
+      return await api.get('/admin/departments')
     } catch (error) {
       console.error('Get departments service error:', error)
       throw error
     }
   },
-  
+
   createDepartment: async (departmentData: any) => {
     try {
-      return {
-        data: {
-          message: 'Département créé avec succès',
-          department: {
-            id: 4,
-            ...departmentData,
-            is_active: true,
-            employee_count: 0,
-            service_count: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        }
-      }
+      return await api.post('/admin/departments', departmentData)
     } catch (error) {
       console.error('Create department service error:', error)
       throw error
     }
   },
-  
+
   updateDepartment: async (departmentId: number, departmentData: any) => {
     try {
-      return {
-        data: {
-          message: 'Département mis à jour avec succès',
-          department: {
-            id: departmentId,
-            ...departmentData,
-            updated_at: new Date().toISOString()
-          }
-        }
-      }
+      return await api.put(`/admin/departments/${departmentId}`, departmentData)
     } catch (error) {
       console.error('Update department service error:', error)
       throw error
     }
   },
-  
+
   deleteDepartment: async (departmentId: number) => {
     try {
-      return {
-        data: {
-          message: 'Département supprimé avec succès'
-        }
-      }
+      return await api.delete(`/admin/departments/${departmentId}`)
     } catch (error) {
       console.error('Delete department service error:', error)
       throw error
@@ -479,60 +412,7 @@ export const adminService = {
   
   getServices: async () => {
     try {
-      return {
-        data: {
-          services: [
-            {
-              id: 1,
-              name: 'Recrutement',
-              description: 'Service de recrutement',
-              department_id: 1,
-              department_name: 'Ressources Humaines',
-              manager_name: 'Marie Dubois',
-              is_active: true,
-              employee_count: 3,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            },
-            {
-              id: 2,
-              name: 'Formation',
-              description: 'Service de formation',
-              department_id: 1,
-              department_name: 'Ressources Humaines',
-              manager_name: null,
-              is_active: true,
-              employee_count: 2,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            },
-            {
-              id: 3,
-              name: 'Frontend',
-              description: 'Développement frontend',
-              department_id: 2,
-              department_name: 'Développement',
-              manager_name: 'Jean Martin',
-              is_active: true,
-              employee_count: 5,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            },
-            {
-              id: 4,
-              name: 'Backend',
-              description: 'Développement backend',
-              department_id: 2,
-              department_name: 'Développement',
-              manager_name: null,
-              is_active: true,
-              employee_count: 5,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            }
-          ]
-        }
-      }
+      return await api.get('/admin/services')
     } catch (error) {
       console.error('Get services service error:', error)
       throw error
@@ -541,20 +421,7 @@ export const adminService = {
   
   createService: async (serviceData: any) => {
     try {
-      return {
-        data: {
-          message: 'Service créé avec succès',
-          service: {
-            id: 5,
-            ...serviceData,
-            department_name: 'Département',
-            is_active: true,
-            employee_count: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        }
-      }
+      return await api.post('/admin/services', serviceData)
     } catch (error) {
       console.error('Create service service error:', error)
       throw error
@@ -563,16 +430,7 @@ export const adminService = {
   
   updateService: async (serviceId: number, serviceData: any) => {
     try {
-      return {
-        data: {
-          message: 'Service mis à jour avec succès',
-          service: {
-            id: serviceId,
-            ...serviceData,
-            updated_at: new Date().toISOString()
-          }
-        }
-      }
+      return await api.put(`/admin/services/${serviceId}`, serviceData)
     } catch (error) {
       console.error('Update service service error:', error)
       throw error
@@ -581,11 +439,7 @@ export const adminService = {
   
   deleteService: async (serviceId: number) => {
     try {
-      return {
-        data: {
-          message: 'Service supprimé avec succès'
-        }
-      }
+      return await api.delete(`/admin/services/${serviceId}`)
     } catch (error) {
       console.error('Delete service service error:', error)
       throw error
@@ -594,51 +448,7 @@ export const adminService = {
   
   getPositions: async () => {
     try {
-      return {
-        data: {
-          positions: [
-            {
-              id: 1,
-              name: 'Développeur Junior',
-              description: 'Développeur en début de carrière',
-              level: 'Junior',
-              salary_min: 35000,
-              salary_max: 45000,
-              requirements: 'Connaissance en JavaScript, HTML, CSS',
-              is_active: true,
-              employee_count: 3,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            },
-            {
-              id: 2,
-              name: 'Développeur Senior',
-              description: 'Développeur expérimenté',
-              level: 'Senior',
-              salary_min: 50000,
-              salary_max: 70000,
-              requirements: 'Minimum 5 ans d\'expérience, maîtrise des frameworks modernes',
-              is_active: true,
-              employee_count: 5,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            },
-            {
-              id: 3,
-              name: 'Chef de Projet',
-              description: 'Gestion de projets et d\'équipes',
-              level: 'Manager',
-              salary_min: 60000,
-              salary_max: 80000,
-              requirements: 'Expérience en gestion d\'équipe, certification PMP appréciée',
-              is_active: true,
-              employee_count: 2,
-              created_at: '2023-01-01T00:00:00Z',
-              updated_at: '2023-01-01T00:00:00Z'
-            }
-          ]
-        }
-      }
+      return await api.get('/admin/positions')
     } catch (error) {
       console.error('Get positions service error:', error)
       throw error
@@ -647,19 +457,7 @@ export const adminService = {
   
   createPosition: async (positionData: any) => {
     try {
-      return {
-        data: {
-          message: 'Poste créé avec succès',
-          position: {
-            id: 4,
-            ...positionData,
-            is_active: true,
-            employee_count: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }
-        }
-      }
+      return await api.post('/admin/positions', positionData)
     } catch (error) {
       console.error('Create position service error:', error)
       throw error
@@ -668,16 +466,7 @@ export const adminService = {
   
   updatePosition: async (positionId: number, positionData: any) => {
     try {
-      return {
-        data: {
-          message: 'Poste mis à jour avec succès',
-          position: {
-            id: positionId,
-            ...positionData,
-            updated_at: new Date().toISOString()
-          }
-        }
-      }
+      return await api.put(`/admin/positions/${positionId}`, positionData)
     } catch (error) {
       console.error('Update position service error:', error)
       throw error
@@ -686,11 +475,7 @@ export const adminService = {
   
   deletePosition: async (positionId: number) => {
     try {
-      return {
-        data: {
-          message: 'Poste supprimé avec succès'
-        }
-      }
+      return await api.delete(`/admin/positions/${positionId}`)
     } catch (error) {
       console.error('Delete position service error:', error)
       throw error
@@ -701,20 +486,7 @@ export const adminService = {
   getCompanyStats: async () => {
     try {
       console.log('📊 Récupération des statistiques de l\'entreprise...')
-      return {
-        data: {
-          stats: {
-            total_employees: 45,
-            active_employees: 42,
-            departments: 5,
-            services: 12,
-            offices: 3,
-            attendance_rate: 94.5,
-            retention_rate: 97.2,
-            growth_rate: 12.5
-          }
-        }
-      }
+      return await api.get('/admin/stats')
     } catch (error) {
       console.error('Get company stats service error:', error)
       throw error
@@ -723,19 +495,8 @@ export const adminService = {
   
   getRecentEmployees: async (limit: number = 5) => {
     try {
-      console.log('👥 Récupération des employés récents...')
-      return {
-        data: {
-          employees: Array.from({ length: limit }, (_, i) => ({
-            id: i + 1,
-            nom: `Nom${i + 1}`,
-            prenom: `Prenom${i + 1}`,
-            email: `employee${i + 1}@example.com`,
-            role: 'employee',
-            created_at: new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString()
-          }))
-        }
-      }
+      const params = { page: 1, per_page: limit }
+      return await api.get('/admin/employees', { params })
     } catch (error) {
       console.error('Get recent employees service error:', error)
       throw error
@@ -745,19 +506,8 @@ export const adminService = {
   getCompanyAttendance: async (date?: string) => {
     try {
       console.log('🕒 Récupération des pointages de l\'entreprise...')
-      return {
-        data: {
-          attendance: Array.from({ length: 10 }, (_, i) => ({
-            id: i + 1,
-            user_id: i + 1,
-            user_name: `Prenom${i + 1} Nom${i + 1}`,
-            date: date || new Date().toISOString().split('T')[0],
-            time: `0${8 + Math.floor(Math.random() * 2)}:${Math.floor(Math.random() * 60).toString().padStart(2, '0')}`,
-            status: ['present', 'present', 'present', 'present', 'retard'][Math.floor(Math.random() * 5)],
-            type: Math.random() > 0.3 ? 'office' : 'mission'
-          }))
-        }
-      }
+      const params = date ? { date } : undefined
+      return await api.get('/attendance', { params })
     } catch (error) {
       console.error('Get company attendance service error:', error)
       throw error
