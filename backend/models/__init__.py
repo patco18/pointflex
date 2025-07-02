@@ -7,6 +7,9 @@ from .user import User
 from .company import Company
 from .office import Office
 from .pointage import Pointage
+from .department import Department
+from .service import Service
+from .position import Position
 from .system_settings import SystemSettings
 from .audit_log import AuditLog
 from .invoice import Invoice
@@ -17,6 +20,9 @@ __all__ = [
     'Company',
     'Office',
     'Pointage',
+    'Department',
+    'Service',
+    'Position',
     'SystemSettings',
     'AuditLog',
     'Invoice',

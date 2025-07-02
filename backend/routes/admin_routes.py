@@ -9,6 +9,9 @@ from middleware.audit import log_user_action
 from models.user import User
 from models.company import Company
 from models.office import Office
+from models.department import Department
+from models.service import Service
+from models.position import Position
 from database import db
 import json
 
@@ -204,34 +207,374 @@ def delete_employee(employee_id):
 def get_organization_data():
     """Récupère les données organisationnelles (départements, services, etc.)"""
     try:
-        # Pour l'instant, retourner des données simulées
-        # En production, ceci viendrait de vraies tables
-        
+        current_user = get_current_user()
+
+        if current_user.role == 'superadmin':
+            departments = Department.query.all()
+            services = Service.query.all()
+            positions = Position.query.all()
+        else:
+            departments = Department.query.filter_by(company_id=current_user.company_id).all()
+            services = Service.query.filter_by(company_id=current_user.company_id).all()
+            positions = Position.query.filter_by(company_id=current_user.company_id).all()
+
         return jsonify({
-            'departments': [
-                {'id': 1, 'name': 'Ressources Humaines'},
-                {'id': 2, 'name': 'Développement'},
-                {'id': 3, 'name': 'Marketing'}
-            ],
-            'services': [
-                {'id': 1, 'name': 'Recrutement', 'department_id': 1},
-                {'id': 2, 'name': 'Formation', 'department_id': 1},
-                {'id': 3, 'name': 'Frontend', 'department_id': 2},
-                {'id': 4, 'name': 'Backend', 'department_id': 2}
-            ],
-            'positions': [
-                {'id': 1, 'name': 'Développeur Junior', 'level': 'Junior'},
-                {'id': 2, 'name': 'Développeur Senior', 'level': 'Senior'},
-                {'id': 3, 'name': 'Chef de Projet', 'level': 'Manager'}
-            ],
-            'managers': [
-                {'id': 1, 'name': 'Marie Dubois', 'role': 'Manager'},
-                {'id': 2, 'name': 'Jean Martin', 'role': 'Chef de Service'}
-            ]
+            'departments': [d.to_dict() for d in departments],
+            'services': [s.to_dict() for s in services],
+            'positions': [p.to_dict() for p in positions]
         }), 200
         
     except Exception as e:
         print(f"Erreur lors de la récupération des données organisationnelles: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/departments', methods=['GET'])
+@require_admin
+def get_departments():
+    """Liste les départements de l'entreprise."""
+    try:
+        current_user = get_current_user()
+        if current_user.role == 'superadmin':
+            departments = Department.query.all()
+        else:
+            departments = Department.query.filter_by(company_id=current_user.company_id).all()
+        return jsonify({'departments': [d.to_dict() for d in departments]}), 200
+    except Exception as e:
+        print(f"Erreur lors de la récupération des départements: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/departments', methods=['POST'])
+@require_admin
+def create_department():
+    """Crée un département."""
+    try:
+        data = request.get_json()
+        current_user = get_current_user()
+
+        if current_user.role == 'superadmin':
+            company_id = data.get('company_id')
+            if not company_id:
+                return jsonify(message="company_id requis"), 400
+        else:
+            company_id = current_user.company_id
+
+        department = Department(
+            company_id=company_id,
+            name=data.get('name'),
+            description=data.get('description'),
+            manager_name=data.get('manager_name'),
+            is_active=data.get('is_active', True),
+        )
+        db.session.add(department)
+        db.session.flush()
+
+        log_user_action(
+            action='CREATE',
+            resource_type='Department',
+            resource_id=department.id,
+            new_values=department.to_dict(),
+        )
+
+        db.session.commit()
+        return jsonify({'department': department.to_dict(), 'message': 'Département créé'}), 201
+    except Exception as e:
+        print(f"Erreur lors de la création du département: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/departments/<int:department_id>', methods=['PUT'])
+@require_admin
+def update_department(department_id):
+    """Met à jour un département."""
+    try:
+        department = Department.query.get_or_404(department_id)
+        current_user = get_current_user()
+        if current_user.role != 'superadmin' and department.company_id != current_user.company_id:
+            return jsonify(message="Accès non autorisé"), 403
+
+        data = request.get_json()
+        old = department.to_dict()
+        for field in ['name', 'description', 'manager_name', 'is_active']:
+            if field in data:
+                setattr(department, field, data[field])
+
+        log_user_action(
+            action='UPDATE',
+            resource_type='Department',
+            resource_id=department.id,
+            old_values=old,
+            new_values=department.to_dict(),
+        )
+
+        db.session.commit()
+        return jsonify({'department': department.to_dict(), 'message': 'Département mis à jour'}), 200
+    except Exception as e:
+        print(f"Erreur lors de la mise à jour du département: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/departments/<int:department_id>', methods=['DELETE'])
+@require_admin
+def delete_department(department_id):
+    """Supprime un département."""
+    try:
+        department = Department.query.get_or_404(department_id)
+        current_user = get_current_user()
+        if current_user.role != 'superadmin' and department.company_id != current_user.company_id:
+            return jsonify(message="Accès non autorisé"), 403
+
+        old = department.to_dict()
+        log_user_action(
+            action='DELETE',
+            resource_type='Department',
+            resource_id=department.id,
+            old_values=old,
+        )
+        db.session.delete(department)
+        db.session.commit()
+        return jsonify(message='Département supprimé'), 200
+    except Exception as e:
+        print(f"Erreur lors de la suppression du département: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/services', methods=['GET'])
+@require_admin
+def get_services():
+    """Liste les services."""
+    try:
+        current_user = get_current_user()
+        query = Service.query
+        if current_user.role != 'superadmin':
+            query = query.filter_by(company_id=current_user.company_id)
+        department_id = request.args.get('department_id', type=int)
+        if department_id:
+            query = query.filter_by(department_id=department_id)
+        services = query.all()
+        return jsonify({'services': [s.to_dict() for s in services]}), 200
+    except Exception as e:
+        print(f"Erreur lors de la récupération des services: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/services', methods=['POST'])
+@require_admin
+def create_service():
+    """Crée un service."""
+    try:
+        data = request.get_json()
+        current_user = get_current_user()
+
+        if current_user.role == 'superadmin':
+            company_id = data.get('company_id')
+            if not company_id:
+                return jsonify(message="company_id requis"), 400
+        else:
+            company_id = current_user.company_id
+
+        service = Service(
+            company_id=company_id,
+            department_id=data.get('department_id'),
+            name=data.get('name'),
+            description=data.get('description'),
+            manager_name=data.get('manager_name'),
+            is_active=data.get('is_active', True),
+        )
+        db.session.add(service)
+        db.session.flush()
+
+        log_user_action(
+            action='CREATE',
+            resource_type='Service',
+            resource_id=service.id,
+            new_values=service.to_dict(),
+        )
+
+        db.session.commit()
+        return jsonify({'service': service.to_dict(), 'message': 'Service créé'}), 201
+    except Exception as e:
+        print(f"Erreur lors de la création du service: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/services/<int:service_id>', methods=['PUT'])
+@require_admin
+def update_service(service_id):
+    """Met à jour un service."""
+    try:
+        service = Service.query.get_or_404(service_id)
+        current_user = get_current_user()
+        if current_user.role != 'superadmin' and service.company_id != current_user.company_id:
+            return jsonify(message="Accès non autorisé"), 403
+
+        data = request.get_json()
+        old = service.to_dict()
+        for field in ['name', 'description', 'manager_name', 'department_id', 'is_active']:
+            if field in data:
+                setattr(service, field, data[field])
+
+        log_user_action(
+            action='UPDATE',
+            resource_type='Service',
+            resource_id=service.id,
+            old_values=old,
+            new_values=service.to_dict(),
+        )
+
+        db.session.commit()
+        return jsonify({'service': service.to_dict(), 'message': 'Service mis à jour'}), 200
+    except Exception as e:
+        print(f"Erreur lors de la mise à jour du service: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/services/<int:service_id>', methods=['DELETE'])
+@require_admin
+def delete_service(service_id):
+    """Supprime un service."""
+    try:
+        service = Service.query.get_or_404(service_id)
+        current_user = get_current_user()
+        if current_user.role != 'superadmin' and service.company_id != current_user.company_id:
+            return jsonify(message="Accès non autorisé"), 403
+
+        old = service.to_dict()
+        log_user_action(
+            action='DELETE',
+            resource_type='Service',
+            resource_id=service.id,
+            old_values=old,
+        )
+        db.session.delete(service)
+        db.session.commit()
+        return jsonify(message='Service supprimé'), 200
+    except Exception as e:
+        print(f"Erreur lors de la suppression du service: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/positions', methods=['GET'])
+@require_admin
+def get_positions():
+    """Liste les postes."""
+    try:
+        current_user = get_current_user()
+        if current_user.role == 'superadmin':
+            positions = Position.query.all()
+        else:
+            positions = Position.query.filter_by(company_id=current_user.company_id).all()
+        return jsonify({'positions': [p.to_dict() for p in positions]}), 200
+    except Exception as e:
+        print(f"Erreur lors de la récupération des postes: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/positions', methods=['POST'])
+@require_admin
+def create_position():
+    """Crée un poste."""
+    try:
+        data = request.get_json()
+        current_user = get_current_user()
+
+        if current_user.role == 'superadmin':
+            company_id = data.get('company_id')
+            if not company_id:
+                return jsonify(message="company_id requis"), 400
+        else:
+            company_id = current_user.company_id
+
+        position = Position(
+            company_id=company_id,
+            name=data.get('name'),
+            description=data.get('description'),
+            level=data.get('level'),
+            salary_min=data.get('salary_min'),
+            salary_max=data.get('salary_max'),
+            requirements=data.get('requirements'),
+            is_active=data.get('is_active', True),
+        )
+        db.session.add(position)
+        db.session.flush()
+
+        log_user_action(
+            action='CREATE',
+            resource_type='Position',
+            resource_id=position.id,
+            new_values=position.to_dict(),
+        )
+
+        db.session.commit()
+        return jsonify({'position': position.to_dict(), 'message': 'Poste créé'}), 201
+    except Exception as e:
+        print(f"Erreur lors de la création du poste: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/positions/<int:position_id>', methods=['PUT'])
+@require_admin
+def update_position(position_id):
+    """Met à jour un poste."""
+    try:
+        position = Position.query.get_or_404(position_id)
+        current_user = get_current_user()
+        if current_user.role != 'superadmin' and position.company_id != current_user.company_id:
+            return jsonify(message="Accès non autorisé"), 403
+
+        data = request.get_json()
+        old = position.to_dict()
+        for field in ['name', 'description', 'level', 'salary_min', 'salary_max', 'requirements', 'is_active']:
+            if field in data:
+                setattr(position, field, data[field])
+
+        log_user_action(
+            action='UPDATE',
+            resource_type='Position',
+            resource_id=position.id,
+            old_values=old,
+            new_values=position.to_dict(),
+        )
+
+        db.session.commit()
+        return jsonify({'position': position.to_dict(), 'message': 'Poste mis à jour'}), 200
+    except Exception as e:
+        print(f"Erreur lors de la mise à jour du poste: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/positions/<int:position_id>', methods=['DELETE'])
+@require_admin
+def delete_position(position_id):
+    """Supprime un poste."""
+    try:
+        position = Position.query.get_or_404(position_id)
+        current_user = get_current_user()
+        if current_user.role != 'superadmin' and position.company_id != current_user.company_id:
+            return jsonify(message="Accès non autorisé"), 403
+
+        old = position.to_dict()
+        log_user_action(
+            action='DELETE',
+            resource_type='Position',
+            resource_id=position.id,
+            old_values=old,
+        )
+        db.session.delete(position)
+        db.session.commit()
+        return jsonify(message='Poste supprimé'), 200
+    except Exception as e:
+        print(f"Erreur lors de la suppression du poste: {e}")
+        db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 
 @admin_bp.route('/offices', methods=['GET'])
