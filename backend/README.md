@@ -31,8 +31,12 @@ python app.py
 ### Pointage
 - `POST /api/attendance/checkin/office` - Pointage bureau
 - `POST /api/attendance/checkin/mission` - Pointage mission
+- `POST /api/attendance/checkout` - Enregistrer l'heure de départ
 - `GET /api/attendance` - Historique des pointages
 - `GET /api/attendance/stats` - Statistiques
+
+### Notifications
+- `GET /api/notifications` - Liste des notifications de l'utilisateur
 
 ## Comptes de test
 

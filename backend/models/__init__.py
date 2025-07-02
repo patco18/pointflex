@@ -14,6 +14,7 @@ from .system_settings import SystemSettings
 from .audit_log import AuditLog
 from .invoice import Invoice
 from .payment import Payment
+from .notification import Notification
 
 __all__ = [
     'User',
@@ -26,5 +27,6 @@ __all__ = [
     'SystemSettings',
     'AuditLog',
     'Invoice',
-    'Payment'
+    'Payment',
+    'Notification'
 ]
