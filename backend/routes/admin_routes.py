@@ -2,7 +2,7 @@
 Routes Admin - Gestion des entreprises
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required
 from middleware.auth import require_admin, get_current_user
 from middleware.audit import log_user_action
@@ -12,6 +12,11 @@ from models.office import Office
 from models.department import Department
 from models.service import Service
 from models.position import Position
+from models.pointage import Pointage
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+from datetime import datetime
 from database import db
 import json
 
@@ -51,6 +56,7 @@ def get_employees():
     except Exception as e:
         print(f"Erreur lors de la récupération des employés: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
+
 
 @admin_bp.route('/employees', methods=['POST'])
 @require_admin
@@ -837,4 +843,65 @@ def get_company_stats():
         
     except Exception as e:
         print(f"Erreur lors de la récupération des statistiques: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/attendance-report/pdf', methods=['GET'])
+@require_admin
+def attendance_report_pdf():
+    """Génère un résumé PDF des pointages de l'entreprise"""
+    try:
+        current_user = get_current_user()
+
+        if not current_user.company_id:
+            return jsonify(message="Aucune entreprise associée"), 400
+
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+
+        query = Pointage.query.join(User).filter(User.company_id == current_user.company_id)
+
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage >= start_date)
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage <= end_date)
+
+        pointages = query.all()
+
+        summary = {}
+        for p in pointages:
+            user_name = f"{p.user.prenom} {p.user.nom}" if p.user else str(p.user_id)
+            summary[user_name] = summary.get(user_name, 0) + 1
+
+        buffer = BytesIO()
+        pdf = canvas.Canvas(buffer, pagesize=A4)
+        pdf.setFont("Helvetica", 12)
+        pdf.drawString(50, 800, "Résumé de présence")
+
+        y = 760
+        pdf.drawString(50, y, "Employé")
+        pdf.drawString(300, y, "Pointages")
+        y -= 20
+
+        for name, count in summary.items():
+            pdf.drawString(50, y, name)
+            pdf.drawString(300, y, str(count))
+            y -= 20
+            if y < 50:
+                pdf.showPage()
+                pdf.setFont("Helvetica", 12)
+                y = 800
+
+        pdf.showPage()
+        pdf.save()
+        buffer.seek(0)
+
+        return send_file(buffer, mimetype='application/pdf',
+                         as_attachment=True,
+                         download_name='attendance_report.pdf')
+
+    except Exception as e:
+        print(f"Erreur génération PDF: {e}")
         return jsonify(message="Erreur interne du serveur"), 500

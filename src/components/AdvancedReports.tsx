@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import toast from 'react-hot-toast'
 import { 
   BarChart3, 
   Download, 
@@ -8,9 +9,26 @@ import {
   FileText
 } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import { adminService } from '../services/api'
 
 export default function AdvancedReports() {
   const { isAdmin } = useAuth()
+
+  const downloadPdf = async () => {
+    try {
+      const response = await adminService.downloadAttendancePdf()
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'attendance_report.pdf'
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success('Rapport téléchargé')
+    } catch (error) {
+      toast.error('Erreur lors du téléchargement du PDF')
+    }
+  }
 
   if (!isAdmin) {
     return (
@@ -34,7 +52,7 @@ export default function AdvancedReports() {
           <p className="text-gray-600">Analyses détaillées des données de pointage</p>
         </div>
         <div className="flex space-x-2">
-          <button className="btn-secondary">
+          <button className="btn-secondary" onClick={downloadPdf}>
             <FileText className="h-4 w-4 mr-2" />
             PDF
           </button>
