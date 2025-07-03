@@ -284,8 +284,8 @@ export default function Login() {
                 </div>
               </div>
               
-              {/* Employé */}
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                {/* Employé */}
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 hover:shadow-md transition-shadow">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-3">
                     <div className="p-2 bg-blue-500 rounded-lg">
@@ -306,8 +306,113 @@ export default function Login() {
                     Utiliser
                   </button>
                 </div>
-                <div className="mt-2 text-xs font-mono text-blue-800 bg-blue-100 p-2 rounded">
-                  employee@pointflex.com / employee123
+
+                {/* Chef de Service */}
+                <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-indigo-500 rounded-lg">
+                        <Shield className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-indigo-900">Chef de Service</p>
+                        <p className="text-xs text-indigo-700">Gestion d'équipe</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'chefservice@pointflex.com'
+                        document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'chefservice123'
+                      }}
+                      className="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded-lg transition-colors"
+                    >
+                      Utiliser
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs font-mono text-indigo-800 bg-indigo-100 p-2 rounded">
+                    chefservice@pointflex.com / chefservice123
+                  </div>
+                </div>
+
+                {/* Chef de Projet */}
+                <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-green-500 rounded-lg">
+                        <Shield className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-green-900">Chef de Projet</p>
+                        <p className="text-xs text-green-700">Suivi des missions</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'chefprojet@pointflex.com'
+                        document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'chefprojet123'
+                      }}
+                      className="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg transition-colors"
+                    >
+                      Utiliser
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs font-mono text-green-800 bg-green-100 p-2 rounded">
+                    chefprojet@pointflex.com / chefprojet123
+                  </div>
+                </div>
+
+                {/* Manager */}
+                <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-yellow-500 rounded-lg">
+                        <Shield className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-yellow-900">Manager</p>
+                        <p className="text-xs text-yellow-700">Supervision d'équipe</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'manager@pointflex.com'
+                        document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'manager123'
+                      }}
+                      className="text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-lg transition-colors"
+                    >
+                      Utiliser
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs font-mono text-yellow-800 bg-yellow-100 p-2 rounded">
+                    manager@pointflex.com / manager123
+                  </div>
+                </div>
+
+                {/* Auditeur */}
+                <div className="bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 rounded-xl p-4 hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-orange-500 rounded-lg">
+                        <Shield className="h-4 w-4 text-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-orange-900">Auditeur</p>
+                        <p className="text-xs text-orange-700">Lecture seule</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'auditeur@pointflex.com'
+                        document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'auditeur123'
+                      }}
+                      className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-lg transition-colors"
+                    >
+                      Utiliser
+                    </button>
+                  </div>
+                  <div className="mt-2 text-xs font-mono text-orange-800 bg-orange-100 p-2 rounded">
+                    auditeur@pointflex.com / auditeur123
+                  </div>
                 </div>
               </div>
             </div>

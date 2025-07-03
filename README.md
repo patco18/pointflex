@@ -118,6 +118,26 @@ npm run lint  # analyse le code avec ESLint
 - **Mot de passe** : employee123
 - **Accès** : Pointage, Dashboard personnel
 
+### Chef de Service
+- **Email** : chefservice@pointflex.com
+- **Mot de passe** : chefservice123
+- **Accès** : Gestion d'équipe, Validation des présences
+
+### Chef de Projet
+- **Email** : chefprojet@pointflex.com
+- **Mot de passe** : chefprojet123
+- **Accès** : Création et suivi des missions
+
+### Manager
+- **Email** : manager@pointflex.com
+- **Mot de passe** : manager123
+- **Accès** : Supervision d'équipe, Rapports
+
+### Auditeur
+- **Email** : auditeur@pointflex.com
+- **Mot de passe** : auditeur123
+- **Accès** : Lecture seule et rapports d'audit
+
 ## 🏗️ Architecture
 
 ### Base de Données

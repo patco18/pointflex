@@ -4,6 +4,10 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import ChefServiceDashboard from './pages/ChefServiceDashboard'
+import ChefProjetDashboard from './pages/ChefProjetDashboard'
+import ManagerDashboard from './pages/ManagerDashboard'
+import AuditeurDashboard from './pages/AuditeurDashboard'
 import CheckIn from './pages/CheckIn'
 import Checkout from './pages/Checkout'
 import Profile from './pages/Profile'
@@ -103,6 +107,36 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <OrganizationManagement />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Dashboards par rôle */}
+          <Route path="/chef-service" element={
+            <ProtectedRoute requiredRole="chef_service">
+              <Layout>
+                <ChefServiceDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/chef-projet" element={
+            <ProtectedRoute requiredRole="chef_projet">
+              <Layout>
+                <ChefProjetDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/manager" element={
+            <ProtectedRoute requiredRole="manager">
+              <Layout>
+                <ManagerDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/auditeur" element={
+            <ProtectedRoute requiredRole="auditeur">
+              <Layout>
+                <AuditeurDashboard />
               </Layout>
             </ProtectedRoute>
           } />
