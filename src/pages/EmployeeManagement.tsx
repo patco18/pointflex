@@ -621,9 +621,13 @@ export default function EmployeeManagement() {
               className="input-field"
             >
               <option value="all">Tous les rôles</option>
-              <option value="admin">Administrateur</option>
+              <option value="superadmin">SuperAdmin</option>
+              <option value="admin_rh">Administrateur</option>
+              <option value="chef_service">Chef de Service</option>
+              <option value="chef_projet">Chef de Projet</option>
               <option value="manager">Manager</option>
               <option value="employee">Employé</option>
+              <option value="auditeur">Auditeur</option>
             </select>
           </div>
           
@@ -728,11 +732,19 @@ export default function EmployeeManagement() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      employee.role === 'admin' 
+                      employee.role === 'superadmin'
+                        ? 'bg-red-100 text-red-800'
+                        : employee.role === 'admin_rh'
                         ? 'bg-purple-100 text-purple-800'
+                        : employee.role === 'chef_service'
+                        ? 'bg-indigo-100 text-indigo-800'
+                        : employee.role === 'chef_projet'
+                        ? 'bg-green-100 text-green-800'
                         : employee.role === 'manager'
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-green-100 text-green-800'
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : employee.role === 'auditeur'
+                        ? 'bg-orange-100 text-orange-800'
+                        : 'bg-gray-100 text-gray-800'
                     }`}>
                       <Shield className="h-3 w-3 mr-1" />
                       {employee.role}
@@ -1008,9 +1020,13 @@ export default function EmployeeManagement() {
                         onChange={(e) => handleInputChange('role', e.target.value)}
                         className="input-field"
                       >
-                        <option value="employee">Employé</option>
+                        <option value="superadmin">SuperAdmin</option>
+                        <option value="admin_rh">Administrateur</option>
+                        <option value="chef_service">Chef de Service</option>
+                        <option value="chef_projet">Chef de Projet</option>
                         <option value="manager">Manager</option>
-                        <option value="admin">Administrateur</option>
+                        <option value="employee">Employé</option>
+                        <option value="auditeur">Auditeur</option>
                       </select>
                     </div>
 
