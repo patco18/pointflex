@@ -18,6 +18,7 @@ from routes.profile_routes import profile_bp
 from routes.attendance_routes import attendance_bp
 from routes.superadmin_routes import superadmin_bp
 from routes.notification_routes import notification_bp
+from routes.mission_routes import mission_bp
 
 # Import middleware
 from middleware.auth import init_auth_middleware
@@ -56,6 +57,7 @@ def create_app():
     app.register_blueprint(attendance_bp, url_prefix='/api/attendance')
     app.register_blueprint(superadmin_bp, url_prefix='/api/superadmin')
     app.register_blueprint(notification_bp, url_prefix='/api/notifications')
+    app.register_blueprint(mission_bp, url_prefix='/api/missions')
     
     # Create database tables
     with app.app_context():

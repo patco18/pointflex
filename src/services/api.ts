@@ -342,6 +342,34 @@ export const superAdminService = {
   }
 }
 
+// Services Missions
+export const missionService = {
+  getMissions: async () => {
+    try {
+      return await api.get('/missions')
+    } catch (error) {
+      console.error('Get missions error:', error)
+      throw error
+    }
+  },
+  createMission: async (missionData: any) => {
+    try {
+      return await api.post('/missions', missionData)
+    } catch (error) {
+      console.error('Create mission error:', error)
+      throw error
+    }
+  },
+  updateMission: async (missionId: number, missionData: any) => {
+    try {
+      return await api.put(`/missions/${missionId}`, missionData)
+    } catch (error) {
+      console.error('Update mission error:', error)
+      throw error
+    }
+  }
+}
+
 // Services Admin
 export const adminService = {
   getEmployees: async () => {

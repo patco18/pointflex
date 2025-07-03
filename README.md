@@ -166,6 +166,8 @@ Company (Entreprises)
 #### Pointage
 - `POST /api/attendance/checkin/office` - Pointage bureau
 - `POST /api/attendance/checkin/mission` - Pointage mission
+- `GET /api/missions` - Liste des missions
+- `POST /api/missions` - Créer mission
 - `GET /api/attendance` - Historique pointages
 - `GET /api/attendance/stats` - Statistiques personnelles
 

@@ -15,6 +15,7 @@ from .audit_log import AuditLog
 from .invoice import Invoice
 from .payment import Payment
 from .notification import Notification
+from .mission import Mission
 
 __all__ = [
     'User',
@@ -28,5 +29,6 @@ __all__ = [
     'AuditLog',
     'Invoice',
     'Payment',
-    'Notification'
+    'Notification',
+    'Mission'
 ]

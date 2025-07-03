@@ -17,6 +17,7 @@ def init_db():
         from models.system_settings import SystemSettings
         from models.audit_log import AuditLog
         from models.office import Office
+        from models.mission import Mission
         from models.invoice import Invoice
         from models.payment import Payment
         from models.notification import Notification
@@ -129,10 +130,32 @@ def init_db():
                 'is_main': True
             }
         ]
-        
+
         for office_data in offices_data:
             office = Office(**office_data)
             db.session.add(office)
+
+        # Créer des missions de test
+        missions_data = [
+            {
+                'company_id': companies[0].id,
+                'order_number': 'M2024-001',
+                'title': 'Installation client Paris',
+                'description': 'Déploiement du nouveau système',
+                'status': 'planned'
+            },
+            {
+                'company_id': companies[0].id,
+                'order_number': 'M2024-002',
+                'title': 'Audit sécurité',
+                'description': 'Audit annuel des infrastructures',
+                'status': 'planned'
+            }
+        ]
+
+        for mission_data in missions_data:
+            mission = Mission(**mission_data)
+            db.session.add(mission)
         
         # Créer les utilisateurs de test
         users_data = [
@@ -234,6 +257,7 @@ def init_db():
         print("✅ Base de données initialisée avec succès!")
         print(f"   - {len(companies)} entreprises créées")
         print(f"   - {len(offices_data)} bureaux créés")
+        print(f"   - {len(missions_data)} missions créées")
         print(f"   - {len(users_data)} utilisateurs créés")
         print(f"   - {len(default_settings)} paramètres système créés")
         
