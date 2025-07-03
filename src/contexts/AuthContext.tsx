@@ -11,6 +11,8 @@ interface User {
   role: UserRole
   company_id?: number | undefined
   company_name?: string | undefined
+  company_logo_url?: string | undefined
+  company_theme_color?: string | undefined
 }
 
 interface AuthContextType {

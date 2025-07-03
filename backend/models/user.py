@@ -112,6 +112,8 @@ class User(db.Model):
             'role': self.role,
             'company_id': self.company_id,
             'company_name': self.company.name if self.company else None,
+            'company_logo_url': self.company.logo_url if self.company else None,
+            'company_theme_color': self.company.theme_color if self.company else None,
             'employee_number': self.employee_number,
             'phone': self.phone,
             'is_active': self.is_active,

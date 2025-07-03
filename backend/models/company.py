@@ -35,6 +35,10 @@ class Company(db.Model):
     office_radius = db.Column(db.Integer, default=100)  # mètres
     work_start_time = db.Column(db.Time, default=datetime.strptime('09:00', '%H:%M').time())
     late_threshold = db.Column(db.Integer, default=15)  # minutes
+
+    # Personnalisation d'entreprise
+    logo_url = db.Column(db.String(255), nullable=True)
+    theme_color = db.Column(db.String(20), default='#3b82f6')  # bleu par défaut
     
     # Statut et métadonnées
     is_active = db.Column(db.Boolean, default=True, nullable=False)
@@ -136,6 +140,8 @@ class Company(db.Model):
             'industry': self.industry,
             'website': self.website,
             'tax_id': self.tax_id,
+            'logo_url': self.logo_url,
+            'theme_color': self.theme_color,
             'subscription_plan': self.subscription_plan,
             'subscription_status': self.subscription_status,
             'max_employees': self.max_employees,

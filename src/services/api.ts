@@ -573,6 +573,15 @@ export const adminService = {
       throw error
     }
   },
+
+  getCompanySettings: async () => {
+    try {
+      return await api.get('/admin/company/settings')
+    } catch (error) {
+      console.error('Get company settings service error:', error)
+      throw error
+    }
+  },
   
   // Service pour mettre à jour les paramètres de l'entreprise
   updateCompanySettings: async (settings: any) => {

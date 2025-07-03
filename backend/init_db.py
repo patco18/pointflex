@@ -75,6 +75,8 @@ def init_database():
             email='contact@demo.pointflex.com',
             phone='+33123456789',
             address='123 Rue de la Démo, 75001 Paris',
+            logo_url=None,
+            theme_color='#3b82f6',
             subscription_plan='premium',
             is_active=True,
             office_latitude=48.8566,  # Paris
