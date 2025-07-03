@@ -9,6 +9,7 @@ from middleware.audit import log_user_action
 from utils.notification_utils import send_notification
 from models.pointage import Pointage
 from models.user import User
+from models.mission import Mission
 from models.office import Office
 from database import db
 from datetime import datetime, date, timedelta
@@ -148,9 +149,15 @@ def mission_checkin():
         data = request.get_json()
         mission_order_number = data.get('mission_order_number')
         coordinates = data.get('coordinates', {})
-        
+
         if not mission_order_number:
             return jsonify(message="Numéro d'ordre de mission requis"), 400
+
+        mission = Mission.query.filter_by(order_number=mission_order_number).first()
+        if not mission:
+            return jsonify(message="Numéro d'ordre de mission invalide"), 404
+        if current_user.role != 'superadmin' and mission.company_id != current_user.company_id:
+            return jsonify(message="Mission non autorisée pour votre entreprise"), 403
         
         # Vérifier si l'utilisateur a déjà pointé aujourd'hui
         today = date.today()

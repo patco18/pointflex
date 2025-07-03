@@ -24,6 +24,7 @@ import OrganizationManagement from './pages/OrganizationManagement'
 import AdvancedFeatures from './pages/AdvancedFeatures'
 import RoleManagementPage from './pages/RoleManagementPage'
 import BillingManagement from './pages/BillingManagement'
+import Missions from './pages/Missions'
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
@@ -160,6 +161,13 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <GeofencingPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/missions" element={
+            <ProtectedRoute>
+              <Layout>
+                <Missions />
               </Layout>
             </ProtectedRoute>
           } />
