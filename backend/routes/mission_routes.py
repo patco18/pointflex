@@ -4,6 +4,8 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from middleware.auth import get_current_user, require_admin
 from models.mission import Mission
+from models.mission_user import MissionUser
+from models.user import User
 from database import db
 
 mission_bp = Blueprint('missions', __name__)
@@ -46,6 +48,15 @@ def create_mission():
             status=data.get('status', 'planned'),
         )
         db.session.add(mission)
+        db.session.flush()
+
+        # assign users if provided
+        user_ids = data.get('user_ids', [])
+        for uid in user_ids:
+            user = User.query.get(uid)
+            if user and (current_user.role == 'superadmin' or user.company_id == current_user.company_id):
+                db.session.add(MissionUser(mission_id=mission.id, user_id=uid))
+
         db.session.commit()
         return jsonify({'mission': mission.to_dict(), 'message': 'Mission créée'}), 201
     except Exception as e:
@@ -65,6 +76,14 @@ def update_mission(mission_id):
         for field in ['title', 'description', 'start_date', 'end_date', 'status']:
             if field in data:
                 setattr(mission, field, data[field])
+
+        if 'user_ids' in data:
+            MissionUser.query.filter_by(mission_id=mission.id).delete()
+            for uid in data.get('user_ids', []):
+                user = User.query.get(uid)
+                if user and (current_user.role == 'superadmin' or user.company_id == current_user.company_id):
+                    db.session.add(MissionUser(mission_id=mission.id, user_id=uid))
+
         db.session.commit()
         return jsonify({'mission': mission.to_dict(), 'message': 'Mission mise à jour'}), 200
     except Exception as e:
