@@ -12,6 +12,8 @@ interface AttendanceRecord {
   heure_depart?: string
   statut: string
   mission_order_number?: string
+  latitude?: number
+  longitude?: number
 }
 
 export default function AttendanceHistory() {
@@ -271,6 +273,9 @@ export default function AttendanceHistory() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Mission
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Coordonnées
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -306,6 +311,20 @@ export default function AttendanceHistory() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {record.mission_order_number || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600">
+                      {record.latitude && record.longitude ? (
+                        <a
+                          href={`https://maps.google.com/?q=${record.latitude},${record.longitude}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="underline"
+                        >
+                          {record.latitude.toFixed(4)}, {record.longitude.toFixed(4)}
+                        </a>
+                      ) : (
+                        '-'
+                      )}
                     </td>
                   </tr>
                 ))}

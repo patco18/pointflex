@@ -16,6 +16,7 @@ from .invoice import Invoice
 from .payment import Payment
 from .notification import Notification
 from .mission import Mission
+from .mission_user import MissionUser
 
 __all__ = [
     'User',
@@ -30,5 +31,6 @@ __all__ = [
     'Invoice',
     'Payment',
     'Notification',
-    'Mission'
+    'Mission',
+    'MissionUser'
 ]

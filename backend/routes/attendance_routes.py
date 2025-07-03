@@ -158,6 +158,14 @@ def mission_checkin():
             return jsonify(message="Numéro d'ordre de mission invalide"), 404
         if current_user.role != 'superadmin' and mission.company_id != current_user.company_id:
             return jsonify(message="Mission non autorisée pour votre entreprise"), 403
+
+        # verify assignment
+        assigned = any(mu.user_id == current_user.id for mu in mission.users)
+        if not assigned:
+            return jsonify(message="Vous n'êtes pas affecté à cette mission"), 403
+
+        if not coordinates.get('latitude') or not coordinates.get('longitude'):
+            return jsonify(message="Coordonnées GPS requises"), 400
         
         # Vérifier si l'utilisateur a déjà pointé aujourd'hui
         today = date.today()
@@ -174,13 +182,10 @@ def mission_checkin():
         pointage = Pointage(
             user_id=current_user.id,
             type='mission',
-            mission_order_number=mission_order_number
+            mission_order_number=mission_order_number,
+            latitude=coordinates['latitude'],
+            longitude=coordinates['longitude']
         )
-        
-        # Ajouter les coordonnées si disponibles
-        if coordinates.get('latitude') and coordinates.get('longitude'):
-            pointage.latitude = coordinates['latitude']
-            pointage.longitude = coordinates['longitude']
         
         db.session.add(pointage)
         db.session.flush()
@@ -193,7 +198,7 @@ def mission_checkin():
             details={
                 'mission_order_number': mission_order_number,
                 'status': pointage.statut,
-                'coordinates': coordinates if coordinates.get('latitude') else None
+                'coordinates': coordinates
             }
         )
         

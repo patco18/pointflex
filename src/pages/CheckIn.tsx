@@ -53,17 +53,29 @@ export default function CheckIn() {
 
   const handleMissionCheckIn = async () => {
     if (!missionOrderNumber.trim()) {
-      toast.error('Veuillez saisir le numéro d\'ordre de mission')
+      toast.error("Veuillez saisir le numéro d'ordre de mission")
       return
     }
 
     setLoading(true)
     try {
-      await attendanceService.checkInMission(missionOrderNumber.trim())
+      const position = await getCurrentLocation()
+      const coordinates = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude
+      }
+
+      await attendanceService.checkInMission(missionOrderNumber.trim(), coordinates)
       toast.success('Pointage mission enregistré avec succès!')
       setMissionOrderNumber('')
-    } catch (error) {
-      toast.error('Erreur lors du pointage mission')
+    } catch (error: any) {
+      if (error.message.includes('Géolocalisation')) {
+        toast.error("Veuillez autoriser l'accès à votre position")
+      } else if (error.response?.data?.message) {
+        toast.error(error.response.data.message)
+      } else {
+        toast.error('Erreur lors du pointage mission')
+      }
     } finally {
       setLoading(false)
     }

@@ -1,6 +1,7 @@
 """Mission model for managing mission orders"""
 
 from database import db
+from .mission_user import MissionUser
 from datetime import datetime
 
 class Mission(db.Model):
@@ -20,6 +21,7 @@ class Mission(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     company = db.relationship('Company', backref='missions', lazy=True)
+    users = db.relationship('MissionUser', backref='mission', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
         return {
@@ -33,6 +35,7 @@ class Mission(db.Model):
             'status': self.status,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
+            'users': [mu.user.to_dict() for mu in self.users]
         }
 
     def __repr__(self):
