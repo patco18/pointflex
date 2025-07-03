@@ -84,6 +84,8 @@ interface Company {
   is_active: boolean
   is_suspended: boolean
   suspension_reason?: string
+  logo_url?: string
+  theme_color?: string
   created_at: string
   updated_at: string
   admin_id?: number
@@ -115,6 +117,8 @@ interface CompanyForm {
   admin_nom: string
   admin_phone: string
   admin_password: string
+  logo_url?: string
+  theme_color?: string
 }
 
 export default function CompanyManagement() {

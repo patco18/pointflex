@@ -39,6 +39,7 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
+  const themeColor = user?.company_theme_color || '#2563eb'
 
   const handleLogout = () => {
     logout()
@@ -173,25 +174,32 @@ export default function Layout({ children }: LayoutProps) {
         <div className="fixed inset-y-0 left-0 flex w-64 flex-col bg-white shadow-xl">
           <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200">
             <div className="flex items-center space-x-3">
-              {/* Logo PointFlex dans la sidebar */}
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <svg 
-                  width="16" 
-                  height="16" 
-                  viewBox="0 0 16 16" 
-                  fill="none" 
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="text-white"
+              {/* Logo dynamique */}
+              {user?.company_logo_url ? (
+                <img src={user.company_logo_url} alt="Logo" className="w-8 h-8 rounded-lg object-contain" />
+              ) : (
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: themeColor }}
                 >
-                  <path 
-                    d="M3 8 L6.5 11.5 L13 5" 
-                    stroke="currentColor" 
-                    strokeWidth="1.5" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="text-white"
+                  >
+                    <path
+                      d="M3 8 L6.5 11.5 L13 5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              )}
               <div>
                 <h1 className="text-lg font-bold">
                   <span className="text-blue-600">Point</span>
@@ -265,25 +273,32 @@ export default function Layout({ children }: LayoutProps) {
         <div className="flex flex-col flex-grow bg-white border-r border-gray-200 shadow-sm">
           <div className="flex h-16 items-center px-4 border-b border-gray-200">
             <div className="flex items-center space-x-3">
-              {/* Logo PointFlex */}
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
-                <svg 
-                  width="16" 
-                  height="16" 
-                  viewBox="0 0 16 16" 
-                  fill="none" 
-                  xmlns="http://www.w3.org/2000/svg"
-                  className="text-white"
+              {/* Logo dynamique */}
+              {user?.company_logo_url ? (
+                <img src={user.company_logo_url} alt="Logo" className="w-8 h-8 rounded-lg object-contain" />
+              ) : (
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: themeColor }}
                 >
-                  <path 
-                    d="M3 8 L6.5 11.5 L13 5" 
-                    stroke="currentColor" 
-                    strokeWidth="1.5" 
-                    strokeLinecap="round" 
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </div>
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 16 16"
+                    fill="none"
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="text-white"
+                  >
+                    <path
+                      d="M3 8 L6.5 11.5 L13 5"
+                      stroke="currentColor"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </div>
+              )}
               <div>
                 <h1 className="text-lg font-bold">
                   <span className="text-blue-600">Point</span>

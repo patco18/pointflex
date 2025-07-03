@@ -11,7 +11,9 @@ export default function CompanySettings() {
     office_longitude: 2.3522,
     office_radius: 100,
     work_start_time: '09:00',
-    late_threshold: 15
+    late_threshold: 15,
+    logo_url: '',
+    theme_color: '#3b82f6'
   })
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -27,18 +29,9 @@ export default function CompanySettings() {
   const loadCompanySettings = async () => {
     try {
       setDataLoading(true)
-      // Simuler le chargement des paramètres depuis l'API
-      // En production, remplacer par un appel API réel
-      setTimeout(() => {
-        setSettings({
-          office_latitude: 48.8566,
-          office_longitude: 2.3522,
-          office_radius: 100,
-          work_start_time: '09:00',
-          late_threshold: 15
-        })
-        setDataLoading(false)
-      }, 1000)
+      const resp = await adminService.getCompanySettings()
+      setSettings(resp.data.company)
+      setDataLoading(false)
     } catch (error) {
       console.error('Erreur lors du chargement des paramètres:', error)
       toast.error('Erreur lors du chargement des paramètres')
@@ -193,6 +186,38 @@ export default function CompanySettings() {
                   office_radius: parseInt(e.target.value)
                 }))}
                 className="input-field"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="flex items-center mb-4">
+            <MapPin className="h-5 w-5 text-purple-600 mr-2" />
+            <h3 className="text-lg font-semibold text-gray-900">Identité visuelle</h3>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Logo (URL)
+              </label>
+              <input
+                type="text"
+                value={settings.logo_url}
+                onChange={(e) => setSettings(prev => ({ ...prev, logo_url: e.target.value }))}
+                className="input-field"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Couleur principale
+              </label>
+              <input
+                type="color"
+                value={settings.theme_color}
+                onChange={(e) => setSettings(prev => ({ ...prev, theme_color: e.target.value }))}
+                className="input-field h-10 p-1"
               />
             </div>
           </div>

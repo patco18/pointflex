@@ -760,6 +760,20 @@ def delete_office(office_id):
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 
+@admin_bp.route('/company/settings', methods=['GET'])
+@require_admin
+def get_company_settings():
+    """Récupère les paramètres de l'entreprise"""
+    current_user = get_current_user()
+
+    if not current_user.company_id:
+        return jsonify(message="Aucune entreprise associée à cet utilisateur"), 400
+
+    company = Company.query.get_or_404(current_user.company_id)
+
+    return jsonify({'company': company.to_dict(include_sensitive=True)}), 200
+
+
 @admin_bp.route('/company/settings', methods=['PUT'])
 @require_admin
 def update_company_settings():
@@ -780,7 +794,7 @@ def update_company_settings():
         # Mettre à jour les champs
         updatable_fields = [
             'office_latitude', 'office_longitude', 'office_radius',
-            'work_start_time', 'late_threshold'
+            'work_start_time', 'late_threshold', 'logo_url', 'theme_color'
         ]
         
         for field in updatable_fields:
