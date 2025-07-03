@@ -9,6 +9,11 @@ export default defineConfig({
         target: 'http://localhost:5000',
         changeOrigin: true,
       },
+      '/stream': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+      },
     },
   },
 })
+
