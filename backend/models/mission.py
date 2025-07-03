@@ -21,7 +21,7 @@ class Mission(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     company = db.relationship('Company', backref='missions', lazy=True)
-    users = db.relationship('MissionUser', backref='mission', lazy=True, cascade='all, delete-orphan')
+    users = db.relationship('MissionUser', back_populates='mission', lazy=True, cascade='all, delete-orphan')
 
     def to_dict(self):
         return {

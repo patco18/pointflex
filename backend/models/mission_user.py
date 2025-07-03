@@ -10,7 +10,7 @@ class MissionUser(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
     user = db.relationship('User', backref='mission_links', lazy=True)
-    mission = db.relationship('Mission', backref='user_links', lazy=True)
+    mission = db.relationship('Mission', back_populates='users', lazy=True)
 
     def to_dict(self):
         return {
