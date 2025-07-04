@@ -4,7 +4,7 @@ Routes Admin - Gestion des entreprises
 
 from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required
-from middleware.auth import require_admin, get_current_user
+from middleware.auth import require_admin, require_manager_or_above, get_current_user
 from middleware.audit import log_user_action
 from models.user import User
 from models.company import Company
@@ -23,7 +23,7 @@ import json
 admin_bp = Blueprint('admin', __name__)
 
 @admin_bp.route('/employees', methods=['GET'])
-@require_admin
+@require_manager_or_above
 def get_employees():
     """Récupère les employés de l'entreprise"""
     try:
