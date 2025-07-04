@@ -23,7 +23,7 @@ import json
 admin_bp = Blueprint('admin', __name__)
 
 @admin_bp.route('/employees', methods=['GET'])
-@require_admin
+@require_manager_or_above
 def get_employees():
     """Récupère les employés de l'entreprise"""
     try:
