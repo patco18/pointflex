@@ -13,9 +13,11 @@ import {
   EyeOff,
   Lock,
   Building,
-  Briefcase
+  Briefcase,
+  Bell // For notifications
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { requestNotificationPermission, initializeFirebaseApp } from '../firebaseInit' // Added
 
 export default function EmployeeProfile() {
   const { user } = useAuth()
@@ -39,6 +41,59 @@ export default function EmployeeProfile() {
     new_password: '',
     confirm_password: ''
   })
+
+  // State for push notification permission
+  const [notificationPermission, setNotificationPermission] = useState(Notification.permission);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+
+  // Initialize Firebase early to check notification status
+  useEffect(() => {
+    initializeFirebaseApp();
+    // Update permission state if it changes in browser settings
+    const interval = setInterval(() => {
+      if (Notification.permission !== notificationPermission) {
+        setNotificationPermission(Notification.permission);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [notificationPermission]);
+
+
+  const handleEnablePushNotifications = async () => {
+    setIsSubscribing(true);
+    const token = await requestNotificationPermission();
+    if (token) {
+      toast.success('Notifications push activées !');
+      setNotificationPermission('granted');
+    } else if (Notification.permission === 'denied') {
+      toast.error('Permission de notification refusée. Veuillez l\'activer dans les paramètres de votre navigateur.');
+      setNotificationPermission('denied');
+    } else {
+      toast.info('Permission de notification non accordée.');
+      setNotificationPermission('default');
+    }
+    setIsSubscribing(false);
+  };
+
+  // Note: True disabling/unsubscribing requires sending the specific FCM token to the server.
+  // This example provides a simpler path for users to manage via browser settings if a token is not readily available.
+  const handleDisablePushNotifications = () => {
+    // Ideally, retrieve the token and call POST /api/push/unsubscribe
+    // For now, guide user or if token known, use it.
+    toast.info('Pour désactiver les notifications push, veuillez gérer les permissions de notification pour ce site dans les paramètres de votre navigateur.');
+    // If you store the FCM token locally (e.g., in localStorage) when it's obtained:
+    // const fcmToken = localStorage.getItem('fcmToken');
+    // if (fcmToken) {
+    //   api.post('/push/unsubscribe', { token: fcmToken })
+    //     .then(() => {
+    //       toast.success('Notifications push désactivées.');
+    //       localStorage.removeItem('fcmToken');
+    //       setNotificationPermission('default'); // Or 'denied' based on browser actual
+    //     })
+    //     .catch(() => toast.error('Erreur lors de la désactivation.'));
+    // }
+  };
+
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -398,6 +453,57 @@ export default function EmployeeProfile() {
               </div>
             </form>
           </div>
+
+          {/* Notification Settings */}
+          <div className="card mt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Notifications Push
+            </h3>
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600">
+                Recevez des alertes importantes même lorsque l'application n'est pas ouverte.
+              </p>
+              {notificationPermission === 'granted' ? (
+                <div>
+                  <p className="text-sm text-green-600 font-medium mb-2">
+                    Les notifications push sont activées pour ce navigateur.
+                  </p>
+                  <button
+                    onClick={handleDisablePushNotifications}
+                    className="btn-secondary text-sm"
+                  >
+                    Désactiver (via paramètres navigateur)
+                  </button>
+                </div>
+              ) : notificationPermission === 'denied' ? (
+                <div>
+                  <p className="text-sm text-red-600 font-medium mb-2">
+                    Les notifications push sont bloquées par votre navigateur.
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Pour les activer, veuillez modifier les permissions de notification pour ce site dans les paramètres de votre navigateur.
+                  </p>
+                </div>
+              ) : ( // default
+                <div>
+                  <p className="text-sm text-gray-700 mb-2">
+                    Les notifications push ne sont pas encore activées.
+                  </p>
+                  <button
+                    onClick={handleEnablePushNotifications}
+                    disabled={isSubscribing}
+                    className="btn-primary text-sm disabled:opacity-50"
+                  >
+                    {isSubscribing ? 'Activation...' : 'Activer les notifications push'}
+                  </button>
+                </div>
+              )}
+               <p className="text-xs text-gray-500 mt-1">
+                Les paramètres de notification sont spécifiques à chaque navigateur/appareil.
+              </p>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

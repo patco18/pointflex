@@ -16,11 +16,163 @@ from models.pointage import Pointage
 from io import BytesIO
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
+from reportlab.platypus import Paragraph, Spacer # Keep only what's directly used here
+from reportlab.lib.units import inch # Keep only what's directly used here
+# Removed other direct reportlab imports as they are now in pdf_utils
 from datetime import datetime
+from backend.utils.pdf_utils import build_pdf_document, create_styled_table, get_report_styles, generate_report_title_elements
 from database import db
 import json
+from flask import current_app # Added for FRONTEND_URL
+
+# Import stripe service and mapping (assuming it's moved or accessible)
+# For now, direct import, consider refactoring STRIPE_PRICE_TO_PLAN_MAPPING if it grows
+from backend.services import stripe_service
+from backend.routes.stripe_routes import STRIPE_PRICE_TO_PLAN_MAPPING
+
 
 admin_bp = Blueprint('admin', __name__)
+
+# Helper to get company for current admin user
+def get_admin_company():
+    current_user = get_current_user()
+    if not current_user.company_id:
+        return None, jsonify(message="Aucune entreprise associée à cet utilisateur administrateur"), 400
+    company = Company.query.get(current_user.company_id)
+    if not company:
+        return None, jsonify(message="Entreprise non trouvée"), 404
+    return company, None
+
+
+@admin_bp.route('/subscription', methods=['GET'])
+@require_admin
+def get_company_subscription():
+    """Récupère les informations d'abonnement de l'entreprise et les plans disponibles."""
+    company, error_response = get_admin_company()
+    if error_response:
+        return error_response
+
+    available_plans = []
+    for price_id, details in STRIPE_PRICE_TO_PLAN_MAPPING.items():
+        available_plans.append({
+            "stripe_price_id": price_id,
+            "name": details["name"],
+            "max_employees": details["max_employees"],
+            "amount_eur": details["amount_eur"],
+            "interval_months": details["interval_months"],
+            "description": f"Plan {details['name'].capitalize()} - {details['amount_eur']}€ / {details['interval_months']} mois, jusqu'à {details['max_employees']} employés."
+        })
+
+    # Get frontend URL for constructing success/cancel URLs
+    frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173') # Fallback
+
+    return jsonify({
+        "subscription_plan": company.subscription_plan,
+        "subscription_status": company.subscription_status,
+        "subscription_start": company.subscription_start.isoformat() if company.subscription_start else None,
+        "subscription_end": company.subscription_end.isoformat() if company.subscription_end else None,
+        "stripe_customer_id": company.stripe_customer_id,
+        "stripe_subscription_id": company.stripe_subscription_id,
+        "active_stripe_price_id": company.active_stripe_price_id,
+        "max_employees": company.max_employees,
+        "can_add_employee": company.can_add_employee,
+        "available_plans": available_plans,
+        "billing_portal_enabled": bool(company.stripe_customer_id) # Enable portal link if customer ID exists
+    }), 200
+
+
+@admin_bp.route('/subscription/checkout-session', methods=['POST'])
+@require_admin
+def create_company_subscription_checkout_session():
+    """Crée une session de checkout Stripe pour un abonnement."""
+    company, error_response = get_admin_company()
+    if error_response:
+        return error_response
+
+    data = request.get_json()
+    stripe_price_id = data.get('stripe_price_id')
+
+    if not stripe_price_id or stripe_price_id not in STRIPE_PRICE_TO_PLAN_MAPPING:
+        return jsonify(message="ID de plan Stripe (stripe_price_id) valide requis."), 400
+
+    frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+    # Define success and cancel URLs for Stripe Checkout
+    # These URLs should be pages on your frontend that handle the result
+    success_url = f"{frontend_url}/company/billing?session_id={{CHECKOUT_SESSION_ID}}&status=success"
+    cancel_url = f"{frontend_url}/company/billing?status=cancel"
+
+    try:
+        # The get_or_create_stripe_customer within create_subscription_checkout_session
+        # might set company.stripe_customer_id. We need to commit this.
+        initial_stripe_customer_id = company.stripe_customer_id
+
+        session = stripe_service.create_subscription_checkout_session(
+            company=company,
+            stripe_price_id=stripe_price_id,
+            success_url=success_url,
+            cancel_url=cancel_url
+        )
+
+        # If stripe_customer_id was newly created, commit it to the database.
+        if company.stripe_customer_id and company.stripe_customer_id != initial_stripe_customer_id:
+            try:
+                db.session.add(company) # Add company to session if it wasn't already
+                db.session.commit()
+                current_app.logger.info(f"Committed new Stripe Customer ID {company.stripe_customer_id} for company {company.id}")
+            except Exception as e:
+                db.session.rollback()
+                current_app.logger.error(f"Failed to commit new Stripe Customer ID for company {company.id}: {e}")
+                # Don't fail the whole request, session might still be usable, but log error.
+                # Or decide to return an error if this commit is critical before redirect.
+
+        return jsonify({'checkout_session_id': session.id, 'checkout_url': session.url}), 200
+
+    except stripe.error.StripeError as e:
+        current_app.logger.error(f"Stripe API error for company {company.id}: {e}")
+        return jsonify(message=f"Erreur Stripe: {str(e)}"), 500
+    except RuntimeError as e: # For "Stripe package not available"
+        current_app.logger.error(f"Stripe runtime error for company {company.id}: {e}")
+        return jsonify(message=str(e)), 500
+    except Exception as e:
+        current_app.logger.error(f"Error creating checkout session for company {company.id}: {e}")
+        db.session.rollback() # Rollback if any db change was attempted (like stripe_customer_id)
+        return jsonify(message="Erreur interne du serveur lors de la création de la session de paiement."), 500
+
+
+@admin_bp.route('/subscription/customer-portal', methods=['POST'])
+@require_admin
+def create_company_customer_portal_session():
+    """Crée une session de portail client Stripe."""
+    company, error_response = get_admin_company()
+    if error_response:
+        return error_response
+
+    if not company.stripe_customer_id:
+        return jsonify(message="Aucun client Stripe associé à cette entreprise. Veuillez d'abord souscrire à un plan."), 400
+
+    frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+    # Define return URL for Stripe Customer Portal
+    return_url = f"{frontend_url}/company/billing"
+
+    try:
+        portal_session = stripe_service.create_customer_portal_session(
+            stripe_customer_id=company.stripe_customer_id,
+            return_url=return_url
+        )
+        return jsonify({'portal_url': portal_session.url}), 200
+    except stripe.error.StripeError as e:
+        current_app.logger.error(f"Stripe API error creating portal for company {company.id}: {e}")
+        return jsonify(message=f"Erreur Stripe: {str(e)}"), 500
+    except ValueError as e: # For missing customer ID
+        current_app.logger.error(f"ValueError creating portal for company {company.id}: {e}")
+        return jsonify(message=str(e)), 400
+    except RuntimeError as e: # For "Stripe package not available"
+        current_app.logger.error(f"Stripe runtime error for company {company.id}: {e}")
+        return jsonify(message=str(e)), 500
+    except Exception as e:
+        current_app.logger.error(f"Error creating customer portal for company {company.id}: {e}")
+        return jsonify(message="Erreur interne du serveur lors de la création du portail client."), 500
+
 
 @admin_bp.route('/employees', methods=['GET'])
 @require_manager_or_above
@@ -111,7 +263,19 @@ def create_employee():
         )
         
         db.session.commit()
-        
+
+        # Dispatch webhook event for user creation
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='user.created',
+                payload_data=employee.to_dict(include_sensitive=False), # Avoid sending sensitive data like password hash
+                company_id=employee.company_id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch user.created webhook for user {employee.id}: {webhook_error}")
+            # Do not fail the main request if webhook dispatch fails
+
         return jsonify({
             'message': 'Employé créé avec succès',
             'employee': employee.to_dict()
@@ -863,59 +1027,236 @@ def get_company_stats():
 @admin_bp.route('/attendance-report/pdf', methods=['GET'])
 @require_admin
 def attendance_report_pdf():
-    """Génère un résumé PDF des pointages de l'entreprise"""
+    """Génère un rapport PDF détaillé des pointages de l'entreprise."""
     try:
         current_user = get_current_user()
+        company_id = current_user.company_id
 
-        if not current_user.company_id:
+        if not company_id:
             return jsonify(message="Aucune entreprise associée"), 400
+
+        company = Company.query.get(company_id)
+        if not company:
+            return jsonify(message="Entreprise non trouvée"), 404
 
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
 
-        query = Pointage.query.join(User).filter(User.company_id == current_user.company_id)
+        query = Pointage.query.join(User).filter(User.company_id == company_id)
 
-        if start_date_str:
+        date_filter_text = "toutes périodes"
+        if start_date_str and end_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage.between(start_date, end_date))
+            date_filter_text = f"du {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}"
+        elif start_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             query = query.filter(Pointage.date_pointage >= start_date)
-        if end_date_str:
+            date_filter_text = f"à partir du {start_date.strftime('%d/%m/%Y')}"
+        elif end_date_str:
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
             query = query.filter(Pointage.date_pointage <= end_date)
+            date_filter_text = f"jusqu'au {end_date.strftime('%d/%m/%Y')}"
 
-        pointages = query.all()
-
-        summary = {}
-        for p in pointages:
-            user_name = f"{p.user.prenom} {p.user.nom}" if p.user else str(p.user_id)
-            summary[user_name] = summary.get(user_name, 0) + 1
+        pointages = query.order_by(User.nom, User.prenom, Pointage.date_pointage, Pointage.heure_arrivee).all()
 
         buffer = BytesIO()
-        pdf = canvas.Canvas(buffer, pagesize=A4)
-        pdf.setFont("Helvetica", 12)
-        pdf.drawString(50, 800, "Résumé de présence")
+        styles = get_report_styles() # Get styles from pdf_utils
 
-        y = 760
-        pdf.drawString(50, y, "Employé")
-        pdf.drawString(300, y, "Pointages")
-        y -= 20
+        story = generate_report_title_elements(
+            title_str="Rapport de Présence",
+            period_str=date_filter_text,
+            company_name=company.name
+        )
 
-        for name, count in summary.items():
-            pdf.drawString(50, y, name)
-            pdf.drawString(300, y, str(count))
-            y -= 20
-            if y < 50:
-                pdf.showPage()
-                pdf.setFont("Helvetica", 12)
-                y = 800
+        if not pointages:
+            story.append(Paragraph("Aucun pointage trouvé pour la période sélectionnée.", styles['Normal']))
+        else:
+            table_data = [
+                # Header Row - Using Paragraphs for potential styling and consistency
+                [
+                    Paragraph("Employé", styles['SmallText']),
+                    Paragraph("Date", styles['SmallText']),
+                    Paragraph("Arrivée", styles['SmallText']),
+                    Paragraph("Départ", styles['SmallText']),
+                    Paragraph("Durée (H)", styles['SmallText']),
+                    Paragraph("Type", styles['SmallText']),
+                    Paragraph("Retard (min)", styles['SmallText']),
+                    Paragraph("Commentaire", styles['SmallText'])
+                ]
+            ]
 
-        pdf.showPage()
-        pdf.save()
-        buffer.seek(0)
+            for p in pointages:
+                user_name = f"{p.user.prenom} {p.user.nom}" if p.user else str(p.user_id)
+                heure_arrivee_str = p.heure_arrivee.strftime('%H:%M') if p.heure_arrivee else "N/A"
+                heure_depart_str = p.heure_depart.strftime('%H:%M') if p.heure_depart else "N/A"
 
-        return send_file(buffer, mimetype='application/pdf',
+                duration_hours_str = ""
+                if p.heure_arrivee and p.heure_depart:
+                    try:
+                        # Ensure date_pointage is a date object, heure_arrivee/depart are time objects
+                        datetime_arrivee = datetime.combine(p.date_pointage, p.heure_arrivee)
+                        datetime_depart = datetime.combine(p.date_pointage, p.heure_depart)
+                        if datetime_depart < datetime_arrivee: # Handles overnight case if checkout is next day, though not typical for pointage
+                             datetime_depart += timedelta(days=1)
+                        duration = datetime_depart - datetime_arrivee
+                        duration_hours = duration.total_seconds() / 3600
+                        duration_hours_str = f"{duration_hours:.2f}"
+                    except TypeError: # In case date_pointage, heure_arrivee or heure_depart is None
+                        duration_hours_str = "Erreur"
+
+                retard_str = str(p.minutes_retard) if p.minutes_retard is not None else "0"
+
+                table_data.append([
+                    Paragraph(user_name, styles['SmallText']),
+                    p.date_pointage.strftime('%d/%m/%y'), # Shorter date format
+                    heure_arrivee_str,
+                    heure_depart_str,
+                    duration_hours_str,
+                    Paragraph(p.type_pointage or "N/A", styles['SmallText']),
+                    retard_str,
+                    Paragraph(p.commentaire or "", styles['SmallText'])
+                ])
+
+            col_widths = [1.4*inch, 0.7*inch, 0.7*inch, 0.7*inch, 0.6*inch, 0.7*inch, 0.6*inch, 1.9*inch]
+
+            # Define any custom style commands for this specific table
+            custom_table_styles = [
+                ('ALIGN', (0, 1), (0, -1), 'LEFT'),      # Align Employee Name to left
+                ('ALIGN', (1, 1), (1, -1), 'CENTER'),    # Align Date to center
+                ('ALIGN', (2, 1), (2, -1), 'CENTER'),    # Align Arrivee to center
+                ('ALIGN', (3, 1), (3, -1), 'CENTER'),    # Align Depart to center
+                ('ALIGN', (4, 1), (4, -1), 'RIGHT'),     # Align Duree to right
+                ('ALIGN', (5, 1), (5, -1), 'CENTER'),    # Align Type to center
+                ('ALIGN', (6, 1), (6, -1), 'RIGHT'),     # Align Retard to right
+                ('ALIGN', (7, 1), (7, -1), 'LEFT'),      # Align Commentaire to left
+                ('FONTSIZE', (0,0), (-1,-1), 7),         # Smaller font for all cells
+                ('BACKGROUND', (0, 1), (-1, -1), colors.HexColor('#F0F0F0')), # Light grey background for data rows
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]), # Alternating rows
+            ]
+
+            attendance_table = create_styled_table(table_data, col_widths=col_widths, style_commands=custom_table_styles)
+            story.append(attendance_table)
+
+        # Build the PDF using the utility function
+        final_pdf_buffer = build_pdf_document(
+            buffer,
+            story,
+            title=f"Rapport Présence - {company.name}",
+            author="PointFlex Application"
+        )
+
+        return send_file(final_pdf_buffer, mimetype='application/pdf',
                          as_attachment=True,
-                         download_name='attendance_report.pdf')
+                         download_name=f'rapport_presence_{company.name.replace(" ", "_")}_{datetime.now().strftime("%Y%m%d")}.pdf')
 
     except Exception as e:
-        print(f"Erreur génération PDF: {e}")
-        return jsonify(message="Erreur interne du serveur"), 500
+        current_app.logger.error(f"Erreur génération PDF pour l'entreprise {current_user.company_id if 'current_user' in locals() and current_user else 'N/A'}: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur lors de la génération du PDF."), 500
+
+
+@admin_bp.route('/employees/<int:employee_id>/attendance-report/pdf', methods=['GET'])
+@require_admin # Ensures current_user is at least an admin of their company
+def employee_attendance_report_pdf(employee_id):
+    """Génère un rapport PDF des pointages pour un employé spécifique."""
+    try:
+        current_user = get_current_user() # This is the admin/manager performing the action
+
+        # Fetch the target employee
+        target_employee = User.query.get(employee_id)
+        if not target_employee:
+            return jsonify(message="Employé non trouvé."), 404
+
+        # Permission check: Admin can only generate reports for employees in their own company
+        if target_employee.company_id != current_user.company_id:
+            # SuperAdmins might be an exception, but @require_admin doesn't cover that role by default here.
+            # If SuperAdmin needs this, the decorator or logic here should be adjusted.
+            return jsonify(message="Accès non autorisé à cet employé."), 403
+
+        # TODO: Add more granular permission for Managers (can only see their direct reports)
+        # This would require knowing the manager-employee relationship.
+
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+
+        query = Pointage.query.filter_by(user_id=employee_id)
+
+        date_filter_text = "toutes périodes"
+        if start_date_str and end_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage.between(start_date, end_date))
+            date_filter_text = f"du {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}"
+        # Add other date filter conditions as in my_attendance_report_pdf if needed
+
+        pointages = query.order_by(Pointage.date_pointage, Pointage.heure_arrivee).all()
+
+        buffer = BytesIO()
+        styles = get_report_styles()
+
+        story = generate_report_title_elements(
+            title_str=f"Rapport de Présence - {target_employee.prenom} {target_employee.nom}",
+            period_str=date_filter_text,
+            company_name=target_employee.company.name if target_employee.company else "N/A"
+        )
+
+        if not pointages:
+            story.append(Paragraph("Aucun pointage trouvé pour cet employé pour la période sélectionnée.", styles['Normal']))
+        else:
+            table_data = [
+                [Paragraph(col, styles['SmallText']) for col in ["Date", "Arrivée", "Départ", "Durée (H)", "Type", "Retard (min)", "Lieu/Mission", "Statut"]]
+            ]
+
+            for p in pointages:
+                heure_arrivee_str = p.heure_arrivee.strftime('%H:%M') if p.heure_arrivee else "N/A"
+                heure_depart_str = p.heure_depart.strftime('%H:%M') if p.heure_depart else "N/A"
+                duration_hours_str = ""
+                if p.heure_arrivee and p.heure_depart:
+                    try:
+                        datetime_arrivee = datetime.combine(p.date_pointage, p.heure_arrivee)
+                        datetime_depart = datetime.combine(p.date_pointage, p.heure_depart)
+                        if datetime_depart < datetime_arrivee: datetime_depart += timedelta(days=1)
+                        duration = datetime_depart - datetime_arrivee
+                        duration_hours_str = f"{(duration.total_seconds() / 3600):.2f}"
+                    except TypeError: duration_hours_str = "Erreur"
+
+                retard_str = str(p.delay_minutes) if p.delay_minutes is not None else "0"
+                lieu_mission_str = p.office.name if p.type == 'office' and p.office else (p.mission_order_number or "N/A")
+
+                table_data.append([
+                    p.date_pointage.strftime('%d/%m/%y'),
+                    heure_arrivee_str,
+                    heure_depart_str,
+                    duration_hours_str,
+                    Paragraph(p.type or "N/A", styles['SmallText']),
+                    retard_str,
+                    Paragraph(lieu_mission_str, styles['SmallText']),
+                    Paragraph(p.statut or "", styles['SmallText'])
+                ])
+
+            col_widths = [0.7*inch, 0.7*inch, 0.7*inch, 0.6*inch, 0.7*inch, 0.6*inch, 1.5*inch, 1.8*inch]
+            custom_table_styles = [
+                ('ALIGN', (1, 1), (1, -1), 'CENTER'), ('ALIGN', (2, 1), (2, -1), 'CENTER'),
+                ('ALIGN', (3, 1), (3, -1), 'CENTER'), ('ALIGN', (4, 1), (4, -1), 'RIGHT'),
+                ('ALIGN', (5, 1), (5, -1), 'CENTER'), ('ALIGN', (6, 1), (6, -1), 'RIGHT'),
+                ('ALIGN', (7, 1), (7, -1), 'LEFT'), ('ALIGN', (8, 1), (8, -1), 'LEFT'),
+                ('FONTSIZE', (0,0), (-1,-1), 7),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
+            ]
+            attendance_table = create_styled_table(table_data, col_widths=col_widths, style_commands=custom_table_styles)
+            story.append(attendance_table)
+
+        final_pdf_buffer = build_pdf_document(
+            buffer, story,
+            title=f"Rapport Présence - {target_employee.prenom} {target_employee.nom}",
+            author="PointFlex Application"
+        )
+
+        return send_file(final_pdf_buffer, mimetype='application/pdf',
+                         as_attachment=True,
+                         download_name=f'rapport_presence_{target_employee.nom.lower()}_{employee_id}_{datetime.now().strftime("%Y%m%d")}.pdf')
+
+    except Exception as e:
+        current_app.logger.error(f"Erreur génération PDF pour employé {employee_id}: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur lors de la génération du PDF."), 500

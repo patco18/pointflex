@@ -44,6 +44,9 @@ class Company(db.Model):
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     is_suspended = db.Column(db.Boolean, default=False, nullable=False)
     suspension_reason = db.Column(db.Text, nullable=True)
+    stripe_customer_id = db.Column(db.String(255), nullable=True) # Stripe Customer ID
+    stripe_subscription_id = db.Column(db.String(255), nullable=True) # Stripe Subscription ID
+    active_stripe_price_id = db.Column(db.String(255), nullable=True) # Active Stripe Price ID for the current subscription
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
