@@ -23,7 +23,8 @@ interface Employee {
   department_name?: string
   service_name?: string
   position_name?: string
-  manager_name?: string
+  manager_id?: number | null; // Added manager_id
+  manager_name?: string | null; // Existing, ensure it can be null
   company_name?: string
   created_at: string
 }
@@ -59,15 +60,25 @@ export default function EmployeeManagement() {
   const [roleFilter, setRoleFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
+  const [potentialManagers, setPotentialManagers] = useState<Employee[]>([]);
   
   const [form, setForm] = useState<EmployeeForm>({
     email: '', nom: '', prenom: '', role: 'employee', password: '',
-    phone: '', department_id: '', service_id: '', position_id: '', manager_id: ''
+    phone: '', department_id: '', service_id: '', position_id: '', manager_id: '' // manager_id can be string here for form
   })
 
-  const { data: employees = [], loading, refetch } = useApi(() => adminService.getEmployees())
+  const { data: employees = [], loading, refetch } = useApi<Employee[]>(() => adminService.getEmployees())
   const { data: orgData } = useApi(() => adminService.getOrganizationData())
   const { loading: saving, execute } = useAsyncAction()
+
+  useEffect(() => {
+    // Assuming adminService.getEmployees() returns all employees for the admin's company
+    // This list can be used as potential managers.
+    // Filter out the employee being currently edited if applicable.
+    if (employees) {
+        setPotentialManagers(employees);
+    }
+  }, [employees]);
 
   const filteredEmployees = employees.filter((emp: Employee) => {
     const matchesSearch = !searchTerm || 
@@ -126,15 +137,31 @@ export default function EmployeeManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Prepare form data, ensuring manager_id is number or null
+    const dataToSubmit: any = { ...form };
+    if (form.manager_id === "" || form.manager_id === "0" || form.manager_id === null) {
+      dataToSubmit.manager_id = null;
+    } else {
+      dataToSubmit.manager_id = parseInt(form.manager_id, 10);
+    }
+
+    // Remove password if not being changed during an edit
+    if (editingEmployee && !form.password) {
+      delete dataToSubmit.password;
+    }
+
     await execute(async () => {
       if (editingEmployee) {
-        await adminService.updateEmployee(editingEmployee.id, form)
+        // Backend PUT /api/admin/employees/:id needs to handle manager_id
+        await adminService.updateEmployee(editingEmployee.id, dataToSubmit)
       } else {
-        await adminService.createEmployee(form)
+        // Backend POST /api/admin/employees needs to handle manager_id
+        await adminService.createEmployee(dataToSubmit)
       }
       setShowModal(false)
       resetForm()
-      refetch()
+      refetch() // This refetch should ideally bring the updated manager_name
     }, editingEmployee ? 'Employé mis à jour' : 'Employé créé')
   }
 
@@ -150,8 +177,11 @@ export default function EmployeeManagement() {
     setEditingEmployee(emp)
     setForm({
       email: emp.email, nom: emp.nom, prenom: emp.prenom, role: emp.role,
-      password: '', phone: emp.phone || '', department_id: '', service_id: '',
-      position_id: '', manager_id: ''
+      password: '', phone: emp.phone || '',
+      department_id: '', // TODO: Populate these from emp if available and needed for edit
+      service_id: '',
+      position_id: '',
+      manager_id: emp.manager_id ? String(emp.manager_id) : '' // Populate manager_id
     })
     setShowModal(true)
   }
@@ -320,6 +350,24 @@ export default function EmployeeManagement() {
                 </div>
               </>
             )}
++            {/* Manager Selection Dropdown */}
++            <div className="md:col-span-2"> {/* Span across two columns if layout allows */}
++              <label className="block text-sm font-medium text-gray-700 mb-1">Manager</label>
++              <select
++                value={form.manager_id}
++                onChange={(e) => setForm(prev => ({ ...prev, manager_id: e.target.value }))}
++                className="input-field"
++              >
++                <option value="">Aucun manager</option>
++                {potentialManagers
++                  .filter(manager => !editingEmployee || manager.id !== editingEmployee.id) // Prevent self-assignment
++                  .map((manager) => (
++                    <option key={manager.id} value={manager.id}>
++                      {manager.prenom} {manager.nom} ({manager.email})
++                    </option>
++                ))}
++              </select>
++            </div>
           </div>
           <div className="flex justify-end space-x-3 mt-6 pt-6 border-t">
             <button type="button" onClick={() => setShowModal(false)} className="btn-secondary" disabled={saving}>

@@ -413,6 +413,15 @@ export const superAdminService = {
       console.error('Create customer portal session service error:', error)
       throw error
     }
+  },
+
+  setEmployeeManager: async (employeeId: number, managerId: number | null) => {
+    try {
+      return await api.put(`/admin/employees/${employeeId}/manager`, { manager_id: managerId });
+    } catch (error) {
+      console.error('Set employee manager service error:', error);
+      throw error;
+    }
   }
 }
 
