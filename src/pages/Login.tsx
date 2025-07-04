@@ -13,10 +13,18 @@ interface LoginForm {
 export default function Login() {
   const { login, serverStatus } = useAuth()
   const navigate = useNavigate()
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false) // For primary login
   const [showPassword, setShowPassword] = useState(false)
+
+  // State for 2FA step
+  const [is2FARequired, setIs2FARequired] = useState(false);
+  const [userIdFor2FA, setUserIdFor2FA] = useState<number | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [loginLoading2FA, setLoginLoading2FA] = useState(false);
   
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>()
+  const { register, handleSubmit, formState: { errors }, reset: resetLoginForm } = useForm<LoginForm>()
+  // react-hook-form for OTP form if needed, or simple state management
+  // For simplicity, using simple state for otpCode
 
   const onSubmit = async (data: LoginForm) => {
     if (serverStatus === 'offline') {
