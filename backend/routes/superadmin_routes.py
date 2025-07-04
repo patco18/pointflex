@@ -473,8 +473,36 @@ def delete_company(company_id):
             old_values=old_values
         )
         
-        db.session.delete(company)
+        users_in_company = User.query.filter_by(company_id=company_id).all()
+        user_ids_deleted = [user.id for user in users_in_company] # Store ids before they are deleted
+        old_user_values_map = {user.id: user.to_dict(include_sensitive=False) for user in users_in_company}
+
+
+        db.session.delete(company) # This should cascade delete users if relationships are set up with cascade delete
+                                   # Or users need to be deleted manually in a loop if not.
+                                   # Assuming cascade delete for users based on company deletion.
+                                   # If not, a loop `for user in users_in_company: db.session.delete(user)` is needed before company delete.
         db.session.commit()
+
+        # Dispatch webhooks for deleted users
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            for user_id in user_ids_deleted:
+                user_data = old_user_values_map.get(user_id)
+                if user_data:
+                    dispatch_webhook_event(
+                        event_type='user.deleted',
+                        payload_data=user_data, # Send data of the user that was deleted
+                        company_id=company_id # Company context
+                    )
+            # Dispatch company.deleted event
+            dispatch_webhook_event(
+                event_type='company.deleted',
+                payload_data=old_values, # old_values of the company
+                company_id=company_id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch user.deleted/company.deleted webhook during company {company_id} deletion: {webhook_error}")
         
         return jsonify(message="Entreprise supprimée avec succès"), 200
         

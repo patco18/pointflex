@@ -76,6 +76,16 @@ def create_leave_type():
     )
     # db.session.commit() # Covered by main commit
 
+    try:
+        from backend.utils.webhook_utils import dispatch_webhook_event
+        dispatch_webhook_event(
+            event_type='leave_type.created',
+            payload_data=new_type.to_dict(),
+            company_id=company_id_for_type # This can be None for global types
+        )
+    except Exception as webhook_error:
+        current_app.logger.error(f"Failed to dispatch leave_type.created webhook for type {new_type.id}: {webhook_error}")
+
     return jsonify(new_type.to_dict()), 201
 
 # PUT and DELETE for leave types would follow similar logic with role checks.

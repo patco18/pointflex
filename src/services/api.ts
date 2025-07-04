@@ -440,6 +440,65 @@ export const calendarService = {
   }
 };
 
+export const webhookService = {
+  getSubscriptions: async () => {
+    try {
+      return await api.get('/webhooks/subscriptions');
+    } catch (error) {
+      console.error('Get webhook subscriptions error:', error);
+      throw error;
+    }
+  },
+  createSubscription: async (data: { target_url: string; subscribed_events: string[] }) => {
+    try {
+      return await api.post('/webhooks/subscriptions', data);
+    } catch (error) {
+      console.error('Create webhook subscription error:', error);
+      throw error;
+    }
+  },
+  getSubscriptionDetails: async (subId: number) => {
+    try {
+      return await api.get(`/webhooks/subscriptions/${subId}`);
+    } catch (error) {
+      console.error('Get webhook subscription details error:', error);
+      throw error;
+    }
+  },
+  updateSubscription: async (subId: number, data: { target_url?: string; subscribed_events?: string[]; is_active?: boolean }) => {
+    try {
+      return await api.put(`/webhooks/subscriptions/${subId}`, data);
+    } catch (error) {
+      console.error('Update webhook subscription error:', error);
+      throw error;
+    }
+  },
+  deleteSubscription: async (subId: number) => {
+    try {
+      return await api.delete(`/webhooks/subscriptions/${subId}`);
+    } catch (error) {
+      console.error('Delete webhook subscription error:', error);
+      throw error;
+    }
+  },
+  getSubscriptionDeliveryLogs: async (subId: number, page: number = 1, perPage: number = 10) => {
+    try {
+      return await api.get(`/webhooks/subscriptions/${subId}/delivery-logs`, { params: { page, per_page: perPage } });
+    } catch (error) {
+      console.error('Get webhook delivery logs error:', error);
+      throw error;
+    }
+  },
+  pingSubscription: async (subId: number) => {
+    try {
+      return await api.post(`/webhooks/subscriptions/${subId}/ping`);
+    } catch (error) {
+      console.error('Ping webhook subscription error:', error);
+      throw error;
+    }
+  }
+};
+
 // Services Missions
 export const missionService = {
   getMissions: async () => {
