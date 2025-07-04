@@ -17,6 +17,12 @@ from .payment import Payment
 from .notification import Notification
 from .mission import Mission
 from .mission_user import MissionUser
+from .push_subscription import PushSubscription
+from .leave_type import LeaveType
+from .leave_balance import LeaveBalance
+from .leave_request import LeaveRequest
+from .webhook_subscription import WebhookSubscription
+from .webhook_delivery_log import WebhookDeliveryLog
 
 __all__ = [
     'User',
@@ -32,5 +38,9 @@ __all__ = [
     'Payment',
     'Notification',
     'Mission',
-    'MissionUser'
+    'MissionUser',
+    'PushSubscription',
+    'LeaveType',
+    'LeaveBalance',
+    'LeaveRequest'
 ]

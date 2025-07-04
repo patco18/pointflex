@@ -146,6 +146,7 @@ def create_company():
             admin.set_password(admin_password)
             
             db.session.add(admin)
+            db.session.flush() # Ensure admin has an ID if needed for payload
         
         # Logger l'action
         log_user_action(
@@ -156,6 +157,24 @@ def create_company():
         )
         
         db.session.commit()
+
+        # Dispatch webhook for company creation
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='company.created',
+                payload_data=company.to_dict(include_sensitive=False), # Basic company data
+                company_id=company.id
+            )
+            if admin: # If an admin user was also created
+                dispatch_webhook_event(
+                    event_type='user.created',
+                    payload_data=admin.to_dict(include_sensitive=False),
+                    company_id=company.id # Admin is associated with this new company
+                )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch company/user created webhook for company {company.id}: {webhook_error}")
+
         
         # Préparer la réponse avec les informations de l'admin
         company_dict = company.to_dict(include_sensitive=True)
@@ -174,6 +193,116 @@ def create_company():
         print(f"Erreur lors de la création de l'entreprise: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
+
+from io import BytesIO
+from flask import send_file, current_app
+from backend.utils.pdf_utils import build_pdf_document, create_styled_table, get_report_styles, generate_report_title_elements
+from reportlab.platypus import Paragraph, Spacer
+from reportlab.lib.units import inch
+from reportlab.lib import colors # For custom table styles if needed
+
+@superadmin_bp.route('/system/audit-log-report/pdf', methods=['GET'])
+@require_superadmin
+def audit_log_report_pdf():
+    """Génère un rapport PDF des logs d'audit."""
+    try:
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        user_email_filter = request.args.get('user_email')
+        action_filter = request.args.get('action')
+        resource_type_filter = request.args.get('resource_type')
+
+        query = AuditLog.query
+
+        report_filters = []
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            query = query.filter(AuditLog.created_at >= datetime.combine(start_date, datetime.min.time()))
+            report_filters.append(f"Début: {start_date.strftime('%d/%m/%Y')}")
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            query = query.filter(AuditLog.created_at <= datetime.combine(end_date, datetime.max.time()))
+            report_filters.append(f"Fin: {end_date.strftime('%d/%m/%Y')}")
+        if user_email_filter:
+            query = query.filter(AuditLog.user_email.ilike(f'%{user_email_filter}%'))
+            report_filters.append(f"Email: {user_email_filter}")
+        if action_filter:
+            query = query.filter(AuditLog.action.ilike(f'%{action_filter}%'))
+            report_filters.append(f"Action: {action_filter}")
+        if resource_type_filter:
+            query = query.filter(AuditLog.resource_type.ilike(f'%{resource_type_filter}%'))
+            report_filters.append(f"Ressource: {resource_type_filter}")
+
+        date_filter_text = ", ".join(report_filters) if report_filters else "toutes périodes"
+
+        logs = query.order_by(AuditLog.created_at.desc()).all() # Get all for PDF, no pagination
+
+        buffer = BytesIO()
+        styles = get_report_styles()
+
+        story = generate_report_title_elements(
+            title_str="Rapport des Logs d'Audit",
+            period_str=date_filter_text
+        )
+
+        if not logs:
+            story.append(Paragraph("Aucun log d'audit trouvé pour les filtres sélectionnés.", styles['Normal']))
+        else:
+            table_data = [
+                # Header Row
+                [Paragraph(col, styles['SmallText']) for col in ["Date/Heure", "Utilisateur", "Action", "Ressource", "ID Ress.", "Détails Changement", "IP"]]
+            ]
+
+            for log in logs:
+                # Summarize details, old_values, new_values to keep PDF readable
+                changes_summary = []
+                if log.parsed_details: changes_summary.append(f"Détails: {json.dumps(log.parsed_details, ensure_ascii=False, default=str)[:100]}") # Truncate
+                if log.parsed_old_values: changes_summary.append(f"Ancien: {json.dumps(log.parsed_old_values, ensure_ascii=False, default=str)[:100]}")
+                if log.parsed_new_values: changes_summary.append(f"Nouveau: {json.dumps(log.parsed_new_values, ensure_ascii=False, default=str)[:100]}")
+
+                change_str = "; ".join(changes_summary)
+                if not change_str: change_str = "N/A"
+
+                table_data.append([
+                    Paragraph(log.created_at.strftime('%d/%m/%y %H:%M:%S'), styles['SmallText']),
+                    Paragraph(log.user_email, styles['SmallText']),
+                    Paragraph(log.action, styles['SmallText']),
+                    Paragraph(log.resource_type, styles['SmallText']),
+                    Paragraph(str(log.resource_id) if log.resource_id is not None else "N/A", styles['SmallText']),
+                    Paragraph(change_str, styles['SmallText']), # Summary of changes
+                    Paragraph(log.ip_address or "N/A", styles['SmallText'])
+                ])
+
+            col_widths = [1.2*inch, 1.5*inch, 0.8*inch, 0.8*inch, 0.6*inch, 2.2*inch, 0.7*inch]
+
+            custom_table_styles = [
+                ('FONTSIZE', (0,0), (-1,-1), 6), # Even smaller font for audit logs
+                ('VALIGN', (0,0), (-1,-1), 'TOP'), # Align content to top for long text cells
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
+                 ('ALIGN', (0, 1), (0, -1), 'LEFT'),  # Date
+                 ('ALIGN', (1, 1), (1, -1), 'LEFT'),  # User
+                 ('ALIGN', (2, 1), (2, -1), 'LEFT'),  # Action
+                 ('ALIGN', (3, 1), (3, -1), 'LEFT'),  # Resource Type
+                 ('ALIGN', (4, 1), (4, -1), 'CENTER'),# Resource ID
+                 ('ALIGN', (5, 1), (5, -1), 'LEFT'),  # Details
+                 ('ALIGN', (6, 1), (6, -1), 'LEFT'),  # IP
+            ]
+            audit_table = create_styled_table(table_data, col_widths=col_widths, style_commands=custom_table_styles)
+            story.append(audit_table)
+
+        final_pdf_buffer = build_pdf_document(
+            buffer, story,
+            title="Rapport Logs d'Audit",
+            author="PointFlex Application"
+        )
+
+        return send_file(final_pdf_buffer, mimetype='application/pdf',
+                         as_attachment=True,
+                         download_name=f'rapport_audit_logs_{datetime.now().strftime("%Y%m%d")}.pdf')
+
+    except Exception as e:
+        current_app.logger.error(f"Erreur génération PDF des logs d'audit: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur lors de la génération du PDF des logs d'audit."), 500
 
 @superadmin_bp.route('/companies/<int:company_id>', methods=['PUT'])
 @require_superadmin

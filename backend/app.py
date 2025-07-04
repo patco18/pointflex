@@ -19,6 +19,11 @@ from routes.attendance_routes import attendance_bp
 from routes.superadmin_routes import superadmin_bp
 from routes.notification_routes import notification_bp
 from routes.mission_routes import mission_bp
+from routes.stripe_routes import stripe_bp  # Added Stripe blueprint
+from routes.push_routes import push_bp # Added Push blueprint
+from routes.calendar_routes import calendar_bp # Added Calendar blueprint
+from routes.leave_routes import leave_bp # Added Leave blueprint
+from routes.webhook_routes import webhook_bp # Added Webhook blueprint
 
 # Import middleware
 from middleware.auth import init_auth_middleware
@@ -58,6 +63,11 @@ def create_app():
     app.register_blueprint(superadmin_bp, url_prefix='/api/superadmin')
     app.register_blueprint(notification_bp, url_prefix='/api/notifications')
     app.register_blueprint(mission_bp, url_prefix='/api/missions')
+    app.register_blueprint(stripe_bp, url_prefix='/api/stripe')  # Registered Stripe blueprint
+    app.register_blueprint(push_bp, url_prefix='/api/push') # Registered Push blueprint
+    app.register_blueprint(calendar_bp, url_prefix='/api/calendar') # Registered Calendar blueprint
+    app.register_blueprint(leave_bp, url_prefix='/api/leave') # Registered Leave blueprint
+    app.register_blueprint(webhook_bp, url_prefix='/api/webhooks') # Registered Webhook blueprint
     
     # Create database tables
     with app.app_context():

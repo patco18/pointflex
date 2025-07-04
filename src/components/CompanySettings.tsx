@@ -1,10 +1,37 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { adminService } from '../services/api'
-import { MapPin, Clock, Save, Navigation } from 'lucide-react'
+import { MapPin, Clock, Save, Navigation, CreditCard, ExternalLink, AlertTriangle } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { useSearchParams, useNavigate } from 'react-router-dom' // For handling Stripe redirect
+
+// Define types for subscription data
+interface Plan {
+  stripe_price_id: string;
+  name: string;
+  max_employees: number;
+  amount_eur: number;
+  interval_months: number;
+  description: string;
+}
+
+interface SubscriptionData {
+  subscription_plan: string | null;
+  subscription_status: string | null;
+  subscription_start: string | null;
+  subscription_end: string | null;
+  stripe_customer_id: string | null;
+  stripe_subscription_id: string | null;
+  active_stripe_price_id: string | null;
+  max_employees: number;
+  can_add_employee: boolean;
+  available_plans: Plan[];
+  billing_portal_enabled: boolean;
+}
 
 export default function CompanySettings() {
+  const navigate = useNavigate(); // For clearing query params
+  const [searchParams] = useSearchParams();
   const { isAdmin } = useAuth()
   const [settings, setSettings] = useState({
     office_latitude: 48.8566,
@@ -16,15 +43,39 @@ export default function CompanySettings() {
     theme_color: '#3b82f6'
   })
   const [saving, setSaving] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(false) // For general loading like geolocation
   const [dataLoading, setDataLoading] = useState(true)
+  const [subscriptionLoading, setSubscriptionLoading] = useState(true);
+  const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
+  const [actionLoading, setActionLoading] = useState(false); // For button actions like subscribe/portal
 
-  // Charger les paramètres de l'entreprise
+  // Charger les paramètres de l'entreprise et l'abonnement
   useEffect(() => {
     if (isAdmin) {
-      loadCompanySettings()
+      loadCompanySettings();
+      loadSubscriptionData();
     }
-  }, [isAdmin])
+  }, [isAdmin]);
+
+  // Handle Stripe redirect
+  useEffect(() => {
+    const stripeStatus = searchParams.get('status');
+    const sessionId = searchParams.get('session_id'); // For success
+
+    if (stripeStatus === 'success' && sessionId) {
+      toast.success('Paiement réussi ! Votre abonnement est en cours de mise à jour.');
+      // Optionally, you could verify the session server-side here for extra security
+      // For now, just refresh data
+      loadSubscriptionData();
+      // Clean up URL
+      navigate('/settings', { replace: true });
+    } else if (stripeStatus === 'cancel') {
+      toast.error('Le processus de paiement a été annulé.');
+      // Clean up URL
+      navigate('/settings', { replace: true });
+    }
+  }, [searchParams, navigate]);
+
 
   const loadCompanySettings = async () => {
     try {
@@ -50,6 +101,52 @@ export default function CompanySettings() {
       toast.error('Erreur lors de la sauvegarde')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const loadSubscriptionData = async () => {
+    setSubscriptionLoading(true);
+    try {
+      const resp = await adminService.getCompanySubscription();
+      setSubscriptionData(resp.data);
+    } catch (error) {
+      console.error('Erreur chargement données abonnement:', error);
+      toast.error('Erreur lors du chargement des informations d\'abonnement.');
+    } finally {
+      setSubscriptionLoading(false);
+    }
+  }
+
+  const handleSubscribe = async (stripePriceId: string) => {
+    setActionLoading(true);
+    try {
+      const resp = await adminService.createSubscriptionCheckoutSession(stripePriceId);
+      if (resp.data.checkout_url) {
+        window.location.href = resp.data.checkout_url;
+      } else {
+        toast.error('Impossible de démarrer la session de paiement.');
+      }
+    } catch (error) {
+      console.error('Erreur création session checkout:', error);
+      // Toast est déjà géré par l'intercepteur api.ts
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  const handleManageBilling = async () => {
+    setActionLoading(true);
+    try {
+      const resp = await adminService.createCustomerPortalSession();
+      if (resp.data.portal_url) {
+        window.location.href = resp.data.portal_url;
+      } else {
+        toast.error('Impossible d\'ouvrir le portail de facturation.');
+      }
+    } catch (error) {
+      console.error('Erreur création portail client:', error);
+    } finally {
+      setActionLoading(false);
     }
   }
 
@@ -116,10 +213,11 @@ export default function CompanySettings() {
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Paramètres de l'entreprise</h1>
         <p className="text-gray-600">
-          Configurez les paramètres de pointage pour votre entreprise
+          Configurez les paramètres de pointage et gérez votre abonnement.
         </p>
       </div>
 
+      {/* Existing Settings Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="card">
           <div className="flex items-center mb-4">
@@ -285,6 +383,112 @@ export default function CompanySettings() {
             </>
           )}
         </button>
+      </div>
+
+      {/* Subscription Management Section */}
+      <div className="mt-8 pt-8 border-t border-gray-200">
+        <h2 className="text-xl font-semibold text-gray-900 mb-1">Abonnement et Facturation</h2>
+        <p className="text-sm text-gray-600 mb-6">Gérez votre plan d'abonnement et vos informations de facturation.</p>
+
+        {subscriptionLoading ? (
+          <div className="flex items-center justify-center h-40">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+          </div>
+        ) : subscriptionData ? (
+          <div className="space-y-6">
+            <div className="card bg-gray-50 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Votre abonnement actuel</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                <div>
+                  <span className="font-medium text-gray-700">Plan:</span>
+                  <span className="ml-2 text-gray-900">{subscriptionData.subscription_plan?.toUpperCase() || 'N/A'}</span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">Statut:</span>
+                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                    subscriptionData.subscription_status === 'active' ? 'bg-green-100 text-green-800' :
+                    subscriptionData.subscription_status === 'trialing' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                  }`}>
+                    {subscriptionData.subscription_status || 'N/A'}
+                  </span>
+                </div>
+                <div>
+                  <span className="font-medium text-gray-700">Employés max:</span>
+                  <span className="ml-2 text-gray-900">{subscriptionData.max_employees}</span>
+                </div>
+                 <div>
+                  <span className="font-medium text-gray-700">Peut ajouter employé:</span>
+                  <span className={`ml-2 font-semibold ${subscriptionData.can_add_employee ? 'text-green-600' : 'text-red-600'}`}>
+                    {subscriptionData.can_add_employee ? 'Oui' : 'Non (limite atteinte)'}
+                  </span>
+                </div>
+                {subscriptionData.subscription_end && (
+                  <div>
+                    <span className="font-medium text-gray-700">Expire le:</span>
+                    <span className="ml-2 text-gray-900">{new Date(subscriptionData.subscription_end).toLocaleDateString()}</span>
+                  </div>
+                )}
+              </div>
+              {subscriptionData.billing_portal_enabled && (
+                <div className="mt-4">
+                  <button
+                    onClick={handleManageBilling}
+                    disabled={actionLoading}
+                    className="btn-secondary text-sm flex items-center disabled:opacity-50"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    {actionLoading ? 'Chargement...' : 'Gérer ma facturation'}
+                    <ExternalLink className="h-3 w-3 ml-1.5" />
+                  </button>
+                   <p className="text-xs text-gray-500 mt-1">Vous serez redirigé vers Stripe pour gérer vos informations de paiement et factures.</p>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Changer de plan</h3>
+              {subscriptionData.available_plans && subscriptionData.available_plans.length > 0 ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {subscriptionData.available_plans.map((plan) => (
+                    <div key={plan.stripe_price_id} className={`card p-5 flex flex-col justify-between ${plan.stripe_price_id === subscriptionData.active_stripe_price_id ? 'border-2 border-blue-600 ring-2 ring-blue-300' : 'border'}`}>
+                      <div>
+                        <h4 className="text-md font-bold text-blue-700 mb-1">{plan.name.toUpperCase()}</h4>
+                        <p className="text-2xl font-extrabold text-gray-900 mb-2">
+                          {plan.amount_eur}€ <span className="text-sm font-normal text-gray-500">/ {plan.interval_months} mois</span>
+                        </p>
+                        <ul className="text-xs text-gray-600 space-y-1 mb-4">
+                          <li>Jusqu'à {plan.max_employees} employés</li>
+                          {/* TODO: Ajouter d'autres features du plan ici */}
+                          <li>Support standard</li>
+                        </ul>
+                      </div>
+                      {plan.stripe_price_id === subscriptionData.active_stripe_price_id ? (
+                        <p className="btn-disabled w-full text-center text-sm">Plan Actuel</p>
+                      ) : (
+                        <button
+                          onClick={() => handleSubscribe(plan.stripe_price_id)}
+                          disabled={actionLoading}
+                          className="btn-primary w-full text-sm disabled:opacity-50"
+                        >
+                          {actionLoading ? 'Chargement...' : 'Choisir ce plan'}
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                 <p className="text-gray-500 text-sm">Aucun autre plan n'est disponible pour le moment.</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="card text-center py-10">
+            <AlertTriangle className="h-10 w-10 text-red-500 mx-auto mb-3" />
+            <p className="text-gray-700 font-medium">Impossible de charger les informations d'abonnement.</p>
+            <p className="text-sm text-gray-500">Veuillez réessayer plus tard ou contacter le support.</p>
+          </div>
+        )}
       </div>
     </div>
   )

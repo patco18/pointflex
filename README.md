@@ -382,16 +382,25 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:pass@host:port/db'
 - Notifications toast en temps réel
 - Navigation intuitive
 
-## 🔄 Évolutions Futures
+## 🔄 Évolutions Futures (Prochaines Étapes)
 
-- [ ] API de facturation (Stripe)
-- [ ] Notifications push
-- [ ] Rapports PDF
-- [ ] Application mobile
-- [ ] Intégration calendrier
-- [ ] Gestion des congés
-- [ ] API webhooks
-- [ ] Audit logs
+- [X] **API de facturation (Stripe)**: Intégration pour la gestion des abonnements et paiements. *(Backend et Frontend Admin Société implémentés; nécessite configuration Stripe et tests approfondis)*
+- [X] **Notifications push**: Via Firebase Cloud Messaging. *(Backend et bases Frontend/Service Worker implémentés; nécessite configuration Firebase et intégration UI pour permissions)*
+- [X] **Rapports PDF**: Génération de rapports de présence (entreprise, individuel) et logs d'audit. *(Backend implémenté; nécessite intégration UI Frontend pour téléchargement/filtrage)*
+- [X] **Application mobile**: Conception initiale et bases pour une application React Native. *(Structure de base, Auth et API client conceptuels; développement complet requis)*
+- [X] **Intégration calendrier**: Affichage des pointages et missions sur un calendrier d'équipe. *(Backend API et composant calendrier Frontend de base implémentés; améliorations UI/filtres possibles)*
+- [X] **Gestion des congés**: Système de demande et d'approbation des congés avec gestion des soldes. *(Backend pour modèles, soumission par employé, approbation admin et gestion des soldes implémenté; nécessite UI Frontend complète et logique d'accumulation annuelle)*
+- [X] **API webhooks**: Système permettant aux applications externes de souscrire à des événements système. *(Backend pour modèles, création/liste de souscriptions, et distribution d'événements clés implémenté; nécessite UI Frontend et intégration de plus d'événements)*
+- [X] **Audit logs**: Journalisation complète des actions critiques. *(Modèle et utilitaires existants améliorés et intégrés plus largement; vue SuperAdmin existe; vue Admin Société est une amélioration possible)*
+
+**Autres améliorations possibles / Prochaines étapes de développement:**
+- Finalisation de l'interface utilisateur (Frontend) pour la Gestion des Congés.
+- Finalisation de l'interface utilisateur (Frontend) pour la gestion des Webhooks par les administrateurs d'entreprise.
+- Implémentation complète de l'application mobile React Native.
+- Intégration de la logique d'accumulation annuelle automatique pour les soldes de congés.
+- Tests unitaires et d'intégration exhaustifs pour toutes les nouvelles fonctionnalités.
+- Documentation utilisateur et administrateur pour les nouvelles fonctionnalités.
+- Optimisations de performance et de sécurité continues.
 
 ## 📄 Licence
 

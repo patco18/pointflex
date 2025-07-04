@@ -123,6 +123,17 @@ def office_checkin():
         
         db.session.commit()
 
+        # Dispatch webhook for pointage creation
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='pointage.created',
+                payload_data=pointage.to_dict(),
+                company_id=current_user.company_id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch pointage.created webhook for pointage {pointage.id}: {webhook_error}")
+
         send_notification(current_user.id, "Pointage bureau enregistré")
         if pointage.statut == 'retard':
             send_notification(current_user.id, "Vous êtes en retard")
@@ -203,6 +214,17 @@ def mission_checkin():
         )
         
         db.session.commit()
+
+        # Dispatch webhook for pointage creation (mission type)
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='pointage.created', # Same event type, payload indicates 'mission'
+                payload_data=pointage.to_dict(),
+                company_id=current_user.company_id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch pointage.created (mission) webhook for pointage {pointage.id}: {webhook_error}")
 
         send_notification(current_user.id, "Pointage mission enregistré")
         if pointage.statut == 'retard':

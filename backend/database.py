@@ -21,6 +21,12 @@ def init_db():
         from models.invoice import Invoice
         from models.payment import Payment
         from models.notification import Notification
+        from models.push_subscription import PushSubscription
+        from models.leave_type import LeaveType
+        from models.leave_balance import LeaveBalance
+        from models.leave_request import LeaveRequest
+        from models.webhook_subscription import WebhookSubscription
+        from models.webhook_delivery_log import WebhookDeliveryLog
         
         # Créer toutes les tables
         db.create_all()

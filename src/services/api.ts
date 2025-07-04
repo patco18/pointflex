@@ -339,8 +339,51 @@ export const superAdminService = {
       console.error('Reset system settings service error:', error)
       throw error
     }
+  },
+
+  // Subscription management for company admins
+  getCompanySubscription: async () => {
+    try {
+      return await api.get('/admin/subscription')
+    } catch (error) {
+      console.error('Get company subscription service error:', error)
+      throw error
+    }
+  },
+
+  createSubscriptionCheckoutSession: async (stripePriceId: string) => {
+    try {
+      return await api.post('/admin/subscription/checkout-session', { stripe_price_id: stripePriceId })
+    } catch (error) {
+      console.error('Create subscription checkout session service error:', error)
+      throw error
+    }
+  },
+
+  createCustomerPortalSession: async () => {
+    try {
+      return await api.post('/admin/subscription/customer-portal')
+    } catch (error) {
+      console.error('Create customer portal session service error:', error)
+      throw error
+    }
   }
 }
+
+export const calendarService = {
+  getCalendarEvents: async (year: number, month: number, userIds?: string) => { // userIds can be 'self' or comma-separated IDs
+    try {
+      const params: any = { year, month };
+      if (userIds) {
+        params.user_ids = userIds;
+      }
+      return await api.get('/calendar/events', { params });
+    } catch (error) {
+      console.error('Get calendar events service error:', error);
+      throw error;
+    }
+  }
+};
 
 // Services Missions
 export const missionService = {

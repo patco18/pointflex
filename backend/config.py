@@ -49,6 +49,11 @@ class Config:
     MAX_LOGIN_ATTEMPTS = 5
     LOCKOUT_DURATION = 30  # minutes
 
+    # Webhooks
+    WEBHOOK_SIGNATURE_HEADER_NAME = os.environ.get('WEBHOOK_SIGNATURE_HEADER_NAME') or 'X-PointFlex-Signature-256'
+    WEBHOOK_TIMEOUT_SECONDS = int(os.environ.get('WEBHOOK_TIMEOUT_SECONDS') or 10)
+    WEBHOOK_MAX_RETRIES = int(os.environ.get('WEBHOOK_MAX_RETRIES') or 3) # For future use with async tasks
+
 class DevelopmentConfig(Config):
     """Configuration pour le développement"""
     DEBUG = True
