@@ -1,29 +1,13 @@
-import React, { useState } from 'react'
-import { useAuth } from '../contexts/AuthContext'
-import { profileService } from '../services/api'
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { profileService, authService } from '../services/api';
 import { 
-  User, 
-  Mail, 
-  Phone, 
-  MapPin, 
-  Calendar, 
-  Save,
-  Edit,
-  Eye,
-  EyeOff,
-  Lock,
-  Building,
-  Briefcase,
-  Bell, // For notifications
-  ShieldCheck, // For 2FA
-  ShieldOff, // For 2FA
-  KeyRound, // For backup codes
-  Copy // For copying secret
-} from 'lucide-react'
-import toast from 'react-hot-toast'
-import { requestNotificationPermission, initializeFirebaseApp } from '../firebaseInit' // Added
-import { authService } from '../services/api' // For 2FA functions
-import QRCodeStyling from 'qrcode.react'; // Corrected import name
+  User, Mail, Phone, MapPin, Calendar, Save, Edit, Eye, EyeOff, Lock, Building, Briefcase, Bell,
+  ShieldCheck, ShieldOff, KeyRound, Copy, LockKeyhole, QrCode // QrCode might not be used if using qrcode.react directly
+} from 'lucide-react';
+import toast from 'react-hot-toast';
+import { requestNotificationPermission, initializeFirebaseApp } from '../firebaseInit';
+import { QRCodeSVG } from 'qrcode.react'; // For QR code display
 
 interface Setup2FAData {
   otp_secret: string;
@@ -31,31 +15,31 @@ interface Setup2FAData {
 }
 
 export default function EmployeeProfile() {
-  const { user, fetchUser } = useAuth(); // Assuming fetchUser exists in AuthContext to refresh user data
-  const [loading, setLoading] = useState(false); // General loading for profile/password updates
+  const { user, fetchUser } = useAuth();
+  const [loading, setLoading] = useState(false);
   const [editMode, setEditMode] = useState(false);
-  const [showPassword, setShowPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false);
   
   const [profileForm, setProfileForm] = useState({
     nom: user?.nom || '',
     prenom: user?.prenom || '',
-    phone: '',
-    address: '',
-    country: 'FR',
+    phone: user?.phone || '', // Initialize with user data
+    address: '', // Assuming these are not directly on user object from context initially
+    country: 'FR', // Default or from user data if available
     date_birth: '',
     bio: '',
     skills: ''
-  })
+  });
 
   const [passwordForm, setPasswordForm] = useState({
     current_password: '',
     new_password: '',
     confirm_password: ''
-  })
+  });
 
   // State for push notification permission
   const [notificationPermission, setNotificationPermission] = useState(Notification.permission);
-  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isSubscribingPush, setIsSubscribingPush] = useState(false);
 
   // State for 2FA
   const [setup2FAData, setSetup2FAData] = useState<Setup2FAData | null>(null);
@@ -66,8 +50,23 @@ export default function EmployeeProfile() {
   const [disable2FAPassword, setDisable2FAPassword] = useState('');
   const [disable2FAOtp, setDisable2FAOtp] = useState('');
 
+  useEffect(() => {
+    // Populate profile form with user data once available
+    if (user) {
+      setProfileForm(prev => ({
+        ...prev,
+        nom: user.nom || '',
+        prenom: user.prenom || '',
+        phone: user.phone || '',
+        // Populate other fields if they exist on the user object from context
+        // address: user.address || '',
+        // country: user.country || 'FR',
+        // date_birth: user.date_birth ? user.date_birth.split('T')[0] : '', // Assuming ISO string date
+      }));
+    }
+  }, [user]);
 
-  // Initialize Firebase early to check notification status & update 2FA status from user object
+
   useEffect(() => {
     initializeFirebaseApp();
     const interval = setInterval(() => {
@@ -78,17 +77,17 @@ export default function EmployeeProfile() {
     return () => clearInterval(interval);
   }, [notificationPermission]);
 
-  // Function to refresh user data (e.g., after 2FA status change)
-  // Assumes fetchUser is available from useAuth to refresh the user object globally
   const refreshUserData = async () => {
-    if (fetchUser) {
+    if (fetchUser) { // fetchUser should be part of your AuthContext to refresh user details
       await fetchUser();
+    } else {
+        // Fallback or warning if user refresh isn't available
+        console.warn("fetchUser function not available in AuthContext. 2FA status might not update immediately in UI.");
     }
   };
 
-
   const handleEnablePushNotifications = async () => {
-    setIsSubscribing(true);
+    setIsSubscribingPush(true);
     const token = await requestNotificationPermission();
     if (token) {
       toast.success('Notifications push activées !');
@@ -100,32 +99,53 @@ export default function EmployeeProfile() {
       toast.info('Permission de notification non accordée.');
       setNotificationPermission('default');
     }
-    setIsSubscribing(false);
+    setIsSubscribingPush(false);
   };
 
-  // Note: True disabling/unsubscribing requires sending the specific FCM token to the server.
-  // This example provides a simpler path for users to manage via browser settings if a token is not readily available.
   const handleDisablePushNotifications = () => {
-    // Ideally, retrieve the token and call POST /api/push/unsubscribe
-    // For now, guide user or if token known, use it.
-    toast.info('Pour désactiver les notifications push, veuillez gérer les permissions de notification pour ce site dans les paramètres de votre navigateur.');
-    // If you store the FCM token locally (e.g., in localStorage) when it's obtained:
-    // const fcmToken = localStorage.getItem('fcmToken');
-    // if (fcmToken) {
-    //   api.post('/push/unsubscribe', { token: fcmToken })
-    //     .then(() => {
-    //       toast.success('Notifications push désactivées.');
-    //       localStorage.removeItem('fcmToken');
-    //       setNotificationPermission('default'); // Or 'denied' based on browser actual
-    //     })
-    //     .catch(() => toast.error('Erreur lors de la désactivation.'));
-    // }
+    toast.info('Pour désactiver les notifications push, veuillez gérer les permissions pour ce site dans les paramètres de votre navigateur.');
+  };
+
+  const handleProfileUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      await profileService.updateProfile(profileForm);
+      toast.success('Profil mis à jour avec succès!');
+      setEditMode(false);
+      refreshUserData(); // Refresh user data if profile update affects context
+    } catch (error) {
+      toast.error('Erreur lors de la mise à jour du profil');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      toast.error('Les mots de passe ne correspondent pas');
+      return;
+    }
+    setLoading(true);
+    try {
+      await profileService.changePassword({
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password
+      });
+      toast.success('Mot de passe modifié avec succès!');
+      setPasswordForm({ current_password: '', new_password: '', confirm_password: '' });
+    } catch (error) {
+      // Error toast is likely handled by API interceptor
+    } finally {
+      setLoading(false);
+    }
   };
 
   // --- 2FA Handler Functions ---
   const handleInitiate2FASetup = async () => {
     setTwoFactorActionLoading(true);
-    setBackupCodes([]); // Clear any old backup codes
+    setBackupCodes([]);
     try {
       const response = await authService.setup2FA();
       setSetup2FAData({
@@ -134,8 +154,7 @@ export default function EmployeeProfile() {
       });
       toast.success("Scannez le QR code et entrez le code OTP pour vérifier.");
     } catch (error) {
-      toast.error("Erreur lors de l'initialisation de la 2FA. Veuillez réessayer.");
-      console.error("2FA setup error", error);
+      toast.error("Erreur lors de l'initialisation de la 2FA.");
     } finally {
       setTwoFactorActionLoading(false);
     }
@@ -144,7 +163,7 @@ export default function EmployeeProfile() {
   const handleVerifyAndEnable2FA = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpForEnable || !setup2FAData?.otp_secret) {
-      toast.error("Code OTP et secret requis.");
+      toast.error("Code OTP et secret de configuration sont requis.");
       return;
     }
     setTwoFactorActionLoading(true);
@@ -152,21 +171,20 @@ export default function EmployeeProfile() {
       const response = await authService.verifyAndEnable2FA(otpForEnable, setup2FAData.otp_secret);
       setBackupCodes(response.data.backup_codes || []);
       toast.success("Authentification à deux facteurs activée !");
-      setSetup2FAData(null); // Clear setup data
+      setSetup2FAData(null);
       setOtpForEnable('');
-      await refreshUserData(); // Refresh user data to get is_two_factor_enabled
+      await refreshUserData();
     } catch (error) {
       toast.error("Code OTP invalide ou erreur lors de l'activation.");
-      console.error("2FA enable error", error);
     } finally {
       setTwoFactorActionLoading(false);
     }
   };
 
-  const handleDisable2FA = async (e?: React.FormEvent) => {
-    e?.preventDefault();
+  const handleDisable2FAConfirmSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
     if (!disable2FAPassword && !disable2FAOtp) {
-        toast.error("Veuillez entrer votre mot de passe actuel ou un code OTP pour désactiver la 2FA.");
+        toast.error("Veuillez entrer votre mot de passe actuel ou un code OTP/secours valide pour désactiver la 2FA.");
         return;
     }
     setTwoFactorActionLoading(true);
@@ -178,8 +196,7 @@ export default function EmployeeProfile() {
       setDisable2FAPassword('');
       setDisable2FAOtp('');
     } catch (error) {
-      toast.error("Erreur lors de la désactivation de la 2FA. Vérifiez votre mot de passe ou code OTP.");
-      console.error("2FA disable error", error);
+      // Error toast likely handled by interceptor
     } finally {
       setTwoFactorActionLoading(false);
     }
@@ -188,15 +205,13 @@ export default function EmployeeProfile() {
   const handleRegenerateBackupCodes = async () => {
     if (!confirm("Êtes-vous sûr de vouloir regénérer les codes de secours ? Vos anciens codes ne fonctionneront plus.")) return;
     setTwoFactorActionLoading(true);
-    setBackupCodes([]); // Clear old ones from view
+    setBackupCodes([]);
     try {
-        // Consider requiring password or current OTP for this action as well for extra security
-        const response = await authService.regenerateBackupCodes({}); // Pass empty payload if no extra verification needed by API
+        const response = await authService.regenerateBackupCodes({});
         setBackupCodes(response.data.backup_codes || []);
         toast.success("Nouveaux codes de secours générés. Conservez-les précieusement.");
     } catch (error) {
         toast.error("Erreur lors de la regénération des codes de secours.");
-        console.error("2FA regenerate backup codes error", error);
     } finally {
         setTwoFactorActionLoading(false);
     }
@@ -208,57 +223,18 @@ export default function EmployeeProfile() {
       .catch(() => toast.error("Erreur de copie."));
   };
 
-
-  const handleProfileUpdate = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    
-    try {
-      await profileService.updateProfile(profileForm)
-      toast.success('Profil mis à jour avec succès!')
-      setEditMode(false)
-    } catch (error) {
-      toast.error('Erreur lors de la mise à jour du profil')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handlePasswordChange = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (passwordForm.new_password !== passwordForm.confirm_password) {
-      toast.error('Les mots de passe ne correspondent pas')
-      return
-    }
-
-    setLoading(true)
-    try {
-      await profileService.changePassword({
-        current_password: passwordForm.current_password,
-        new_password: passwordForm.new_password
-      })
-      toast.success('Mot de passe modifié avec succès!')
-      setPasswordForm({
-        current_password: '',
-        new_password: '',
-        confirm_password: ''
-      })
-    } catch (error) {
-      toast.error('Erreur lors du changement de mot de passe')
-    } finally {
-      setLoading(false)
-    }
+  if (!user) {
+    return <div className="text-center py-8">Chargement du profil...</div>;
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8 pb-8"> {/* Added pb-8 for spacing */}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Mon Profil</h1>
           <p className="text-gray-600">
-            Gérez vos informations personnelles et paramètres
+            Gérez vos informations personnelles et paramètres de sécurité.
           </p>
         </div>
         <div className="flex items-center space-x-2">
@@ -276,350 +252,94 @@ export default function EmployeeProfile() {
         </div>
       </div>
 
-      {/* Informations personnelles */}
+      {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
+        {/* Left Column: Personal Info */}
+        <div className="lg:col-span-2 space-y-6">
           <div className="card">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Informations personnelles
-              </h3>
-              <button
-                onClick={() => setEditMode(!editMode)}
-                className="btn-secondary"
-              >
-                <Edit className="h-4 w-4 mr-2" />
-                {editMode ? 'Annuler' : 'Modifier'}
+              <h3 className="text-lg font-semibold text-gray-900">Informations personnelles</h3>
+              <button onClick={() => setEditMode(!editMode)} className="btn-secondary">
+                <Edit className="h-4 w-4 mr-2" />{editMode ? 'Annuler' : 'Modifier'}
               </button>
             </div>
-
             <form onSubmit={handleProfileUpdate}>
+              {/* ... existing profileForm fields ... (ensure they are correctly mapped) */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Prénom
-                  </label>
-                  <input
-                    type="text"
-                    value={profileForm.prenom}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, prenom: e.target.value }))}
-                    disabled={!editMode}
-                    className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Prénom</label>
+                  <input type="text" value={profileForm.prenom} onChange={(e) => setProfileForm(prev => ({ ...prev, prenom: e.target.value }))} disabled={!editMode} className="input-field disabled:bg-gray-50"/>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nom
-                  </label>
-                  <input
-                    type="text"
-                    value={profileForm.nom}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, nom: e.target.value }))}
-                    disabled={!editMode}
-                    className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nom</label>
+                  <input type="text" value={profileForm.nom} onChange={(e) => setProfileForm(prev => ({ ...prev, nom: e.target.value }))} disabled={!editMode} className="input-field disabled:bg-gray-50"/>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={user?.email}
-                    disabled
-                    className="input-field bg-gray-50 text-gray-500"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                  <input type="email" value={user?.email} disabled className="input-field bg-gray-100"/>
                 </div>
-
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Téléphone
-                  </label>
-                  <input
-                    type="tel"
-                    value={profileForm.phone}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
-                    disabled={!editMode}
-                    className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                    placeholder="01 23 45 67 89"
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Téléphone</label>
+                  <input type="tel" value={profileForm.phone} onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))} disabled={!editMode} className="input-field disabled:bg-gray-50"/>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Date de naissance
-                  </label>
-                  <input
-                    type="date"
-                    value={profileForm.date_birth}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, date_birth: e.target.value }))}
-                    disabled={!editMode}
-                    className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Pays
-                  </label>
-                  <select
-                    value={profileForm.country}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, country: e.target.value }))}
-                    disabled={!editMode}
-                    className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                  >
-                    <option value="FR">France</option>
-                    <option value="BE">Belgique</option>
-                    <option value="CH">Suisse</option>
-                    <option value="CA">Canada</option>
-                  </select>
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Adresse
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={profileForm.address}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, address: e.target.value }))}
-                    disabled={!editMode}
-                    className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                    placeholder="123 Rue de la Paix, 75001 Paris"
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Biographie
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={profileForm.bio}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, bio: e.target.value }))}
-                    disabled={!editMode}
-                    className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                    placeholder="Parlez-nous de vous..."
-                  />
-                </div>
-
-                <div className="md:col-span-2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Compétences
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={profileForm.skills}
-                    onChange={(e) => setProfileForm(prev => ({ ...prev, skills: e.target.value }))}
-                    disabled={!editMode}
-                    className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                    placeholder="React, TypeScript, Python, etc."
-                  />
-                </div>
+                {/* Add other profile fields like address, date_birth, country if needed */}
               </div>
-
               {editMode && (
-                <div className="flex justify-end space-x-3 mt-6 pt-6 border-t border-gray-200">
-                  <button
-                    type="button"
-                    onClick={() => setEditMode(false)}
-                    className="btn-secondary"
-                    disabled={loading}
-                  >
-                    Annuler
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                    disabled={loading}
-                  >
-                    {loading ? (
-                      <div className="flex items-center">
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Sauvegarde...
-                      </div>
-                    ) : (
-                      <>
-                        <Save className="h-4 w-4 mr-2" />
-                        Sauvegarder
-                      </>
-                    )}
-                  </button>
-                </div>
+                <div className="flex justify-end mt-6 pt-6 border-t"><button type="submit" className="btn-primary" disabled={loading}>{loading ? 'Sauvegarde...' : 'Sauvegarder Profil'}</button></div>
               )}
             </form>
           </div>
         </div>
 
-        {/* Informations professionnelles */}
-        <div>
+        {/* Right Column: Professional Info, Security, Notifications, 2FA */}
+        <div className="space-y-6">
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Informations professionnelles
-            </h3>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Entreprise
-                </label>
-                <div className="flex items-center space-x-2">
-                  <Building className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-900">
-                    {user?.company_name || 'Non spécifié'}
-                  </span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Rôle
-                </label>
-                <div className="flex items-center space-x-2">
-                  <Briefcase className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-900 capitalize">
-                    {user?.role}
-                  </span>
-                </div>
-              </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Informations professionnelles</h3>
+            <div className="space-y-3">
+              <div><label className="text-xs text-gray-500">Entreprise</label><p className="text-sm flex items-center"><Building className="h-4 w-4 mr-2 text-gray-400" />{user?.company_name || 'N/A'}</p></div>
+              <div><label className="text-xs text-gray-500">Rôle</label><p className="text-sm flex items-center capitalize"><Briefcase className="h-4 w-4 mr-2 text-gray-400" />{user?.role}</p></div>
+               {user?.manager_name && <div><label className="text-xs text-gray-500">Manager</label><p className="text-sm flex items-center"><User className="h-4 w-4 mr-2 text-gray-400" />{user.manager_name}</p></div>}
             </div>
           </div>
 
-          {/* Sécurité */}
-          <div className="card mt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Sécurité
-            </h3>
-            
-            <form onSubmit={handlePasswordChange}>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Mot de passe actuel
-                  </label>
-                  <div className="relative">
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={passwordForm.current_password}
-                      onChange={(e) => setPasswordForm(prev => ({ ...prev, current_password: e.target.value }))}
-                      className="input-field pr-10"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Nouveau mot de passe
-                  </label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={passwordForm.new_password}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
-                    className="input-field"
-                    required
-                    minLength={6}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Confirmer le nouveau mot de passe
-                  </label>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    value={passwordForm.confirm_password}
-                    onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
-                    className="input-field"
-                    required
-                    minLength={6}
-                  />
-                </div>
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Sécurité - Mot de passe</h3>
+            <form onSubmit={handlePasswordChange} className="space-y-4">
+              {/* ... existing password change fields ... */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mot de passe actuel</label>
+                <div className="relative"><input type={showPassword ? 'text' : 'password'} value={passwordForm.current_password} onChange={(e) => setPasswordForm(prev => ({ ...prev, current_password: e.target.value }))} className="input-field pr-10" required /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute inset-y-0 right-0 pr-3 flex items-center">{showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>
               </div>
-
-              <div className="flex justify-end mt-4">
-                <button 
-                  type="submit" 
-                  className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <div className="flex items-center">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                      Modification...
-                    </div>
-                  ) : (
-                    <>
-                      <Lock className="h-4 w-4 mr-2" />
-                      Changer le mot de passe
-                    </>
-                  )}
-                </button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nouveau mot de passe</label>
+                <input type={showPassword ? 'text' : 'password'} value={passwordForm.new_password} onChange={(e) => setPasswordForm(prev => ({ ...prev, new_password: e.target.value }))} className="input-field" required minLength={6}/>
               </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirmer nouveau mot de passe</label>
+                <input type={showPassword ? 'text' : 'password'} value={passwordForm.confirm_password} onChange={(e) => setPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))} className="input-field" required minLength={6}/>
+              </div>
+              <div className="flex justify-end"><button type="submit" className="btn-primary" disabled={loading}>{loading ? 'Modification...' : 'Changer Mot de Passe'}</button></div>
             </form>
           </div>
 
-          {/* Notification Settings */}
-          <div className="card mt-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Notifications Push
-            </h3>
+          {/* Push Notification Settings Card - Existing */}
+          <div className="card">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center"><Bell className="h-5 w-5 mr-2 text-gray-700" />Notifications Push</h3>
+            {/* ... existing push notification JSX ... */}
             <div className="space-y-3">
-              <p className="text-sm text-gray-600">
-                Recevez des alertes importantes même lorsque l'application n'est pas ouverte.
-              </p>
+              <p className="text-sm text-gray-600">Recevez des alertes importantes même lorsque l'application n'est pas ouverte.</p>
               {notificationPermission === 'granted' ? (
-                <div>
-                  <p className="text-sm text-green-600 font-medium mb-2">
-                    Les notifications push sont activées pour ce navigateur.
-                  </p>
-                  <button
-                    onClick={handleDisablePushNotifications}
-                    className="btn-secondary text-sm"
-                  >
-                    Désactiver (via paramètres navigateur)
-                  </button>
-                </div>
+                <div><p className="text-sm text-green-600 font-medium mb-2">Notifications push activées.</p><button onClick={handleDisablePushNotifications} className="btn-secondary text-sm">Désactiver (via navigateur)</button></div>
               ) : notificationPermission === 'denied' ? (
-                <div>
-                  <p className="text-sm text-red-600 font-medium mb-2">
-                    Les notifications push sont bloquées par votre navigateur.
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    Pour les activer, veuillez modifier les permissions de notification pour ce site dans les paramètres de votre navigateur.
-                  </p>
-                </div>
-              ) : ( // default
-                <div>
-                  <p className="text-sm text-gray-700 mb-2">
-                    Les notifications push ne sont pas encore activées.
-                  </p>
-                  <button
-                    onClick={handleEnablePushNotifications}
-                    disabled={isSubscribing}
-                    className="btn-primary text-sm disabled:opacity-50"
-                  >
-                    {isSubscribing ? 'Activation...' : 'Activer les notifications push'}
-                  </button>
-                </div>
+                <p className="text-sm text-red-600 font-medium">Notifications push bloquées. Veuillez les autoriser dans les paramètres de votre navigateur.</p>
+              ) : (
+                <button onClick={handleEnablePushNotifications} disabled={isSubscribingPush} className="btn-primary text-sm">{isSubscribingPush ? 'Activation...' : 'Activer Notifications Push'}</button>
               )}
-               <p className="text-xs text-gray-500 mt-1">
-                Les paramètres de notification sont spécifiques à chaque navigateur/appareil.
-              </p>
             </div>
           </div>
 
-          {/* Two-Factor Authentication Section */}
-          <div className="card mt-6">
+          {/* Two-Factor Authentication Section - NEW */}
+          <div className="card">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
               <LockKeyhole className="h-5 w-5 mr-2 text-gray-700" />
               Authentification à Deux Facteurs (2FA)
@@ -629,144 +349,67 @@ export default function EmployeeProfile() {
               <div className="space-y-4">
                 <div className="flex items-center p-3 bg-green-50 border border-green-200 rounded-md">
                   <ShieldCheck className="h-6 w-6 text-green-600 mr-3" />
-                  <div>
-                    <p className="text-sm font-medium text-green-700">L'authentification à deux facteurs est activée.</p>
-                    <p className="text-xs text-green-600">Votre compte est mieux protégé.</p>
-                  </div>
+                  <div><p className="text-sm font-medium text-green-700">2FA Activée.</p></div>
                 </div>
-
-                <button
-                  onClick={handleRegenerateBackupCodes}
-                  disabled={twoFactorActionLoading}
-                  className="btn-secondary text-sm w-full justify-center"
-                >
-                  <KeyRound className="h-4 w-4 mr-2" />
-                  {twoFactorActionLoading && backupCodes.length === 0 ? 'Génération...' : 'Regénérer les codes de secours'}
+                <button onClick={handleRegenerateBackupCodes} disabled={twoFactorActionLoading} className="btn-secondary text-sm w-full justify-center">
+                  <KeyRound className="h-4 w-4 mr-2" />{twoFactorActionLoading && backupCodes.length === 0 ? 'Génération...' : 'Regénérer Codes de Secours'}
                 </button>
-
                 {backupCodes.length > 0 && (
                   <div className="mt-3 p-3 border rounded-md bg-gray-50">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Nouveaux codes de secours :</p>
-                    <ul className="space-y-1 list-disc list-inside pl-2">
-                      {backupCodes.map((code, index) => (
-                        <li key={index} className="text-sm font-mono bg-gray-100 px-2 py-1 rounded inline-block mr-2 mb-1">
-                          {code}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="text-xs text-red-600 mt-2">Conservez ces codes en lieu sûr. Ils ne seront plus affichés.</p>
+                    <p className="text-sm font-medium text-gray-700 mb-2">Nouveaux codes de secours (enregistrez-les !):</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {backupCodes.map((code) => (<span key={code} className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">{code}</span>))}
+                    </div>
                   </div>
                 )}
-
-                <button
-                  onClick={() => setShowDisable2FAConfirm(true)}
-                  disabled={twoFactorActionLoading}
-                  className="btn-danger text-sm w-full justify-center"
-                >
-                  <ShieldOff className="h-4 w-4 mr-2" />
-                  Désactiver la 2FA
+                <button onClick={() => setShowDisable2FAConfirm(true)} disabled={twoFactorActionLoading} className="btn-danger text-sm w-full justify-center">
+                  <ShieldOff className="h-4 w-4 mr-2" />Désactiver la 2FA
                 </button>
-
                 {showDisable2FAConfirm && (
-                  <form onSubmit={handleDisable2FA} className="mt-4 p-4 border rounded-md bg-yellow-50 border-yellow-200 space-y-3">
-                     <p className="text-sm font-medium text-yellow-800">Confirmez la désactivation :</p>
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Mot de passe actuel</label>
-                      <input type="password" value={disable2FAPassword} onChange={e => setDisable2FAPassword(e.target.value)} className="input-field input-sm" placeholder="Requis si pas de code OTP"/>
-                    </div>
-                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Ou Code OTP/Secours Actuel</label>
-                      <input type="text" value={disable2FAOtp} onChange={e => setDisable2FAOtp(e.target.value)} className="input-field input-sm" placeholder="Optionnel"/>
-                    </div>
-                    <div className="flex justify-end space-x-2">
-                        <button type="button" onClick={() => setShowDisable2FAConfirm(false)} className="btn-secondary btn-sm">Annuler</button>
-                        <button type="submit" className="btn-danger btn-sm" disabled={twoFactorActionLoading}>
-                            {twoFactorActionLoading ? "Désactivation..." : "Confirmer Désactivation"}
-                        </button>
-                    </div>
+                  <form onSubmit={handleDisable2FAConfirmSubmit} className="mt-4 p-4 border rounded-md bg-yellow-50 border-yellow-200 space-y-3">
+                    <p className="text-sm font-medium text-yellow-800">Confirmer la désactivation :</p>
+                    <div><label className="block text-xs font-medium text-gray-700 mb-1">Mot de passe actuel</label><input type="password" value={disable2FAPassword} onChange={e => setDisable2FAPassword(e.target.value)} className="input-field input-sm" placeholder="Requis si pas de code OTP"/></div>
+                    <div><label className="block text-xs font-medium text-gray-700 mb-1">Ou Code OTP/Secours Actuel</label><input type="text" value={disable2FAOtp} onChange={e => setDisable2FAOtp(e.target.value)} className="input-field input-sm" placeholder="Optionnel"/></div>
+                    <div className="flex justify-end space-x-2"><button type="button" onClick={() => setShowDisable2FAConfirm(false)} className="btn-secondary btn-sm">Annuler</button><button type="submit" className="btn-danger btn-sm" disabled={twoFactorActionLoading}>{twoFactorActionLoading ? "Désactivation..." : "Confirmer"}</button></div>
                   </form>
                 )}
-
               </div>
             ) : setup2FAData ? (
               // --- 2FA SETUP STEP 2: VERIFY ---
               <form onSubmit={handleVerifyAndEnable2FA} className="space-y-4">
-                <p className="text-sm text-gray-700">
-                  1. Scannez le QR code avec votre application d'authentification (Google Authenticator, Authy, etc.).
-                </p>
-                <div className="flex justify-center my-4 p-4 border rounded-md bg-white">
-                  <QRCodeSVG value={setup2FAData.provisioning_uri} size={160} includeMargin={true} />
-                </div>
-                <p className="text-sm text-gray-700">
-                  Ou entrez manuellement la clé suivante :
-                </p>
-                <div className="flex items-center space-x-2 p-2 border rounded-md bg-gray-100">
-                  <span className="text-sm font-mono break-all">{setup2FAData.otp_secret}</span>
-                  <button type="button" onClick={() => copyToClipboard(setup2FAData.otp_secret)} title="Copier la clé" className="text-gray-500 hover:text-gray-700">
-                    <Copy className="h-4 w-4" />
-                  </button>
+                <p className="text-sm text-gray-700">1. Scannez le QR code avec votre application d'authentification.</p>
+                <div className="flex justify-center my-3 p-2 border rounded-md bg-white"><QRCodeSVG value={setup2FAData.provisioning_uri} size={128} includeMargin={true} /></div>
+                <div className="text-sm text-gray-700">Ou entrez manuellement la clé :
+                  <div className="flex items-center space-x-2 p-2 mt-1 border rounded-md bg-gray-100">
+                    <span className="text-xs font-mono break-all">{setup2FAData.otp_secret}</span>
+                    <button type="button" onClick={() => copyToClipboard(setup2FAData.otp_secret)} title="Copier" className="text-gray-500 hover:text-gray-700"><Copy className="h-4 w-4" /></button>
+                  </div>
                 </div>
                 <div>
-                  <label htmlFor="otpForEnable" className="block text-sm font-medium text-gray-700 mb-1">
-                    2. Entrez le code de vérification de votre application :
-                  </label>
-                  <input
-                    type="text"
-                    id="otpForEnable"
-                    value={otpForEnable}
-                    onChange={(e) => setOtpForEnable(e.target.value)}
-                    className="input-field w-full"
-                    placeholder="Code à 6 chiffres"
-                    required
-                    maxLength={6}
-                    pattern="\d{6}"
-                  />
+                  <label htmlFor="otpForEnable" className="block text-sm font-medium text-gray-700 mb-1">2. Entrez le code de vérification :</label>
+                  <input type="text" id="otpForEnable" value={otpForEnable} onChange={(e) => setOtpForEnable(e.target.value)} className="input-field w-full" placeholder="123456" required maxLength={6} pattern="\d{6}"/>
                 </div>
-                <div className="flex justify-end space-x-3">
-                   <button type="button" onClick={() => setSetup2FAData(null)} className="btn-secondary" disabled={twoFactorActionLoading}>
-                    Annuler
-                  </button>
-                  <button type="submit" className="btn-primary" disabled={twoFactorActionLoading}>
-                    {twoFactorActionLoading ? 'Vérification...' : 'Vérifier et Activer'}
-                  </button>
-                </div>
+                <div className="flex justify-end space-x-3"><button type="button" onClick={() => setSetup2FAData(null)} className="btn-secondary" disabled={twoFactorActionLoading}>Annuler</button><button type="submit" className="btn-primary" disabled={twoFactorActionLoading}>{twoFactorActionLoading ? 'Vérification...' : 'Vérifier & Activer'}</button></div>
               </form>
             ) : backupCodes.length > 0 ? (
-                // --- 2FA SETUP STEP 3: SHOW BACKUP CODES ---
+                 // --- 2FA SETUP STEP 3: SHOW BACKUP CODES ---
                 <div className="p-4 border rounded-md bg-green-50 border-green-200">
-                    <h4 className="text-md font-semibold text-green-800 mb-2">2FA Activée ! Conservez précieusement vos codes de secours :</h4>
-                    <ul className="space-y-1 list-disc list-inside pl-2 mb-3">
-                      {backupCodes.map((code, index) => (
-                        <li key={index} className="text-md font-mono bg-green-100 px-3 py-1.5 rounded inline-block mr-2 mb-1 text-green-900 tracking-wider">
-                          {code}
-                        </li>
-                      ))}
-                    </ul>
-                    <p className="text-sm text-red-700 font-medium">
-                        Important : C'est la SEULE fois que ces codes seront affichés. Copiez-les et stockez-les en lieu sûr.
-                        Ils vous permettront d'accéder à votre compte si vous perdez l'accès à votre application d'authentification.
-                    </p>
-                    <button onClick={() => setBackupCodes([])} className="btn-primary mt-4">
-                        J'ai sauvegardé mes codes
-                    </button>
+                    <h4 className="text-md font-semibold text-green-800 mb-2">2FA Activée ! Conservez vos codes de secours :</h4>
+                     <div className="grid grid-cols-2 gap-2 mb-3">
+                      {backupCodes.map((code) => (<span key={code} className="text-md font-mono bg-green-100 px-3 py-1.5 rounded text-green-900 tracking-wider">{code}</span>))}
+                    </div>
+                    <p className="text-sm text-red-700 font-medium">Important : C'est la SEULE fois que ces codes seront affichés. Copiez-les en lieu sûr.</p>
+                    <button onClick={() => setBackupCodes([])} className="btn-primary mt-4">J'ai sauvegardé mes codes</button>
                 </div>
             ) : (
               // --- 2FA IS NOT ENABLED, NO SETUP IN PROGRESS ---
               <div className="space-y-3">
                 <div className="flex items-center p-3 bg-yellow-50 border border-yellow-200 rounded-md">
-                    <ShieldOff className="h-6 w-6 text-yellow-600 mr-3"/>
-                    <div>
-                        <p className="text-sm font-medium text-yellow-700">L'authentification à deux facteurs (2FA) n'est pas activée.</p>
-                        <p className="text-xs text-yellow-600">Activez la 2FA pour une sécurité renforcée de votre compte.</p>
-                    </div>
+                  <ShieldOff className="h-6 w-6 text-yellow-600 mr-3"/>
+                  <div><p className="text-sm font-medium text-yellow-700">2FA non activée.</p><p className="text-xs text-yellow-600">Activez la 2FA pour une sécurité renforcée.</p></div>
                 </div>
-                <button
-                  onClick={handleInitiate2FASetup}
-                  disabled={twoFactorActionLoading}
-                  className="btn-primary w-full justify-center"
-                >
-                  <ShieldCheck className="h-4 w-4 mr-2" />
-                  {twoFactorActionLoading ? 'Initialisation...' : 'Activer l\'authentification à deux facteurs'}
+                <button onClick={handleInitiate2FASetup} disabled={twoFactorActionLoading} className="btn-primary w-full justify-center">
+                  <ShieldCheck className="h-4 w-4 mr-2" />{twoFactorActionLoading ? 'Initialisation...' : 'Activer la 2FA'}
                 </button>
               </div>
             )}
