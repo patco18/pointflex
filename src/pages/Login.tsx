@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react' // Added useEffect
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { authService, api } from '../services/api' // Added authService and api
 import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
-import { Clock, Mail, Lock, Shield, AlertCircle, CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { Clock, Mail, Lock, Shield, AlertCircle, CheckCircle, Eye, EyeOff, ShieldCheck, LockKeyhole } from 'lucide-react' // Added ShieldCheck, LockKeyhole
 
 interface LoginForm {
   email: string
@@ -25,26 +26,85 @@ export default function Login() {
   const { register, handleSubmit, formState: { errors }, reset: resetLoginForm } = useForm<LoginForm>()
   // react-hook-form for OTP form if needed, or simple state management
   // For simplicity, using simple state for otpCode
+  const { login: contextLogin, serverStatus, checkServerStatus } = useAuth(); // Renamed login to contextLogin from useAuth
+  const [emailFor2FA, setEmailFor2FA] = useState<string>(''); // Store email for context login
 
-  const onSubmit = async (data: LoginForm) => {
+  useEffect(() => {
+    if(checkServerStatus) checkServerStatus();
+  }, [checkServerStatus]);
+
+  const handlePrimaryLogin = async (data: LoginForm) => {
     if (serverStatus === 'offline') {
-      toast.error('Le serveur backend n\'est pas accessible. Veuillez le démarrer.')
-      return
+      toast.error('Le serveur backend n\'est pas accessible. Veuillez le démarrer.');
+      return;
     }
-
-    setLoading(true)
+    setLoading(true); // Use 'loading' for primary, 'loginLoading2FA' for 2FA step
     try {
-      await login(data.email, data.password)
-      toast.success('Connexion réussie!')
-      navigate('/')
+      const response = await authService.login(data.email, data.password); // Direct API call
+
+      if (response.data.two_factor_required && response.data.user_id) {
+        setIs2FARequired(true);
+        setUserIdFor2FA(response.data.user_id);
+        setEmailFor2FA(data.email);
+        toast.success("Vérification en deux étapes requise.");
+      } else if (response.data.token && response.data.user) {
+        await contextLogin(data.email, data.password);
+        toast.success('Connexion réussie!');
+        navigate('/');
+      } else {
+        toast.error("Réponse de connexion inattendue.");
+      }
     } catch (error: any) {
-      console.error('Erreur de connexion:', error)
-      const message = error.response?.data?.message || error.message || 'Erreur de connexion'
-      toast.error(message)
+      const message = error.response?.data?.message || 'Email ou mot de passe incorrect.';
+      toast.error(message);
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
+
+  const handle2FASubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!userIdFor2FA || !otpCode) {
+      toast.error("Code OTP requis.");
+      return;
+    }
+    setLoginLoading2FA(true);
+    try {
+      const response = await authService.verifyLogin2FA(userIdFor2FA, otpCode);
+
+      if (response.data.token && response.data.user) {
+        localStorage.setItem('token', response.data.token);
+        // Storing user object might be large; often just token is stored and user re-fetched or context updated.
+        localStorage.setItem('user', JSON.stringify(response.data.user));
+        api.defaults.headers.common['Authorization'] = `Bearer ${response.data.token}`;
+
+        // Critical: Update AuthContext.
+        // This assumes contextLogin can re-initialize state based on stored token/user.
+        await contextLogin(emailFor2FA, "useContextAfter2FA"); // Password not relevant here if contextLogin adapts
+
+        toast.success('Connexion 2FA réussie!');
+        navigate('/');
+        setIs2FARequired(false);
+        setUserIdFor2FA(null);
+        setOtpCode('');
+        resetLoginForm();
+      } else {
+        toast.error("Échec de la vérification 2FA. Réponse inattendue.");
+      }
+    } catch (error: any) {
+      const message = error.response?.data?.message || 'Code OTP invalide ou expiré.';
+      toast.error(message);
+    } finally {
+      setLoginLoading2FA(false);
+    }
+  };
+
+  const handleCancel2FA = () => {
+    setIs2FARequired(false);
+    setUserIdFor2FA(null);
+    setEmailFor2FA('');
+    setOtpCode('');
+  };
 
   const getServerStatusDisplay = () => {
     switch (serverStatus) {
@@ -152,9 +212,63 @@ export default function Login() {
             </div>
           )}
 
-          <form className="space-y-6" onSubmit={handleSubmit(onSubmit)}>
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+          {is2FARequired ? (
+            // --- 2FA OTP Form ---
+            <form className="space-y-6" onSubmit={handle2FASubmit}>
+              <div className="text-center">
+                <ShieldCheck className="h-10 w-10 text-blue-600 mx-auto mb-2" />
+                <h2 className="text-xl font-semibold text-gray-800">Vérification en Deux Étapes</h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Entrez le code de votre application d'authentification.
+                </p>
+              </div>
+              <div>
+                <label htmlFor="otpCode" className="block text-sm font-medium text-gray-700 mb-2">
+                  Code de Vérification (6 chiffres)
+                </label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <LockKeyhole className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    id="otpCode"
+                    type="text"
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.replace(/\s/g, '').slice(0,6))}
+                    className="input-field pl-10 focus:ring-blue-500 focus:border-blue-500 text-center tracking-widest text-lg"
+                    placeholder="123456"
+                    maxLength={6}
+                    required
+                    autoComplete="one-time-code"
+                    inputMode="numeric"
+                    pattern="\d{6}"
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                disabled={loginLoading2FA || serverStatus === 'offline'}
+                className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white font-medium py-3 px-4 rounded-xl transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed transform hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
+              >
+                {loginLoading2FA ? (
+                  <div className="flex items-center justify-center"><div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>Vérification...</div>
+                ) : (
+                  <div className="flex items-center justify-center"><ShieldCheck className="h-5 w-5 mr-2" />Vérifier le Code</div>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={handleCancel2FA}
+                className="w-full text-sm text-blue-600 hover:underline text-center mt-3"
+              >
+                Annuler et retourner à la connexion
+              </button>
+            </form>
+          ) : (
+            // --- Original Email/Password Form ---
+            <form className="space-y-6" onSubmit={handleSubmit(handlePrimaryLogin)}> {/* Use handlePrimaryLogin */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Adresse email
               </label>
               <div className="relative">

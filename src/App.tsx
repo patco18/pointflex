@@ -24,6 +24,7 @@ import OrganizationManagement from './pages/OrganizationManagement'
 import AdvancedFeatures from './pages/AdvancedFeatures'
 import RoleManagementPage from './pages/RoleManagementPage'
 import BillingManagement from './pages/BillingManagement'
+import WebhookManagementPage from './pages/WebhookManagementPage' // Added Webhook Page
 import Missions from './pages/Missions'
 import Layout from './components/Layout'
 
@@ -108,6 +109,20 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <OrganizationManagement />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/webhooks" element={
+            <ProtectedRoute> {/* Assuming general admin access, refine with specific role if needed */}
+              <Layout>
+                <WebhookManagementPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/webhooks" element={
+            <ProtectedRoute> {/* Assuming general admin access, refine with specific role if needed */}
+              <Layout>
+                <WebhookManagementPage />
               </Layout>
             </ProtectedRoute>
           } />

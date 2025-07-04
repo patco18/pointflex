@@ -58,7 +58,17 @@ def update_profile():
         )
         
         db.session.commit()
-        
+
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='user.updated',
+                payload_data=current_user.to_dict(include_sensitive=False), # Send non-sensitive updated data
+                company_id=current_user.company_id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch user.updated webhook for user {current_user.id} after profile update: {webhook_error}")
+
         return jsonify({
             'message': 'Profil mis à jour avec succès',
             'profile': current_user.to_dict()

@@ -996,7 +996,17 @@ def update_company_settings():
         )
         
         db.session.commit()
-        
+
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='company.updated', # Or more specific like 'company.settings_updated'
+                payload_data=company.to_dict(include_sensitive=False), # Send updated, non-sensitive company data
+                company_id=company.id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch company.updated webhook for company {company.id} after settings update: {webhook_error}")
+
         return jsonify({
             'message': 'Paramètres de l\'entreprise mis à jour avec succès',
             'company': company.to_dict()
@@ -1412,6 +1422,17 @@ def update_company_leave_policy():
                 'default_country_code_for_holidays': company.default_country_code_for_holidays
             }
         )
+        # Dispatch webhook after successful commit
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='company.updated', # Specific event: 'company.leave_policy_updated'
+                payload_data=company.to_dict(include_sensitive=False), # Send updated company data
+                company_id=company.id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch company.updated (leave_policy) webhook for company {company.id}: {webhook_error}")
+
         return jsonify({
             'message': 'Leave policy updated successfully.',
             'work_days': company.work_days,
