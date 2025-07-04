@@ -1,7 +1,7 @@
 """
 LeaveType Model - Defines different types of leave available
 """
-from backend.database import db # Corrected import path
+from database import db # Corrected import path
 from datetime import datetime
 
 class LeaveType(db.Model):
@@ -18,6 +18,9 @@ class LeaveType(db.Model):
     requires_approval = db.Column(db.Boolean, default=True, nullable=False)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
 
+    # For automated annual accrual
+    annual_accrual_days = db.Column(db.Float, nullable=True, default=None) # Days accrued annually, if applicable
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -32,6 +35,7 @@ class LeaveType(db.Model):
             'is_paid': self.is_paid,
             'requires_approval': self.requires_approval,
             'is_active': self.is_active,
+            'annual_accrual_days': self.annual_accrual_days,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

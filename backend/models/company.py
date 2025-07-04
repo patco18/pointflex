@@ -47,6 +47,13 @@ class Company(db.Model):
     stripe_customer_id = db.Column(db.String(255), nullable=True) # Stripe Customer ID
     stripe_subscription_id = db.Column(db.String(255), nullable=True) # Stripe Subscription ID
     active_stripe_price_id = db.Column(db.String(255), nullable=True) # Active Stripe Price ID for the current subscription
+
+    # Leave Policy Configuration
+    # Stores work days as a comma-separated string of integers e.g., "0,1,2,3,4" for Mon-Fri
+    work_days = db.Column(db.String(20), default="0,1,2,3,4")
+    # Default country for national holidays from 'holidays' library, e.g., "FR", "US"
+    default_country_code_for_holidays = db.Column(db.String(10), default="FR")
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
@@ -168,6 +175,8 @@ class Company(db.Model):
                 'office_radius': self.office_radius,
                 'work_start_time': self.work_start_time.strftime('%H:%M') if self.work_start_time else None,
                 'late_threshold': self.late_threshold,
+                'work_days': self.work_days, # Add new leave policy fields
+                'default_country_code_for_holidays': self.default_country_code_for_holidays, # Add new leave policy fields
                 'plan_limits': self.get_plan_limits(),
                 'notes': self.notes
             })

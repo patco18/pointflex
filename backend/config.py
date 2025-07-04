@@ -54,6 +54,9 @@ class Config:
     WEBHOOK_TIMEOUT_SECONDS = int(os.environ.get('WEBHOOK_TIMEOUT_SECONDS') or 10)
     WEBHOOK_MAX_RETRIES = int(os.environ.get('WEBHOOK_MAX_RETRIES') or 3) # For future use with async tasks
 
+    # 2FA
+    TWO_FACTOR_ENCRYPTION_KEY = os.environ.get('TWO_FACTOR_ENCRYPTION_KEY') # Loaded in security_utils directly
+
 class DevelopmentConfig(Config):
     """Configuration pour le développement"""
     DEBUG = True

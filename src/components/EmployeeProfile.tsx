@@ -14,15 +14,26 @@ import {
   Lock,
   Building,
   Briefcase,
-  Bell // For notifications
+  Bell, // For notifications
+  ShieldCheck, // For 2FA
+  ShieldOff, // For 2FA
+  KeyRound, // For backup codes
+  Copy // For copying secret
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { requestNotificationPermission, initializeFirebaseApp } from '../firebaseInit' // Added
+import { authService } from '../services/api' // For 2FA functions
+import QRCodeStyling from 'qrcode.react'; // Corrected import name
+
+interface Setup2FAData {
+  otp_secret: string;
+  provisioning_uri: string;
+}
 
 export default function EmployeeProfile() {
-  const { user } = useAuth()
-  const [loading, setLoading] = useState(false)
-  const [editMode, setEditMode] = useState(false)
+  const { user, fetchUser } = useAuth(); // Assuming fetchUser exists in AuthContext to refresh user data
+  const [loading, setLoading] = useState(false); // General loading for profile/password updates
+  const [editMode, setEditMode] = useState(false);
   const [showPassword, setShowPassword] = useState(false)
   
   const [profileForm, setProfileForm] = useState({

@@ -6,9 +6,9 @@ import requests
 from datetime import datetime, timedelta
 from flask import current_app
 
-from backend.database import db
-from backend.models.webhook_subscription import WebhookSubscription
-from backend.models.webhook_delivery_log import WebhookDeliveryLog
+from database import db # Corrected import
+from backend.models.webhook_subscription import WebhookSubscription # This import is fine as it's a sibling package
+from backend.models.webhook_delivery_log import WebhookDeliveryLog # This import is fine
 
 # Configuration for webhook delivery
 WEBHOOK_TIMEOUT_SECONDS = 10

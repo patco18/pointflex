@@ -12,3 +12,6 @@ reportlab==4.0.4
 holidays>=0.20 # Using a version that's likely to be stable
 jsonschema>=3.0.0 # For webhook event validation
 requests>=2.20.0 # For sending webhooks
+pyotp>=2.6.0
+qrcode[pil]>=7.0.0 # qrcode with Pillow for image generation
+cryptography>=3.4.0 # For encrypting the TOTP secret

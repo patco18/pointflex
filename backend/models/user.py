@@ -35,6 +35,12 @@ class User(db.Model):
     last_login = db.Column(db.DateTime, nullable=True)
     failed_login_attempts = db.Column(db.Integer, default=0)
     locked_until = db.Column(db.DateTime, nullable=True)
+
+    # Two-Factor Authentication Fields
+    two_factor_secret = db.Column(db.String(255), nullable=True) # Encrypted TOTP secret
+    is_two_factor_enabled = db.Column(db.Boolean, default=False, nullable=False)
+    # Hashed backup codes, stored as JSON string array: '["hash1", "hash2", ...]'
+    two_factor_backup_codes = db.Column(db.Text, nullable=True)
     
     # Métadonnées
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -43,6 +49,12 @@ class User(db.Model):
     # Relations
     company = db.relationship('Company', backref='users', lazy=True)
     pointages = db.relationship('Pointage', backref='user', lazy=True, cascade='all, delete-orphan')
+
+    # Manager relationship (self-referential)
+    manager_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+    manager = db.relationship('User', remote_side=[id], backref=db.backref('direct_reports', lazy='dynamic'))
+    # 'remote_side=[id]' is necessary for self-referential many-to-one relationships.
+    # 'direct_reports' will be the collection on the manager User object.
     
     def __init__(self, **kwargs):
         """Initialisation avec génération automatique du numéro d'employé"""
@@ -118,6 +130,9 @@ class User(db.Model):
             'phone': self.phone,
             'is_active': self.is_active,
             'last_login': self.last_login.isoformat() if self.last_login else None,
+            'manager_id': self.manager_id,
+            'manager_name': f"{self.manager.prenom} {self.manager.nom}" if self.manager else None,
+            'is_two_factor_enabled': self.is_two_factor_enabled, # Add 2FA status
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
