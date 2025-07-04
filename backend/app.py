@@ -24,6 +24,7 @@ from routes.push_routes import push_bp # Added Push blueprint
 from routes.calendar_routes import calendar_bp # Added Calendar blueprint
 from routes.leave_routes import leave_bp # Added Leave blueprint
 from routes.webhook_routes import webhook_bp # Added Webhook blueprint
+from routes.two_factor_routes import two_factor_bp # Added 2FA blueprint
 
 # Import middleware
 from middleware.auth import init_auth_middleware
@@ -68,11 +69,16 @@ def create_app():
     app.register_blueprint(calendar_bp, url_prefix='/api/calendar') # Registered Calendar blueprint
     app.register_blueprint(leave_bp, url_prefix='/api/leave') # Registered Leave blueprint
     app.register_blueprint(webhook_bp, url_prefix='/api/webhooks') # Registered Webhook blueprint
+    app.register_blueprint(two_factor_bp, url_prefix='/api/auth/2fa') # Registered 2FA blueprint under /auth path
     
     # Create database tables
     with app.app_context():
         init_db()
     
+    # Register CLI commands
+    from backend import cli_commands # Assuming cli_commands.py is in backend directory
+    cli_commands.register_cli_commands(app)
+
     return app
 
 app = create_app()

@@ -1156,6 +1156,62 @@ def attendance_report_pdf():
         return jsonify(message="Erreur interne du serveur lors de la génération du PDF."), 500
 
 
+@admin_bp.route('/employees/<int:employee_id>/manager', methods=['PUT'])
+@require_admin # Only company admins can change managers for now
+def set_employee_manager(employee_id):
+    """Sets or changes the manager for an employee."""
+    current_admin = get_current_user()
+    data = request.get_json()
+    new_manager_id = data.get('manager_id') # Can be None to remove manager
+
+    target_employee = User.query.get_or_404(employee_id)
+
+    # Permission check: Admin must belong to the same company as the employee
+    if target_employee.company_id != current_admin.company_id:
+        return jsonify(message="Accès non autorisé à cet employé."), 403
+
+    if employee_id == new_manager_id:
+        return jsonify(message="Un employé ne peut pas être son propre manager."), 400
+
+    old_manager_id = target_employee.manager_id
+    old_values_details = {'manager_id': old_manager_id}
+
+
+    if new_manager_id is not None:
+        new_manager = User.query.get(new_manager_id)
+        if not new_manager:
+            return jsonify(message=f"Manager avec ID {new_manager_id} non trouvé."), 404
+        if new_manager.company_id != current_admin.company_id:
+            return jsonify(message="Le manager sélectionné n'appartient pas à la même entreprise."), 403
+        # TODO: Check for circular dependencies (e.g., A manages B, B manages A) - more complex logic needed
+
+        target_employee.manager_id = new_manager_id
+        new_values_details = {'manager_id': new_manager_id, 'manager_name': f"{new_manager.prenom} {new_manager.nom}"}
+    else:
+        target_employee.manager_id = None # Remove manager
+        new_values_details = {'manager_id': None, 'manager_name': None}
+
+    try:
+        db.session.commit()
+        log_user_action(
+            action='SET_EMPLOYEE_MANAGER',
+            resource_type='User',
+            resource_id=target_employee.id,
+            old_values=old_values_details,
+            new_values=new_values_details,
+            details=f"Manager set for employee {target_employee.email} to manager_id {new_manager_id}"
+        )
+        # db.session.commit() # For audit log if not covered by main commit
+        return jsonify({
+            'message': 'Manager de l\'employé mis à jour avec succès.',
+            'employee': target_employee.to_dict()
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Erreur lors de la définition du manager pour l'employé {employee_id}: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur."), 500
+
+
 @admin_bp.route('/employees/<int:employee_id>/attendance-report/pdf', methods=['GET'])
 @require_admin # Ensures current_user is at least an admin of their company
 def employee_attendance_report_pdf(employee_id):
@@ -1170,12 +1226,25 @@ def employee_attendance_report_pdf(employee_id):
 
         # Permission check: Admin can only generate reports for employees in their own company
         if target_employee.company_id != current_user.company_id:
-            # SuperAdmins might be an exception, but @require_admin doesn't cover that role by default here.
-            # If SuperAdmin needs this, the decorator or logic here should be adjusted.
-            return jsonify(message="Accès non autorisé à cet employé."), 403
+            return jsonify(message="Accès non autorisé à cet employé (hors entreprise)."), 403
 
-        # TODO: Add more granular permission for Managers (can only see their direct reports)
-        # This would require knowing the manager-employee relationship.
+        # Manager Scoping
+        if current_user.role == 'manager':
+            # Need to import or define get_managed_user_ids similar to leave_routes
+            # For now, assuming a simplified check or that this endpoint is primarily for admins
+            # A proper solution would be to share/import get_managed_user_ids or use a service
+            # Let's add a placeholder for now and it can be refined.
+            # This would require User model to be imported to get current_user.direct_reports
+            is_managed_by_current_user = False
+            if hasattr(current_user, 'direct_reports'): # Check if the relationship is loaded/available
+                 managed_ids = [report.id for report in current_user.direct_reports]
+                 if target_employee.id in managed_ids:
+                    is_managed_by_current_user = True
+
+            if not is_managed_by_current_user:
+                 # Check if the target_employee's manager is the current_user
+                if target_employee.manager_id != current_user.id:
+                    return jsonify(message="Accès non autorisé. Le manager ne peut voir que les rapports de son équipe."), 403
 
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
@@ -1260,3 +1329,148 @@ def employee_attendance_report_pdf(employee_id):
     except Exception as e:
         current_app.logger.error(f"Erreur génération PDF pour employé {employee_id}: {e}", exc_info=True)
         return jsonify(message="Erreur interne du serveur lors de la génération du PDF."), 500
+
+# --- Company Leave Policy Management ---
+from backend.models.company_holiday import CompanyHoliday
+
+@admin_bp.route('/company/leave-policy', methods=['GET'])
+@require_admin
+def get_company_leave_policy():
+    current_admin = get_current_user()
+    company = Company.query.get_or_404(current_admin.company_id)
+
+    company_holidays = CompanyHoliday.query.filter_by(company_id=company.id).order_by(CompanyHoliday.date).all()
+
+    return jsonify({
+        'work_days': company.work_days,
+        'default_country_code_for_holidays': company.default_country_code_for_holidays,
+        'company_holidays': [h.to_dict() for h in company_holidays]
+    }), 200
+
+@admin_bp.route('/company/leave-policy', methods=['PUT'])
+@require_admin
+def update_company_leave_policy():
+    current_admin = get_current_user()
+    company = Company.query.get_or_404(current_admin.company_id)
+    data = request.get_json()
+
+    old_policy_data = {
+        'work_days': company.work_days,
+        'default_country_code_for_holidays': company.default_country_code_for_holidays
+    }
+
+    if 'work_days' in data:
+        # Basic validation: comma-separated string of numbers 0-6
+        work_days_str = data['work_days']
+        try:
+            days_list = [int(d.strip()) for d in work_days_str.split(',') if d.strip()]
+            if not all(0 <= day <= 6 for day in days_list):
+                raise ValueError("Work days must be between 0 (Monday) and 6 (Sunday).")
+            if len(set(days_list)) != len(days_list): # Check for duplicates
+                 raise ValueError("Work days must not contain duplicates.")
+            company.work_days = ",".join(map(str, sorted(days_list)))
+        except ValueError as e:
+            return jsonify(message=f"Invalid work_days format: {e}. Expected comma-separated numbers (0-6)."), 400
+
+    if 'default_country_code_for_holidays' in data:
+        country_code = data['default_country_code_for_holidays']
+        if not country_code or len(country_code) > 10: # Basic validation
+            return jsonify(message="Invalid country code format."), 400
+        # Further validation against 'holidays' library supported countries could be added
+        company.default_country_code_for_holidays = country_code.upper()
+
+    try:
+        db.session.commit()
+        log_user_action(
+            action='UPDATE_LEAVE_POLICY_SETTINGS',
+            resource_type='Company',
+            resource_id=company.id,
+            old_values=old_policy_data,
+            new_values={
+                'work_days': company.work_days,
+                'default_country_code_for_holidays': company.default_country_code_for_holidays
+            }
+        )
+        return jsonify({
+            'message': 'Leave policy updated successfully.',
+            'work_days': company.work_days,
+            'default_country_code_for_holidays': company.default_country_code_for_holidays
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error updating leave policy for company {company.id}: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur."), 500
+
+
+@admin_bp.route('/company/holidays', methods=['POST'])
+@require_admin
+def add_company_holiday():
+    current_admin = get_current_user()
+    company_id = current_admin.company_id
+    data = request.get_json()
+
+    if not data.get('date') or not data.get('name'):
+        return jsonify(message="'date' and 'name' are required for company holiday."), 400
+
+    try:
+        holiday_date = datetime.strptime(data['date'], '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify(message="Invalid date format for holiday. Use YYYY-MM-DD."), 400
+
+    # Check if holiday with same date and name already exists for the company
+    existing_holiday = CompanyHoliday.query.filter_by(
+        company_id=company_id,
+        date=holiday_date,
+        name=data['name'] # Allow same date if name is different, or make date unique per company
+    ).first()
+    if existing_holiday:
+        return jsonify(message="A company holiday with this date and name already exists."), 409
+
+    new_holiday = CompanyHoliday(
+        company_id=company_id,
+        date=holiday_date,
+        name=data['name']
+    )
+
+    try:
+        db.session.add(new_holiday)
+        db.session.commit()
+        log_user_action(
+            action='ADD_COMPANY_HOLIDAY',
+            resource_type='CompanyHoliday',
+            resource_id=new_holiday.id,
+            new_values=new_holiday.to_dict(),
+            details={'company_id': company_id}
+        )
+        return jsonify(new_holiday.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error adding company holiday for company {company_id}: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur."), 500
+
+
+@admin_bp.route('/company/holidays/<int:holiday_id>', methods=['DELETE'])
+@require_admin
+def delete_company_holiday(holiday_id):
+    current_admin = get_current_user()
+    holiday = CompanyHoliday.query.get_or_404(holiday_id)
+
+    if holiday.company_id != current_admin.company_id:
+        return jsonify(message="Permission denied. Holiday does not belong to your company."), 403
+
+    old_holiday_data = holiday.to_dict()
+    try:
+        db.session.delete(holiday)
+        db.session.commit()
+        log_user_action(
+            action='DELETE_COMPANY_HOLIDAY',
+            resource_type='CompanyHoliday',
+            resource_id=holiday_id, # Use holiday_id from path as object is deleted
+            old_values=old_holiday_data,
+            details={'company_id': current_admin.company_id}
+        )
+        return jsonify(message="Company holiday deleted successfully."), 200
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting company holiday {holiday_id}: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur."), 500

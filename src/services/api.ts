@@ -96,6 +96,52 @@ export const authService = {
       throw error
     }
   },
+
+  // 2FA related services
+  setup2FA: async () => {
+    try {
+      return await api.post('/auth/2fa/setup');
+    } catch (error) {
+      console.error('2FA setup service error:', error);
+      throw error;
+    }
+  },
+
+  verifyAndEnable2FA: async (otpCode: string, otpSecret: string) => {
+    try {
+      return await api.post('/auth/2fa/verify-and-enable', { otp_code: otpCode, otp_secret: otpSecret });
+    } catch (error) {
+      console.error('2FA verify and enable service error:', error);
+      throw error;
+    }
+  },
+
+  verifyLogin2FA: async (userId: number, otpCode: string) => {
+    try {
+      return await api.post('/auth/2fa/verify-login', { user_id: userId, otp_code: otpCode });
+    } catch (error) {
+      console.error('2FA verify login service error:', error);
+      throw error;
+    }
+  },
+
+  disable2FA: async (payload: {password?: string; otp_code?: string}) => { // Password or OTP might be required
+    try {
+      return await api.post('/auth/2fa/disable', payload);
+    } catch (error) {
+      console.error('2FA disable service error:', error);
+      throw error;
+    }
+  },
+
+  regenerateBackupCodes: async (payload?: {password?: string; otp_code?: string}) => { // Password or OTP might be required
+    try {
+      return await api.post('/auth/2fa/backup-codes', payload);
+    } catch (error) {
+      console.error('2FA regenerate backup codes service error:', error);
+      throw error;
+    }
+  }
 }
 
 export const attendanceService = {

@@ -83,8 +83,48 @@ def login():
             user_agent=request.headers.get('User-Agent'),
             success=True
         )
-        db.session.commit()
+        db.session.commit() # Commit failed attempts updates or last_login before 2FA check
+
+        # Check if 2FA is enabled
+        if user.is_two_factor_enabled:
+            # Do not issue full access token yet.
+            # Frontend will need user_id to make the /2fa/verify-login call.
+            # A temporary, short-lived token specifically for 2FA verification might be an option
+            # but for simplicity, just returning a flag and user_id.
+            log_user_action(
+                action='2FA_REQUIRED_FOR_LOGIN',
+                resource_type='User',
+                resource_id=user.id,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent')
+            )
+            # db.session.commit() # For the audit log if not covered by earlier commit
+            return jsonify({
+                'message': "2FA required for this account.",
+                'two_factor_required': True,
+                'user_id': user.id # Frontend needs this to call the verify endpoint
+            }), 202 # 202 Accepted: request is fine, but further action (2FA) is needed
+
+        # 2FA not enabled, proceed with normal token generation
+        access_token = create_access_token(identity=user)
         
+        print(f"Connexion réussie pour {email}, token généré")
+
+        # Logger la connexion réussie (already done by user.update_last_login() if AuditLog.log_login is called there)
+        # AuditLog.log_login was already called after password check, which is fine.
+        # No, it's called AFTER successful login. So, if 2FA is enabled, this point is not reached yet.
+        # The log_login for success should happen AFTER 2FA verification if 2FA is enabled.
+        # The AuditLog.log_login(success=True) has been moved to /2fa/verify-login for 2FA users.
+        # For non-2FA users, it's logged here:
+        if not user.is_two_factor_enabled: # Log successful non-2FA login
+            AuditLog.log_login(
+                user=user,
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get('User-Agent'),
+                success=True
+            )
+            db.session.commit() # Commit the audit log for non-2FA login
+
         return jsonify({
             'token': access_token,
             'user': user.to_dict()

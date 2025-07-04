@@ -23,6 +23,7 @@ from .leave_balance import LeaveBalance
 from .leave_request import LeaveRequest
 from .webhook_subscription import WebhookSubscription
 from .webhook_delivery_log import WebhookDeliveryLog
+from .company_holiday import CompanyHoliday # Added CompanyHoliday
 
 __all__ = [
     'User',

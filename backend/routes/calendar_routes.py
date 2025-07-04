@@ -39,26 +39,53 @@ def get_calendar_events():
             end_of_month = date(year, month + 1, 1) - timedelta(days=1)
 
         target_user_ids = []
-        if user_ids_str == 'self' or not user_ids_str:
+
+        # Determine target_user_ids based on role and input
+        if user_ids_str == 'self' or (not user_ids_str and current_user.role not in ['admin_rh', 'superadmin', 'manager']):
             target_user_ids = [current_user.id]
-        elif current_user.role in ['admin_rh', 'superadmin', 'manager']: # Admins/managers can see more
-            # For simplicity, allow admin/superadmin to query specific users.
-            # Managers would ideally have a filter for their team.
-            try:
-                target_user_ids = [int(uid.strip()) for uid in user_ids_str.split(',') if uid.strip()]
-                # Security check: ensure admin can only access users in their company
-                if current_user.role == 'admin_rh':
-                    allowed_users = User.query.filter(User.company_id == current_user.company_id, User.id.in_(target_user_ids)).all()
-                    target_user_ids = [u.id for u in allowed_users]
-                elif current_user.role == 'manager':
-                    # TODO: Implement logic to get manager's team members
-                    # For now, restrict to self if manager tries to query others without specific team logic
-                    # Or, allow if target_user_ids are within their company and modify later
-                    pass # Placeholder for manager logic
-            except ValueError:
-                return jsonify(message="user_ids doit être une liste d'IDs numériques séparés par des virgules."), 400
-        else: # Regular employee can only see their own
-             target_user_ids = [current_user.id]
+        elif current_user.role == 'superadmin':
+            if user_ids_str: # Superadmin can query specific users
+                try:
+                    target_user_ids = [int(uid.strip()) for uid in user_ids_str.split(',') if uid.strip()]
+                except ValueError:
+                    return jsonify(message="user_ids doit être une liste d'IDs numériques séparés par des virgules."), 400
+            else: # Superadmin getting all users (potentially very large, might need company filter)
+                  # For now, let's assume if superadmin doesn't specify user_ids, they might want company-specific if company_id is passed.
+                  # This endpoint might need a company_id parameter for superadmin use.
+                  # For simplicity here, if user_ids_str is empty for SA, fetch nothing or require explicit user_ids/company_id.
+                  pass # Or fetch all if that's intended: target_user_ids = [u.id for u in User.query.all()]
+
+        elif current_user.role == 'admin_rh':
+            if not current_user.company_id: return jsonify(calendar_events=[]), 200
+            company_users = User.query.filter_by(company_id=current_user.company_id).with_entities(User.id).all()
+            company_user_ids = {uid[0] for uid in company_users}
+            if user_ids_str: # Admin queries specific users within their company
+                try:
+                    requested_ids = {int(uid.strip()) for uid in user_ids_str.split(',') if uid.strip()}
+                    target_user_ids = list(requested_ids.intersection(company_user_ids))
+                except ValueError:
+                    return jsonify(message="user_ids doit être une liste d'IDs numériques séparés par des virgules."), 400
+            else: # Admin gets all users in their company
+                target_user_ids = list(company_user_ids)
+
+        elif current_user.role == 'manager':
+            if not current_user.company_id: return jsonify(calendar_events=[]), 200
+            managed_ids = [report.id for report in current_user.direct_reports]
+            managed_ids.append(current_user.id) # Manager can also see their own events
+
+            if user_ids_str: # Manager queries specific users they manage
+                try:
+                    requested_ids = {int(uid.strip()) for uid in user_ids_str.split(',') if uid.strip()}
+                    target_user_ids = list(requested_ids.intersection(set(managed_ids)))
+                except ValueError:
+                    return jsonify(message="user_ids doit être une liste d'IDs numériques séparés par des virgules."), 400
+            else: # Manager gets all their direct reports + self
+                target_user_ids = managed_ids
+        else: # Default: employee sees self
+            target_user_ids = [current_user.id]
+
+        if not target_user_ids and user_ids_str and user_ids_str != 'self': # If specific users requested but none are valid/allowed
+             return jsonify(calendar_events=[]), 200
 
 
         calendar_events = []

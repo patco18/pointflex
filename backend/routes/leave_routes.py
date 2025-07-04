@@ -210,13 +210,22 @@ def get_managed_user_ids(manager):
     Admins can manage all in their company. SuperAdmins can manage all.
     """
     if manager.role == 'superadmin':
-        # Potentially all users, or needs a company_id filter from request
-        return [u.id for u in User.query.all()] # Example: all users
+        # Superadmin can see all users if no specific company filter is applied from request
+        # This function might need company_id context if superadmin is acting for a company
+        return [u.id for u in User.query.all()]
+
     if not manager.company_id:
-        return []
-    if manager.role in ['admin_rh', 'manager']: # For now, manager sees whole company like admin
+        return [] # No company, no one to manage in this context
+
+    if manager.role == 'admin_rh': # Company Admin sees all in their company
         return [u.id for u in User.query.filter_by(company_id=manager.company_id).all()]
-    return []
+
+    if manager.role == 'manager':
+        # A manager sees their direct reports
+        # The 'direct_reports' backref was defined on the User model for the manager relationship
+        return [report.id for report in manager.direct_reports]
+
+    return [] # Default to no one if role doesn't fit known management patterns
 
 @leave_bp.route('/admin/requests', methods=['GET'])
 @jwt_required() # Should be @require_manager_or_admin or similar
@@ -240,17 +249,29 @@ def admin_get_leave_requests():
 
         # Filter by users in the admin/manager's company
         query = query.join(User).filter(User.company_id == current_user.company_id)
-        # TODO: For managers, further filter by users they directly manage.
-        # managed_ids = get_managed_user_ids(current_user)
-        # if not managed_ids: return jsonify(requests=[], pagination={}), 200
-        # query = query.filter(LeaveRequest.user_id.in_(managed_ids))
+
+        if current_user.role == 'manager':
+            managed_ids = get_managed_user_ids(current_user)
+            if not managed_ids: # Manager manages no one
+                return jsonify(requests=[], pagination={'page': page, 'per_page': per_page, 'total_pages': 0, 'total_items': 0}), 200
+            query = query.filter(LeaveRequest.user_id.in_(managed_ids))
 
     if user_id_filter:
         # Ensure the filtered user_id is within the manager/admin's scope
-        if current_user.role == 'admin_rh' or current_user.role == 'manager':
+        is_allowed_to_filter_user = False
+        if current_user.role == 'superadmin':
+            is_allowed_to_filter_user = True
+        elif current_user.role == 'admin_rh':
             user_to_check = User.query.get(user_id_filter)
-            if not user_to_check or user_to_check.company_id != current_user.company_id:
-                return jsonify(message="Cannot filter by this user ID."), 403
+            if user_to_check and user_to_check.company_id == current_user.company_id:
+                is_allowed_to_filter_user = True
+        elif current_user.role == 'manager':
+            managed_ids = get_managed_user_ids(current_user)
+            if user_id_filter in managed_ids:
+                is_allowed_to_filter_user = True
+
+        if not is_allowed_to_filter_user:
+            return jsonify(message="Vous n'êtes pas autorisé à filtrer par cet ID utilisateur ou l'utilisateur n'est pas géré par vous."), 403
         query = query.filter(LeaveRequest.user_id == user_id_filter)
 
     if status_filter:
@@ -291,11 +312,10 @@ def admin_update_leave_request_status(request_id):
     if current_user.role != 'superadmin' and requester.company_id != current_user.company_id:
         return jsonify(message="Cannot manage requests for this company."), 403
 
-    # TODO: Manager should only manage their team's requests.
-    # managed_ids = get_managed_user_ids(current_user)
-    # if requester.id not in managed_ids:
-    #     return jsonify(message="You do not manage this employee's requests."), 403
-
+    if current_user.role == 'manager':
+        managed_ids = get_managed_user_ids(current_user)
+        if requester.id not in managed_ids:
+            return jsonify(message="You do not manage this employee's leave requests."), 403
 
     if leave_request.status not in ['pending', 'approved']: # Can't reject an already rejected, or re-approve a cancelled.
         return jsonify(message=f"Cannot change status of a request that is already '{leave_request.status}'."), 400
@@ -380,11 +400,19 @@ def admin_get_user_leave_balances(user_id):
     current_user = get_current_user() # This is the admin performing the action
     target_user = User.query.get_or_404(user_id)
 
-    # Permission Check: Admin for the same company or SuperAdmin
-    if not (current_user.role == 'superadmin' or \
-            (current_user.role == 'admin_rh' and target_user.company_id == current_user.company_id) or \
-            (current_user.role == 'manager' and target_user.company_id == current_user.company_id)): # TODO: Manager scope check
-        return jsonify(message="Permission denied to view these leave balances."), 403
+    # Permission Check
+    if current_user.role == 'superadmin':
+        pass # Superadmin can see anyone
+    elif current_user.role == 'admin_rh':
+        if target_user.company_id != current_user.company_id:
+            return jsonify(message="Permission denied. Admin can only view balances for users in their own company."), 403
+    elif current_user.role == 'manager':
+        managed_ids = get_managed_user_ids(current_user)
+        if target_user.id not in managed_ids:
+            return jsonify(message="Permission denied. Manager can only view balances for their direct reports."), 403
+    else: # Other roles (e.g. employee) cannot access this endpoint for others
+        return jsonify(message="Permission denied."), 403
+
 
     balances = LeaveBalance.query.filter_by(user_id=target_user.id).join(LeaveType).filter(LeaveType.is_active==True).all()
     return jsonify([b.to_dict() for b in balances]), 200

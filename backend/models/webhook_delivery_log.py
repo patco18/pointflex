@@ -1,7 +1,7 @@
 """
 WebhookDeliveryLog Model - Logs attempts to deliver webhooks
 """
-from backend.database import db # Corrected import
+from database import db # Corrected import
 from datetime import datetime
 import json
 
