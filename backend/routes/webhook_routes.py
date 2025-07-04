@@ -101,9 +101,196 @@ def list_webhook_subscriptions():
     # Exclude secret by default when listing
     return jsonify([sub.to_dict(include_secret=False) for sub in subscriptions]), 200
 
+
+@webhook_bp.route('/subscriptions/<int:sub_id>', methods=['GET'])
+@require_admin
+def get_webhook_subscription_details(sub_id):
+    current_user = get_current_user()
+    if not current_user.company_id:
+         return jsonify(message="User must be associated with a company."), 400
+
+    subscription = WebhookSubscription.query.get_or_404(sub_id)
+
+    if subscription.company_id != current_user.company_id:
+        return jsonify(message="Access to this webhook subscription is denied."), 403
+
+    # Exclude secret by default
+    return jsonify(subscription.to_dict(include_secret=False)), 200
+
+
+@webhook_bp.route('/subscriptions/<int:sub_id>', methods=['PUT'])
+@require_admin
+def update_webhook_subscription(sub_id):
+    current_user = get_current_user()
+    if not current_user.company_id:
+         return jsonify(message="User must be associated with a company."), 400
+
+    subscription = WebhookSubscription.query.get_or_404(sub_id)
+
+    if subscription.company_id != current_user.company_id:
+        return jsonify(message="Access to this webhook subscription is denied."), 403
+
+    data = request.get_json()
+    old_values = subscription.to_dict(include_secret=False) # For audit log
+
+    if 'target_url' in data:
+        target_url = data['target_url']
+        if not (target_url.startswith('http://') or target_url.startswith('https://')):
+            return jsonify(message="Invalid target_url format. Must be http or https."), 400
+        subscription.target_url = target_url
+
+    if 'subscribed_events' in data:
+        subscribed_events = data['subscribed_events']
+        try:
+            jsonschema.validate(instance=subscribed_events, schema=subscribed_events_schema)
+            subscription.subscribed_events = subscribed_events # Use setter for validation/conversion
+        except jsonschema.exceptions.ValidationError as e:
+            return jsonify(message=f"Invalid subscribed_events: {e.message}"), 400
+        except ValueError as e: # From setter if not list or valid JSON string
+             return jsonify(message=str(e)), 400
+
+
+    if 'is_active' in data:
+        if not isinstance(data['is_active'], bool):
+            return jsonify(message="is_active must be a boolean."), 400
+        subscription.is_active = data['is_active']
+
+    try:
+        db.session.commit()
+        log_user_action(
+            action='UPDATE_WEBHOOK_SUBSCRIPTION',
+            resource_type='WebhookSubscription',
+            resource_id=subscription.id,
+            old_values=old_values,
+            new_values=subscription.to_dict(include_secret=False)
+        )
+        return jsonify(subscription.to_dict(include_secret=False)), 200
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error updating webhook subscription {sub_id}: {e}", exc_info=True)
+        return jsonify(message="Failed to update webhook subscription."), 500
+
+
 # TODO: Implement other CRUD endpoints for subscriptions:
-# GET /subscriptions/<id>
-# PUT /subscriptions/<id> (update target_url, events, is_active)
-# DELETE /subscriptions/<id> (or set is_active=False)
-# GET /subscriptions/<id>/delivery-logs (with pagination)
-# POST /subscriptions/<id>/ping (send a test event)
+@webhook_bp.route('/subscriptions/<int:sub_id>', methods=['DELETE'])
+@require_admin
+def delete_webhook_subscription(sub_id):
+    current_user = get_current_user()
+    if not current_user.company_id:
+         return jsonify(message="User must be associated with a company."), 400
+
+    subscription = WebhookSubscription.query.get_or_404(sub_id)
+
+    if subscription.company_id != current_user.company_id:
+        return jsonify(message="Access to this webhook subscription is denied."), 403
+
+    old_values = subscription.to_dict(include_secret=False) # For audit log
+
+    try:
+        # Delivery logs might have a cascade delete due to model relationship,
+        # or they might be kept with a nullable subscription_id if preferred (current model cascades).
+        db.session.delete(subscription)
+        db.session.commit()
+        log_user_action(
+            action='DELETE_WEBHOOK_SUBSCRIPTION',
+            resource_type='WebhookSubscription',
+            resource_id=sub_id, # Use sub_id from path as object is deleted
+            old_values=old_values
+        )
+        return jsonify(message="Webhook subscription deleted successfully."), 200
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Error deleting webhook subscription {sub_id}: {e}", exc_info=True)
+        return jsonify(message="Failed to delete webhook subscription."), 500
+
+
+@webhook_bp.route('/subscriptions/<int:sub_id>/delivery-logs', methods=['GET'])
+@require_admin
+def get_webhook_delivery_logs(sub_id):
+    current_user = get_current_user()
+    if not current_user.company_id:
+         return jsonify(message="User must be associated with a company."), 400
+
+    subscription = WebhookSubscription.query.get_or_404(sub_id)
+    if subscription.company_id != current_user.company_id:
+        return jsonify(message="Access to this webhook subscription's logs is denied."), 403
+
+    page = request.args.get('page', 1, type=int)
+    per_page = min(request.args.get('per_page', 20, type=int), 100) # Max 100 logs per page
+
+    logs_page = WebhookDeliveryLog.query.filter_by(subscription_id=sub_id)\
+        .order_by(WebhookDeliveryLog.attempted_at.desc())\
+        .paginate(page=page, per_page=per_page, error_out=False)
+
+    return jsonify({
+        'logs': [log.to_dict() for log in logs_page.items],
+        'pagination': {
+            'page': logs_page.page,
+            'per_page': logs_page.per_page,
+            'total_pages': logs_page.pages,
+            'total_items': logs_page.total
+        }
+    }), 200
+
+
+@webhook_bp.route('/subscriptions/<int:sub_id>/ping', methods=['POST'])
+@require_admin
+def ping_webhook_subscription(sub_id):
+    current_user = get_current_user()
+    if not current_user.company_id:
+         return jsonify(message="User must be associated with a company."), 400
+
+    subscription = WebhookSubscription.query.get_or_404(sub_id)
+    if subscription.company_id != current_user.company_id:
+        return jsonify(message="Access to this webhook subscription is denied."), 403
+
+    if not subscription.is_active:
+        return jsonify(message="Cannot ping an inactive webhook subscription."), 400
+
+    try:
+        from backend.utils.webhook_utils import dispatch_webhook_event # Re-import for clarity or if moved
+
+        test_event_type = "ping.test"
+        test_payload = {
+            "message": "Webhook test ping from PointFlex.",
+            "subscription_id": sub_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        # Dispatch a single event directly to this subscription's URL
+        # We can reuse dispatch_webhook_event, but it queries for subscriptions.
+        # A more direct call to send_single_webhook might be cleaner if available,
+        # or adapt dispatch_webhook_event to take a single subscription.
+        # For now, we'll use a conceptual direct send or a specific utility for ping.
+
+        # Let's use a slightly modified approach for a single ping for clarity here,
+        # though in a real app, send_single_webhook from webhook_utils would be ideal.
+        from backend.utils.webhook_utils import send_single_webhook # Assuming this can be imported
+        import json # for payload_json_bytes
+
+        full_ping_payload = {
+            "event_id": f"evt_ping_{datetime.utcnow().timestamp()}_{subscription.id}",
+            "event_type": test_event_type,
+            "created_at": datetime.utcnow().isoformat(),
+            "data": test_payload,
+            "company_id": subscription.company_id
+        }
+        payload_json_bytes = json.dumps(full_ping_payload, sort_keys=True, default=str).encode('utf-8')
+
+        send_single_webhook(subscription, test_event_type, full_ping_payload, payload_json_bytes)
+
+        log_user_action(
+            action='PING_WEBHOOK_SUBSCRIPTION',
+            resource_type='WebhookSubscription',
+            resource_id=sub_id,
+            details={'target_url': subscription.target_url}
+        )
+        # db.session.commit() # Covered by send_single_webhook's internal commit for the log
+
+        return jsonify(message=f"Test ping event sent to {subscription.target_url}. Check delivery logs for status."), 200
+    except ImportError:
+        current_app.logger.error("webhook_utils.send_single_webhook not found or importable for ping.")
+        return jsonify(message="Error sending ping: Utility not found."), 500
+    except Exception as e:
+        current_app.logger.error(f"Error sending ping for webhook subscription {sub_id}: {e}", exc_info=True)
+        return jsonify(message="Failed to send ping test event."), 500

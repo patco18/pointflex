@@ -324,7 +324,17 @@ def update_employee(employee_id):
         )
         
         db.session.commit()
-        
+
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='user.updated',
+                payload_data=employee.to_dict(include_sensitive=False),
+                company_id=employee.company_id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch user.updated webhook for user {employee.id}: {webhook_error}")
+
         return jsonify({
             'message': 'Employé mis à jour avec succès',
             'employee': employee.to_dict()
@@ -364,6 +374,17 @@ def delete_employee(employee_id):
         
         db.session.delete(employee)
         db.session.commit()
+
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='user.deleted',
+                # old_values contains the state of the user before deletion
+                payload_data=old_values, # Send the data of the deleted user
+                company_id=old_values.get('company_id') # Get company_id from the old data
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch user.deleted webhook for user ID {employee_id}: {webhook_error}")
         
         return jsonify(message="Employé supprimé avec succès"), 200
         
