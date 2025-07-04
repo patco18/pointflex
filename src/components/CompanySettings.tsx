@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { adminService } from '../services/api'
-import { MapPin, Clock, Save, Navigation, CreditCard, ExternalLink, AlertTriangle } from 'lucide-react'
+import {
+  MapPin, Clock, Save, Navigation, CreditCard, ExternalLink, AlertTriangle,
+  CalendarDays, Trash2, PlusCircle, Edit // Added CalendarDays, Trash2, PlusCircle, Edit for Leave Policy
+} from 'lucide-react'
 import toast from 'react-hot-toast'
 import { useSearchParams, useNavigate } from 'react-router-dom' // For handling Stripe redirect
 
@@ -49,11 +52,20 @@ export default function CompanySettings() {
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [actionLoading, setActionLoading] = useState(false); // For button actions like subscribe/portal
 
-  // Charger les paramètres de l'entreprise et l'abonnement
+  // State for Leave Policy
+  const [leavePolicyLoading, setLeavePolicyLoading] = useState(true);
+  const [workDays, setWorkDays] = useState<number[]>([0, 1, 2, 3, 4]); // Default Mon-Fri (0=Mon, 6=Sun)
+  const [defaultCountryCode, setDefaultCountryCode] = useState('FR');
+  const [companyHolidays, setCompanyHolidays] = useState<{ id: number; date: string; name: string }[]>([]);
+  const [newHoliday, setNewHoliday] = useState({ date: '', name: '' });
+  const [leavePolicySaving, setLeavePolicySaving] = useState(false);
+
+  // Charger les paramètres de l'entreprise, l'abonnement, et la politique de congés
   useEffect(() => {
     if (isAdmin) {
       loadCompanySettings();
       loadSubscriptionData();
+      loadLeavePolicy();
     }
   }, [isAdmin]);
 
@@ -149,6 +161,82 @@ export default function CompanySettings() {
       setActionLoading(false);
     }
   }
+
+  const loadLeavePolicy = async () => {
+    setLeavePolicyLoading(true);
+    try {
+      const resp = await adminService.getCompanyLeavePolicy();
+      const policy = resp.data;
+      setWorkDays(policy.work_days ? policy.work_days.split(',').map(Number) : [0,1,2,3,4]);
+      setDefaultCountryCode(policy.default_country_code_for_holidays || 'FR');
+      setCompanyHolidays(policy.company_holidays || []);
+    } catch (error) {
+      console.error('Erreur chargement politique de congés:', error);
+      toast.error('Erreur lors du chargement de la politique de congés.');
+    } finally {
+      setLeavePolicyLoading(false);
+    }
+  };
+
+  const handleWorkDayChange = (dayIndex: number) => {
+    setWorkDays(prev =>
+      prev.includes(dayIndex)
+        ? prev.filter(d => d !== dayIndex)
+        : [...prev, dayIndex].sort((a,b) => a-b)
+    );
+  };
+
+  const handleSaveLeavePolicy = async () => {
+    setLeavePolicySaving(true);
+    try {
+      const policyData = {
+        work_days: workDays.join(','),
+        default_country_code_for_holidays: defaultCountryCode
+      };
+      await adminService.updateCompanyLeavePolicy(policyData);
+      toast.success('Politique de congés mise à jour.');
+    } catch (error) {
+      console.error('Erreur sauvegarde politique de congés:', error);
+      toast.error('Erreur lors de la sauvegarde de la politique de congés.');
+    } finally {
+      setLeavePolicySaving(false);
+    }
+  };
+
+  const handleAddCompanyHoliday = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newHoliday.date || !newHoliday.name) {
+      toast.error('Date et nom du jour férié sont requis.');
+      return;
+    }
+    setLeavePolicySaving(true); // Use same saving flag or a specific one
+    try {
+      const addedHoliday = await adminService.addCompanyHoliday(newHoliday);
+      setCompanyHolidays(prev => [...prev, addedHoliday.data]);
+      setNewHoliday({ date: '', name: '' }); // Reset form
+      toast.success('Jour férié ajouté.');
+    } catch (error) {
+      console.error('Erreur ajout jour férié:', error);
+      // Toast error is likely handled by interceptor
+    } finally {
+      setLeavePolicySaving(false);
+    }
+  };
+
+  const handleDeleteCompanyHoliday = async (holidayId: number) => {
+    if (!confirm('Êtes-vous sûr de vouloir supprimer ce jour férié ?')) return;
+    // Optimistic UI update or wait for success? For now, wait.
+    setLeavePolicySaving(true);
+    try {
+      await adminService.deleteCompanyHoliday(holidayId);
+      setCompanyHolidays(prev => prev.filter(h => h.id !== holidayId));
+      toast.success('Jour férié supprimé.');
+    } catch (error) {
+      console.error('Erreur suppression jour férié:', error);
+    } finally {
+      setLeavePolicySaving(false);
+    }
+  };
 
   // Fonction pour obtenir la position actuelle
   const getCurrentLocation = () => {
@@ -487,6 +575,115 @@ export default function CompanySettings() {
             <AlertTriangle className="h-10 w-10 text-red-500 mx-auto mb-3" />
             <p className="text-gray-700 font-medium">Impossible de charger les informations d'abonnement.</p>
             <p className="text-sm text-gray-500">Veuillez réessayer plus tard ou contacter le support.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Leave Policy Management Section */}
+      <div className="mt-8 pt-8 border-t border-gray-200">
+        <h2 className="text-xl font-semibold text-gray-900 mb-1">Politique de Congés</h2>
+        <p className="text-sm text-gray-600 mb-6">Configurez la semaine de travail et les jours fériés spécifiques à l'entreprise.</p>
+
+        {leavePolicyLoading ? (
+          <div className="flex items-center justify-center h-40">
+            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary-600"></div>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {/* Work Week Configuration */}
+            <div className="card">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                <CalendarDays className="h-5 w-5 mr-2 text-indigo-600" />
+                Semaine de Travail
+              </h3>
+              <p className="text-sm text-gray-500 mb-3">Cochez les jours considérés comme ouvrés pour le calcul des congés.</p>
+              <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-2 mb-4">
+                {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map((dayName, index) => (
+                  <label key={index} className="flex items-center space-x-2 p-2 border rounded-md hover:bg-gray-50 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={workDays.includes(index)}
+                      onChange={() => handleWorkDayChange(index)}
+                      className="form-checkbox h-4 w-4 text-indigo-600 border-gray-300 rounded"
+                    />
+                    <span className="text-sm text-gray-700">{dayName}</span>
+                  </label>
+                ))}
+              </div>
+
+              <div>
+                <label htmlFor="countryCodeHolidays" className="block text-sm font-medium text-gray-700 mb-1">
+                  Code Pays pour Jours Fériés Nationaux (ex: FR, US, GB)
+                </label>
+                <input
+                  type="text"
+                  id="countryCodeHolidays"
+                  value={defaultCountryCode}
+                  onChange={(e) => setDefaultCountryCode(e.target.value.toUpperCase())}
+                  className="input-field w-full md:w-1/3"
+                  maxLength={10}
+                />
+              </div>
+              <div className="mt-4 text-right">
+                <button onClick={handleSaveLeavePolicy} disabled={leavePolicySaving} className="btn-primary">
+                  {leavePolicySaving ? 'Sauvegarde...' : 'Sauvegarder Politique'}
+                </button>
+              </div>
+            </div>
+
+            {/* Company Specific Holidays */}
+            <div className="card">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center">
+                <PlusCircle className="h-5 w-5 mr-2 text-teal-600" />
+                Jours Fériés Spécifiques à l'Entreprise
+              </h3>
+              <form onSubmit={handleAddCompanyHoliday} className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 items-end">
+                <div>
+                  <label htmlFor="holidayName" className="block text-sm font-medium text-gray-700 mb-1">Nom du jour férié</label>
+                  <input
+                    type="text"
+                    id="holidayName"
+                    value={newHoliday.name}
+                    onChange={(e) => setNewHoliday(prev => ({ ...prev, name: e.target.value }))}
+                    className="input-field"
+                    placeholder="Ex: Anniversaire Entreprise"
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="holidayDate" className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                  <input
+                    type="date"
+                    id="holidayDate"
+                    value={newHoliday.date}
+                    onChange={(e) => setNewHoliday(prev => ({ ...prev, date: e.target.value }))}
+                    className="input-field"
+                    required
+                  />
+                </div>
+                <button type="submit" disabled={leavePolicySaving} className="btn-primary h-fit">
+                  <PlusCircle className="h-4 w-4 mr-1" /> Ajouter Férié
+                </button>
+              </form>
+
+              {companyHolidays.length > 0 ? (
+                <ul className="space-y-2">
+                  {companyHolidays.map(holiday => (
+                    <li key={holiday.id} className="flex justify-between items-center p-2 border rounded-md bg-gray-50">
+                      <div>
+                        <span className="font-medium text-gray-800">{holiday.name}</span>
+                        <span className="text-sm text-gray-600 ml-2">({new Date(holiday.date+'T00:00:00').toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })})</span>
+                      </div>
+                      <button onClick={() => handleDeleteCompanyHoliday(holiday.id)} disabled={leavePolicySaving} className="text-red-500 hover:text-red-700">
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500">Aucun jour férié spécifique à l'entreprise ajouté.</p>
+              )}
+            </div>
           </div>
         )}
       </div>

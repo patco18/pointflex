@@ -465,7 +465,41 @@ export const missionService = {
       console.error('Update mission error:', error)
       throw error
     }
-  }
+  },
+
+  // Leave Policy Management
+  getCompanyLeavePolicy: async () => {
+    try {
+      return await api.get('/admin/company/leave-policy');
+    } catch (error) {
+      console.error('Get company leave policy error:', error);
+      throw error;
+    }
+  },
+  updateCompanyLeavePolicy: async (policyData: { work_days?: string; default_country_code_for_holidays?: string }) => {
+    try {
+      return await api.put('/admin/company/leave-policy', policyData);
+    } catch (error) {
+      console.error('Update company leave policy error:', error);
+      throw error;
+    }
+  },
+  addCompanyHoliday: async (holidayData: { date: string; name: string }) => {
+    try {
+      return await api.post('/admin/company/holidays', holidayData);
+    } catch (error) {
+      console.error('Add company holiday error:', error);
+      throw error;
+    }
+  },
+  deleteCompanyHoliday: async (holidayId: number) => {
+    try {
+      return await api.delete(`/admin/company/holidays/${holidayId}`);
+    } catch (error) {
+      console.error('Delete company holiday error:', error);
+      throw error;
+    }
+  },
 }
 
 // Services Admin
