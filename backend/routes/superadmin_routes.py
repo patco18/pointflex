@@ -410,21 +410,32 @@ def update_company(company_id):
         )
         
         db.session.commit()
+
+        # Dispatch webhook for company update
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='company.updated',
+                payload_data=company.to_dict(include_sensitive=False),
+                company_id=company.id
+            )
+            # Note: If admin user details were changed as part of this company update,
+            # a 'user.updated' event for that admin might also be relevant.
+            # This would require tracking if admin details were actually part of the 'data' payload.
+            # For simplicity, we'll assume the primary event is company.updated.
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch company.updated webhook for company {company.id}: {webhook_error}")
         
         # Préparer la réponse avec les informations de l'admin
         company_dict = company.to_dict(include_sensitive=True)
         
-        # Récupérer l'administrateur pour la réponse
-        admin = User.query.filter_by(
-            company_id=company.id, 
-            role='admin_rh'
-        ).first()
-        
-        if admin:
-            company_dict['admin_id'] = admin.id
-            company_dict['admin_email'] = admin.email
-            company_dict['admin_name'] = f"{admin.prenom} {admin.nom}"
-            company_dict['admin_phone'] = admin.phone
+        # Récupérer l'administrateur pour la réponse (it might have been created/updated)
+        admin_user_for_response = User.query.filter_by(company_id=company.id, role='admin_rh').first()
+        if admin_user_for_response:
+            company_dict['admin_id'] = admin_user_for_response.id
+            company_dict['admin_email'] = admin_user_for_response.email
+            company_dict['admin_name'] = f"{admin_user_for_response.prenom} {admin_user_for_response.nom}"
+            company_dict['admin_phone'] = admin_user_for_response.phone
         
         return jsonify({
             'message': 'Entreprise mise à jour avec succès',
@@ -520,6 +531,23 @@ def extend_subscription(company_id):
         )
         
         db.session.commit()
+
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='invoice.created',
+                payload_data=invoice.to_dict(),
+                company_id=company.id
+            )
+            # Also dispatch subscription.updated as extend_subscription changes it
+            dispatch_webhook_event(
+                event_type='subscription.updated', # Or a more specific 'subscription.extended'
+                payload_data=company.to_dict(include_sensitive=True), # Send updated company subscription details
+                company_id=company.id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch invoice/subscription webhook for company {company.id} during extension: {webhook_error}")
+
         
         # Préparer la réponse avec les informations de l'admin
         company_dict = company.to_dict(include_sensitive=True)

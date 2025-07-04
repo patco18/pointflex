@@ -273,6 +273,16 @@ def checkout():
 
         db.session.commit()
 
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='pointage.updated', # Or 'pointage.checkout'
+                payload_data=pointage.to_dict(),
+                company_id=current_user.company_id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch pointage.updated (checkout) webhook for pointage {pointage.id}: {webhook_error}")
+
         send_notification(current_user.id, "Heure de départ enregistrée")
 
         return jsonify({

@@ -482,6 +482,18 @@ def admin_adjust_user_leave_balance(user_id):
         db.session.commit()
         # Notify user? Maybe if it's a significant manual change.
         # send_notification(target_user.id, f"Your leave balance for {leave_type.name} has been updated to {new_balance_days} days.")
+
+        # Dispatch webhook for leave_balance.updated
+        try:
+            from backend.utils.webhook_utils import dispatch_webhook_event
+            dispatch_webhook_event(
+                event_type='leave_balance.updated',
+                payload_data=balance.to_dict(), # Send the updated balance
+                company_id=target_user.company_id
+            )
+        except Exception as webhook_error:
+            current_app.logger.error(f"Failed to dispatch leave_balance.updated webhook for balance {balance.id}: {webhook_error}")
+
         return jsonify(balance.to_dict()), 200
     except Exception as e:
         db.session.rollback()

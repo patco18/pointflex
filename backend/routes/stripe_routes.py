@@ -178,6 +178,18 @@ def stripe_webhook():
                 webhook_payload['invoice'] = invoice_to_pay.to_dict() # Include the first invoice
                 webhook_payload['payment_details'] = payment.to_dict()
 
+                # Also dispatch invoice.created for the first invoice of the subscription
+                try:
+                    from backend.utils.webhook_utils import dispatch_webhook_event
+                    dispatch_webhook_event(
+                        event_type='invoice.created',
+                        payload_data=invoice_to_pay.to_dict(), # The new_invoice object
+                        company_id=company.id
+                    )
+                except Exception as webhook_error:
+                    current_app.logger.error(f"Failed to dispatch invoice.created (subscription) webhook for company {company.id}: {webhook_error}")
+
+
             if webhook_event_type:
                 try:
                     from backend.utils.webhook_utils import dispatch_webhook_event
@@ -278,18 +290,128 @@ def stripe_webhook():
 
 
     elif event.type == 'payment_intent.succeeded':
-        # Generally, checkout.session.completed (for initial) or invoice.payment_succeeded (for recurring) are preferred.
-        # payment_intent = event.data.object
-        # Contains amount, currency, customer, metadata etc.
-        # You might need to correlate this with an invoice if not using Checkout's metadata.
         current_app.logger.info(f"Stripe Webhook: Received payment_intent.succeeded: {event.data.object.id}")
-        pass # Add specific handling if needed
+        # This event might be too generic if not tied to a Checkout session with metadata.
+        # Usually handled by checkout.session.completed or invoice.payment_succeeded.
+        pass
 
-    elif event.type == 'payment_intent.payment_failed':
-        # payment_intent = event.data.object
-        # Handle failed payment, e.g., notify user, update invoice status to 'failed' or 'pending'.
-        current_app.logger.warning(f"Stripe Webhook: Received payment_intent.payment_failed: {event.data.object.id}")
-        pass # Add specific handling if needed
+    elif event.type == 'invoice.payment_failed' or event.type == 'checkout.session.async_payment_failed':
+        current_app.logger.warning(f"Stripe Webhook: Received {event.type}")
+        session_data = event.data.object
+        invoice_id_from_stripe_invoice = None
+        company_id_from_stripe_invoice = None
+
+        if event.type == 'invoice.payment_failed':
+            stripe_invoice_object = session_data
+            # Try to find our local invoice if Stripe invoice ID is stored, or via customer ID and subscription
+            # This part requires more robust linking if we store stripe_invoice_id on our Invoice model.
+            # For now, let's assume we can get company_id from customer if present
+            stripe_customer_id = stripe_invoice_object.get('customer')
+            if stripe_customer_id:
+                company = Company.query.filter_by(stripe_customer_id=stripe_customer_id).first()
+                if company:
+                    company_id_from_stripe_invoice = company.id
+                    # Try to find a relevant PENDING invoice for this customer. This is not ideal.
+                    # A better way is to store stripe_invoice_id on our Invoice model.
+                    # For now, we'll dispatch a generic company-level event.
+                    invoice_obj_for_webhook = stripe_invoice_object # Send stripe's invoice object
+
+        elif event.type == 'checkout.session.async_payment_failed':
+            # This event has metadata from the checkout session
+            metadata = session_data.get('metadata', {})
+            invoice_id_str = metadata.get('invoice_id') # If it was for a one-time invoice
+            company_id_str = metadata.get('company_id')
+            if company_id_str:
+                try:
+                    company_id_from_stripe_invoice = int(company_id_str)
+                    if invoice_id_str:
+                        local_invoice = Invoice.query.get(int(invoice_id_str))
+                        if local_invoice:
+                            local_invoice.status = 'failed' # Or keep 'pending' and notify admin
+                            db.session.add(local_invoice)
+                            db.session.commit()
+                            invoice_obj_for_webhook = local_invoice.to_dict()
+                        else: # No local invoice found, send generic session data
+                            invoice_obj_for_webhook = {"checkout_session_id": session_data.id, "failure_reason": session_data.get("last_payment_error", {}).get("message")}
+                    else: # Subscription setup failed async
+                         invoice_obj_for_webhook = {"checkout_session_id": session_data.id, "failure_reason": session_data.get("last_payment_error", {}).get("message"), "type": "subscription_setup"}
+
+                except ValueError:
+                    current_app.logger.error("Invalid company_id or invoice_id in async_payment_failed metadata.")
+                    return jsonify({'status': 'error', 'message': 'Invalid metadata'}), 400
+
+        if company_id_from_stripe_invoice and invoice_obj_for_webhook:
+            try:
+                from backend.utils.webhook_utils import dispatch_webhook_event
+                dispatch_webhook_event(
+                    event_type='invoice.payment_failed',
+                    payload_data=invoice_obj_for_webhook,
+                    company_id=company_id_from_stripe_invoice
+                )
+            except Exception as webhook_error:
+                current_app.logger.error(f"Failed to dispatch invoice.payment_failed webhook for company {company_id_from_stripe_invoice}: {webhook_error}")
+        else:
+            current_app.logger.warning(f"Could not determine company or relevant invoice for {event.type} to dispatch webhook.")
+
+    elif event.type == 'customer.subscription.updated' or event.type == 'customer.subscription.deleted':
+        stripe_subscription = event.data.object
+        stripe_customer_id = stripe_subscription.customer
+        company = Company.query.filter_by(stripe_customer_id=stripe_customer_id).first()
+
+        if company:
+            old_company_sub_details = company.to_dict(include_sensitive=True) # For old_values in audit
+
+            if event.type == 'customer.subscription.updated':
+                company.subscription_status = stripe_subscription.status # e.g., active, past_due, canceled
+                company.active_stripe_price_id = stripe_subscription.items.data[0].price.id if stripe_subscription.items.data else None
+                # Update plan name based on new price ID if mapping exists
+                if company.active_stripe_price_id and company.active_stripe_price_id in STRIPE_PRICE_TO_PLAN_MAPPING:
+                    plan_details = STRIPE_PRICE_TO_PLAN_MAPPING[company.active_stripe_price_id]
+                    company.subscription_plan = plan_details['name']
+                    company.max_employees = plan_details['max_employees']
+
+                if stripe_subscription.current_period_end:
+                    company.subscription_end = datetime.fromtimestamp(stripe_subscription.current_period_end).date()
+
+                webhook_event_type = 'subscription.updated'
+                action_log = 'SUBSCRIPTION_UPDATED_VIA_STRIPE'
+                current_app.logger.info(f"Stripe Webhook: Subscription updated for company {company.id} to status {company.subscription_status}")
+
+            else: # customer.subscription.deleted
+                company.subscription_status = 'cancelled' # Or 'expired' depending on context
+                company.stripe_subscription_id = None # Clear the Stripe subscription ID
+                # company.active_stripe_price_id = None # Clear price ID
+                # Consider setting subscription_end to now or period end if not already past
+                webhook_event_type = 'subscription.cancelled'
+                action_log = 'SUBSCRIPTION_CANCELLED_VIA_STRIPE'
+                current_app.logger.info(f"Stripe Webhook: Subscription cancelled for company {company.id}")
+
+            db.session.add(company)
+            db.session.commit()
+
+            # Audit Log
+            log_user_action(
+                user_email="stripe.webhook@system.com", # System action
+                action=action_log,
+                resource_type='CompanySubscription',
+                resource_id=company.id,
+                details={'stripe_subscription_id': stripe_subscription.id, 'new_status': company.subscription_status},
+                old_values=old_company_sub_details, # This might not be perfectly aligned if only partial data is in old_company_sub_details
+                new_values=company.to_dict(include_sensitive=True)
+            )
+
+            # Dispatch internal webhook
+            try:
+                from backend.utils.webhook_utils import dispatch_webhook_event
+                dispatch_webhook_event(
+                    event_type=webhook_event_type,
+                    payload_data=company.to_dict(include_sensitive=True), # Send full updated company object
+                    company_id=company.id
+                )
+            except Exception as webhook_error:
+                current_app.logger.error(f"Failed to dispatch internal {webhook_event_type} webhook for company {company.id}: {webhook_error}")
+        else:
+            current_app.logger.warning(f"Stripe Webhook: Received {event.type} for unknown customer {stripe_customer_id}")
 
     else:
         current_app.logger.info(f"Stripe Webhook: Unhandled event type {event.type}")
