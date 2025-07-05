@@ -450,6 +450,17 @@ export const calendarService = {
       console.error('Calculate leave duration error:', error);
       throw error;
     }
+  },
+  downloadMyLeaveReport: async (filters: { start_date?: string; end_date?: string; status?: string }) => {
+    try {
+      return await api.get('/profile/my-leave-report/pdf', {
+        params: filters,
+        responseType: 'blob' // Important for file downloads
+      });
+    } catch (error) {
+      console.error('Download my leave report error:', error);
+      throw error;
+    }
   }
 };
 
@@ -838,6 +849,17 @@ export const adminService = {
     } catch (error) {
       console.error('Download attendance pdf service error:', error)
       throw error
+    }
+  },
+  downloadEmployeeLeaveReport: async (employeeId: number, filters: { start_date?: string; end_date?: string; status?: string }) => {
+    try {
+      return await api.get(`/admin/employees/${employeeId}/leave-report/pdf`, {
+        params: filters,
+        responseType: 'blob'
+      });
+    } catch (error) {
+      console.error(`Download employee ${employeeId} leave report error:`, error);
+      throw error;
     }
   }
 }

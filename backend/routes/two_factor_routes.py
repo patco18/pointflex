@@ -16,11 +16,20 @@ from backend.middleware.audit import log_user_action
 
 two_factor_bp = Blueprint('two_factor_bp', __name__)
 
+# USER ACTION: Import your initialized 'limiter' instance here.
+# Example: from ..extensions import limiter # User needs to ensure 'limiter' is their Flask-Limiter instance
+
 # Helper to generate backup codes
 def generate_backup_codes(count=10, length=8):
     import secrets
     import string
     return [''.join(secrets.choice(string.digits) for _ in range(length)) for _ in range(count)]
+
+# USER ACTION: Decorate routes below with appropriate limits from your 'limiter' instance
+# Example:
+# @limiter.limit(lambda: current_app.config.get('RATELIMIT_SENSITIVE_ACTIONS'))
+# @two_factor_bp.route('/setup', methods=['POST'])
+# ...
 
 # Helper to hash backup codes (using werkzeug for consistency with password hashing if desired, or simple SHA256)
 def hash_backup_code(code):

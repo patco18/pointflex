@@ -8,7 +8,8 @@ import {
   MapPin,
   Filter,
   Briefcase, // For mission type
-  Home // For office type
+  Home, // For office type
+  Sunrise, Sunset, Sun, Moon // For half-day leave indicators
 } from 'lucide-react';
 import {
   format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, getDay,
@@ -260,18 +261,23 @@ export default function TeamCalendar() {
                               style={{ backgroundColor: event.color || '#777' }}
                               title={event.title}
                             >
-                              {event.type === 'pointage' && event.pointage_type === 'office' && <Home size={12} className="inline mr-1 flex-shrink-0" />}
-                              {event.type === 'pointage' && event.pointage_type === 'mission' && <Briefcase size={12} className="inline mr-1 flex-shrink-0" />}
-                              {event.type === 'mission' && <Briefcase size={12} className="inline mr-1 flex-shrink-0" />}
-                              {event.type === 'leave' && <Calendar size={12} className="inline mr-1 flex-shrink-0" />}
 
-                              {event.title}
-                              {event.type === 'leave' && event.requested_days === 0.5 && (
-                                <span className="ml-1 text-gray-200 text-[10px]">
-                                  {event.start_day_period === 'half_day_morning' && '(Matin)'}
-                                  {event.start_day_period === 'half_day_afternoon' && '(A-M)'}
+                              {/* Icon based on type */}
+                              {event.type === 'pointage' && event.pointage_type === 'office' && <Home size={12} className="inline mr-0.5 flex-shrink-0" />}
+                              {event.type === 'pointage' && event.pointage_type === 'mission' && <Briefcase size={12} className="inline mr-0.5 flex-shrink-0" />}
+                              {event.type === 'mission' && <Briefcase size={12} className="inline mr-0.5 flex-shrink-0" />}
+                              {event.type === 'leave' && event.requested_days === 0.5 && event.start_day_period === 'half_day_morning' && <Sunrise size={12} className="inline mr-0.5 flex-shrink-0" />}
+                              {event.type === 'leave' && event.requested_days === 0.5 && event.start_day_period === 'half_day_afternoon' && <Sunset size={12} className="inline mr-0.5 flex-shrink-0" />}
+                              {event.type === 'leave' && event.requested_days !== 0.5 && <Calendar size={12} className="inline mr-0.5 flex-shrink-0" />}
+
+                              <span className="truncate">{event.title}</span>
+                              {/* Text indicator for half-day leave, now more as a supplement to icon or if icons are too similar */}
+                              {/* {event.type === 'leave' && event.requested_days === 0.5 && (
+                                <span className="ml-1 text-gray-500 text-[9px]">
+                                  {event.start_day_period === 'half_day_morning' && 'Matin'}
+                                  {event.start_day_period === 'half_day_afternoon' && 'A-M'}
                                 </span>
-                              )}
+                              )} */}
                             </div>
                           ))}
                           {dayEvents.length > 3 && (

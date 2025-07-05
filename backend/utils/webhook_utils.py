@@ -57,83 +57,49 @@ def dispatch_webhook_event(event_type: str, payload_data: dict, company_id: int 
         "company_id": company_id
     }
 
-    payload_json_bytes = json.dumps(full_payload, sort_keys=True, default=str).encode('utf-8')
+    payload_json_bytes_str = json.dumps(full_payload, sort_keys=True, default=str)
+    # No longer encode to bytes here, task will do it. Pass string to RQ.
+
+    # Get RQ queue
+    # This assumes Redis is configured for the Flask app.
+    # RQ connection and queue should ideally be managed globally or via Flask extension.
+    try:
+        redis_url = current_app.config.get('REDIS_URL', os.environ.get('REDIS_URL', 'redis://localhost:6379/0'))
+        redis_conn = Redis.from_url(redis_url)
+        # Using a dedicated queue for webhooks
+        webhook_queue = Queue("pointflex_webhooks", connection=redis_conn)
+    except Exception as e:
+        current_app.logger.error(f"Failed to connect to Redis for RQ: {e}. Webhooks will not be queued.")
+        return
 
     for sub in subscriptions_to_notify:
-        send_single_webhook(sub, event_type, full_payload, payload_json_bytes)
-
-
-def send_single_webhook(subscription: WebhookSubscription, event_type: str, full_payload: dict, payload_json_bytes: bytes, attempt: int = 1):
-    """
-    Sends a single webhook to the subscription's target URL.
-    Logs the delivery attempt.
-    """
-    signature = subscription.generate_signature(payload_json_bytes)
-    headers = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'PointFlex-Webhook/1.0',
-        f'X-{current_app.config.get("WEBHOOK_SIGNATURE_HEADER_NAME", "PointFlex")}-Signature-256': signature,
-        # Could add a request ID header for better tracing
-    }
-
-    delivery_log = WebhookDeliveryLog(
-        subscription_id=subscription.id,
-        event_type=event_type,
-        payload=payload_json_bytes.decode('utf-8'), # Store the JSON string
-        target_url=subscription.target_url,
-        retry_attempt=attempt -1 # 0-indexed attempts
-    )
-    db.session.add(delivery_log)
-    # Commit early to get delivery_log.id if needed, or commit after response.
-    # For now, let's commit after getting response.
-
-    start_time = datetime.utcnow()
-    try:
-        current_app.logger.info(f"Sending webhook for event '{event_type}' to {subscription.target_url} (Attempt {attempt}) for sub ID {subscription.id}")
-        response = requests.post(
-            subscription.target_url,
-            data=payload_json_bytes,
-            headers=headers,
-            timeout=WEBHOOK_TIMEOUT_SECONDS
-        )
-        end_time = datetime.utcnow()
-
-        delivery_log.duration_ms = int((end_time - start_time).total_seconds() * 1000)
-        delivery_log.response_status_code = response.status_code
-        delivery_log.response_headers = json.dumps(dict(response.headers))
-        # Log only a part of the response body to avoid storing too much data
-        delivery_log.response_body = response.text[:1024] if response.text else None
-
-        if 200 <= response.status_code < 300:
-            delivery_log.is_success = True
-            current_app.logger.info(f"Webhook to {subscription.target_url} succeeded with status {response.status_code}.")
-        else:
-            delivery_log.is_success = False
-            delivery_log.error_message = f"HTTP Error: {response.status_code}"
-            current_app.logger.warning(f"Webhook to {subscription.target_url} failed with status {response.status_code}. Response: {response.text[:200]}")
-            # Basic retry logic placeholder (would be better with a task queue)
-            # if attempt < WEBHOOK_MAX_RETRIES:
-            #     current_app.logger.info(f"Scheduling retry for webhook to {subscription.target_url}")
-            #     # This is where you'd schedule a background task
-            #     # e.g., schedule_webhook_retry(delivery_log.id, delay=WEBHOOK_RETRY_DELAY_SECONDS * attempt)
-
-    except requests.exceptions.RequestException as e:
-        end_time = datetime.utcnow()
-        delivery_log.duration_ms = int((end_time - start_time).total_seconds() * 1000)
-        delivery_log.is_success = False
-        delivery_log.error_message = str(e)
-        current_app.logger.error(f"Error sending webhook to {subscription.target_url}: {e}")
-        # Retry logic placeholder
-        # if attempt < WEBHOOK_MAX_RETRIES:
-        #     current_app.logger.info(f"Scheduling retry for webhook to {subscription.target_url} due to exception.")
-
-    finally:
         try:
-            db.session.commit() # Commit the delivery log
-        except Exception as db_err:
-            db.session.rollback()
-            current_app.logger.error(f"Failed to save WebhookDeliveryLog: {db_err}")
+            # Enqueue the task
+            # The task path is 'backend.tasks.webhook_tasks.send_webhook_attempt_task'
+            job = webhook_queue.enqueue(
+                'backend.tasks.webhook_tasks.send_webhook_attempt_task',
+                args=(sub.id, event_type, full_payload, payload_json_bytes_str),
+                job_timeout=current_app.config.get('WEBHOOK_TIMEOUT_SECONDS', 10) * 2, # Give task more time than single HTTP timeout
+                retry=Retry(max=current_app.config.get('WEBHOOK_MAX_RETRIES', 3), interval=[10, 30, 60]), # Example retry strategy
+                # result_ttl=3600, # How long to keep job result
+                # failure_ttl=... # How long to keep failed job info
+                job_id=f"webhook_{sub.id}_{full_payload.get('event_id', secrets.token_hex(4))}" # Optional: custom job ID
+            )
+            current_app.logger.info(f"Enqueued webhook job {job.id} for event '{event_type}' to sub ID {sub.id}, URL {sub.target_url}")
 
+            # Optionally, create an initial WebhookDeliveryLog here with 'queued' status
+            # This ensures a log exists even if the worker never picks up the task.
+            # However, the task itself also creates a log upon actual attempt.
+            # For simplicity, we'll let the task create its own log.
+
+        except Exception as e:
+            current_app.logger.error(f"Failed to enqueue webhook task for sub ID {sub.id}, event '{event_type}': {e}", exc_info=True)
+
+# The send_single_webhook function is now effectively replaced by the RQ task in webhook_tasks.py
+# We can remove it or keep it for non-RQ/testing purposes if clearly marked.
+# For this refactor, it's assumed to be replaced.
 
 # Need to import secrets for event_id generation in dispatch_webhook_event
 import secrets
+from redis import Redis # For RQ connection
+from rq import Queue, Retry # For RQ

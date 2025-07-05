@@ -31,6 +31,10 @@ from middleware.auth import init_auth_middleware
 from middleware.audit import init_audit_middleware
 from middleware.error_handler import init_error_handlers
 
+# For Rate Limiting
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
+
 def create_app():
     app = Flask(__name__)
     
@@ -45,6 +49,25 @@ def create_app():
     
     # Initialize database
     db.init_app(app)
+
+    # Initialize Rate Limiter
+    if app.config.get('RATELIMIT_ENABLED', True):
+        limiter = Limiter(
+            get_remote_address, # Key function: by default, use remote IP address
+            app=app,
+            default_limits=[app.config.get('RATELIMIT_DEFAULT', "200/day;50/hour;10/minute")],
+            storage_uri=app.config.get('RATELIMIT_STORAGE_URL', "memory://"),
+            strategy=app.config.get('RATELIMIT_STRATEGY', "fixed-window")
+        )
+        # Make limiter available for decorators on blueprints/routes if needed elsewhere
+        app.limiter = limiter
+    else:
+        # Create a dummy limiter if disabled, so app.limiter doesn't break if accessed
+        class DummyLimiter:
+            def limit(self, *args, **kwargs): return lambda func: func
+            def exempt(self, *args, **kwargs): return lambda func: func
+        app.limiter = DummyLimiter()
+
 
     # SSE configuration
     app.config['REDIS_URL'] = os.environ.get('REDIS_URL', 'redis://localhost:6379/0')

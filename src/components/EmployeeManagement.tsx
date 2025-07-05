@@ -8,7 +8,7 @@ import StatusBadge from './shared/StatusBadge'
 import DataTable from './shared/DataTable'
 import { 
   Users, Plus, Edit, Trash2, Mail, Phone, Building, 
-  Briefcase, UserCheck, Shield, Save
+  Briefcase, UserCheck, Shield, Save, FileText, Download // Added FileText, Download
 } from 'lucide-react'
 
 interface Employee {
@@ -62,6 +62,12 @@ export default function EmployeeManagement() {
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [potentialManagers, setPotentialManagers] = useState<Employee[]>([]);
   
+  // State for Leave Report Modal
+  const [showLeaveReportModal, setShowLeaveReportModal] = useState(false);
+  const [selectedEmployeeForReport, setSelectedEmployeeForReport] = useState<Employee | null>(null);
+  const [leaveReportFilters, setLeaveReportFilters] = useState({ start_date: '', end_date: '', status: '' });
+  const [isDownloadingReport, setIsDownloadingReport] = useState(false);
+
   const [form, setForm] = useState<EmployeeForm>({
     email: '', nom: '', prenom: '', role: 'employee', password: '',
     phone: '', department_id: '', service_id: '', position_id: '', manager_id: '' // manager_id can be string here for form
@@ -194,12 +200,49 @@ export default function EmployeeManagement() {
     setEditingEmployee(null)
   }
 
+  const handleOpenLeaveReportModal = (emp: Employee) => {
+    setSelectedEmployeeForReport(emp);
+    setLeaveReportFilters({ start_date: '', end_date: '', status: '' }); // Reset filters
+    setShowLeaveReportModal(true);
+  };
+
+  const handleLeaveReportFilterChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    setLeaveReportFilters(prev => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const handleDownloadEmployeeLeaveReport = async () => {
+    if (!selectedEmployeeForReport) return;
+    setIsDownloadingReport(true);
+    try {
+      const response = await adminService.downloadEmployeeLeaveReport(selectedEmployeeForReport.id, leaveReportFilters);
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const fileName = `historique_conges_${selectedEmployeeForReport.nom.toLowerCase()}_${selectedEmployeeForReport.prenom.toLowerCase()}.pdf`;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success("Rapport de congés PDF téléchargé.");
+      setShowLeaveReportModal(false); // Close modal on success
+    } catch (error) {
+      toast.error("Erreur lors du téléchargement du rapport de congés.");
+    } finally {
+      setIsDownloadingReport(false);
+    }
+  };
+
   const actions = (emp: Employee) => (
     <div className="flex space-x-2">
-      <button onClick={() => startEdit(emp)} className="text-blue-600 hover:text-blue-900">
+      <button onClick={() => startEdit(emp)} className="text-blue-600 hover:text-blue-900 p-1" title="Modifier Employé">
         <Edit className="h-4 w-4" />
       </button>
-      <button onClick={() => handleDelete(emp)} className="text-red-600 hover:text-red-900">
+      <button onClick={() => handleOpenLeaveReportModal(emp)} className="text-green-600 hover:text-green-900 p-1" title="Rapport de Congés">
+        <FileText className="h-4 w-4" />
+      </button>
+      <button onClick={() => handleDelete(emp)} className="text-red-600 hover:text-red-900 p-1" title="Supprimer Employé">
         <Trash2 className="h-4 w-4" />
       </button>
     </div>
@@ -379,6 +422,44 @@ export default function EmployeeManagement() {
           </div>
         </form>
       </Modal>
+
+      {/* Leave Report Filter Modal */}
+      {selectedEmployeeForReport && (
+        <Modal
+          isOpen={showLeaveReportModal}
+          onClose={() => setShowLeaveReportModal(false)}
+          title={`Rapport de Congés pour ${selectedEmployeeForReport.prenom} ${selectedEmployeeForReport.nom}`}
+          size="lg"
+        >
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="lr_start_date" className="block text-sm font-medium text-gray-700 mb-1">Date de début (optionnel)</label>
+              <input type="date" name="start_date" id="lr_start_date" value={leaveReportFilters.start_date} onChange={handleLeaveReportFilterChange} className="input-field"/>
+            </div>
+            <div>
+              <label htmlFor="lr_end_date" className="block text-sm font-medium text-gray-700 mb-1">Date de fin (optionnel)</label>
+              <input type="date" name="end_date" id="lr_end_date" value={leaveReportFilters.end_date} onChange={handleLeaveReportFilterChange} className="input-field"/>
+            </div>
+            <div>
+              <label htmlFor="lr_status" className="block text-sm font-medium text-gray-700 mb-1">Statut (optionnel)</label>
+              <select name="status" id="lr_status" value={leaveReportFilters.status} onChange={handleLeaveReportFilterChange} className="input-field">
+                  <option value="">Tous</option>
+                  <option value="pending">En attente</option>
+                  <option value="approved">Approuvé</option>
+                  <option value="rejected">Rejeté</option>
+                  <option value="cancelled">Annulé</option>
+              </select>
+            </div>
+            <div className="flex justify-end space-x-3 pt-4">
+              <button type="button" onClick={() => setShowLeaveReportModal(false)} className="btn-secondary" disabled={isDownloadingReport}>Annuler</button>
+              <button onClick={handleDownloadEmployeeLeaveReport} className="btn-primary flex items-center" disabled={isDownloadingReport}>
+                {isDownloadingReport ? <LoadingSpinner size="sm" /> : <Download className="h-4 w-4 mr-2" />}
+                Télécharger Rapport
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   )
 }

@@ -23,7 +23,8 @@ from .leave_balance import LeaveBalance
 from .leave_request import LeaveRequest
 from .webhook_subscription import WebhookSubscription
 from .webhook_delivery_log import WebhookDeliveryLog
-from .company_holiday import CompanyHoliday # Added CompanyHoliday
+from .company_holiday import CompanyHoliday
+from .password_history import PasswordHistory # Added PasswordHistory
 
 __all__ = [
     'User',

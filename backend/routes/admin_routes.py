@@ -247,13 +247,27 @@ def create_employee():
             prenom=data['prenom'],
             role=data.get('role', 'employee'),
             company_id=company_id,
-            phone=data.get('phone'),
-            password=data['password']
+            phone=data.get('phone')
+            # Password will be set after validation
         )
         
+        # Validate password before setting it
+        from backend.utils.security_utils import validate_password_policy
+        policy_errors = validate_password_policy(data['password'], user_object=None) # No user object for history check on create
+        if policy_errors:
+            return jsonify(message="Validation du mot de passe échouée.", errors=policy_errors), 400
+
+        employee.set_password(data['password']) # Set password after validation
+
         db.session.add(employee)
         db.session.flush()  # Pour obtenir l'ID
         
+        # Add initial password to history (set_password does this, but user ID must be set first)
+        # This is implicitly handled if employee.id is available before set_password,
+        # or if set_password is called after flush and before commit.
+        # The current User.set_password() will add to history if self.id is available.
+        # Since we flush to get ID, then set_password, this should work.
+
         # Logger l'action
         log_user_action(
             action='CREATE',
@@ -312,6 +326,10 @@ def update_employee(employee_id):
         
         # Changer le mot de passe si fourni
         if data.get('password'):
+            from backend.utils.security_utils import validate_password_policy
+            policy_errors = validate_password_policy(data['password'], user_object=employee)
+            if policy_errors:
+                return jsonify(message="Validation du nouveau mot de passe échouée.", errors=policy_errors), 400
             employee.set_password(data['password'])
         
         # Logger l'action
@@ -1072,25 +1090,56 @@ def attendance_report_pdf():
 
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
+        pointage_type_filter = request.args.get('pointage_type') # 'office' or 'mission'
+        pointage_status_filter = request.args.get('pointage_status') # 'present', 'retard'
+        user_id_filter = request.args.get('user_id', type=int)
+        sort_by_filter = request.args.get('sort_by', 'user_then_date') # e.g., 'date', 'user', 'type', 'status'
+        sort_direction_filter = request.args.get('sort_direction', 'asc') # 'asc' or 'desc'
+
 
         query = Pointage.query.join(User).filter(User.company_id == company_id)
 
-        date_filter_text = "toutes périodes"
-        if start_date_str and end_date_str:
-            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
-            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            query = query.filter(Pointage.date_pointage.between(start_date, end_date))
-            date_filter_text = f"du {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}"
-        elif start_date_str:
+        report_filters_texts = []
+        if start_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
             query = query.filter(Pointage.date_pointage >= start_date)
-            date_filter_text = f"à partir du {start_date.strftime('%d/%m/%Y')}"
-        elif end_date_str:
+            report_filters_texts.append(f"Début: {start_date.strftime('%d/%m/%Y')}")
+        if end_date_str:
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            query = query.filter(Pointage.date_pointage <= end_date)
-            date_filter_text = f"jusqu'au {end_date.strftime('%d/%m/%Y')}"
+            query = query.filter(Pointage.date_pointage <= end_date) # Corrected to <= for end_date
+            report_filters_texts.append(f"Fin: {end_date.strftime('%d/%m/%Y')}")
+        if pointage_type_filter:
+            query = query.filter(Pointage.type == pointage_type_filter)
+            report_filters_texts.append(f"Type: {pointage_type_filter}")
+        if pointage_status_filter:
+            query = query.filter(Pointage.statut == pointage_status_filter)
+            report_filters_texts.append(f"Statut Pointage: {pointage_status_filter}")
+        if user_id_filter:
+            # Ensure admin can access this user (user is in their company)
+            user_to_filter = User.query.filter_by(id=user_id_filter, company_id=company_id).first()
+            if not user_to_filter:
+                return jsonify(message=f"Utilisateur avec ID {user_id_filter} non trouvé ou non autorisé."), 404
+            query = query.filter(Pointage.user_id == user_id_filter)
+            report_filters_texts.append(f"Employé: {user_to_filter.prenom} {user_to_filter.nom}")
 
-        pointages = query.order_by(User.nom, User.prenom, Pointage.date_pointage, Pointage.heure_arrivee).all()
+        date_filter_text = ", ".join(report_filters_texts) if report_filters_texts else "toutes périodes"
+
+        # Sorting logic
+        order_criteria = []
+        if sort_by_filter == 'date':
+            order_criteria.extend([Pointage.date_pointage, Pointage.heure_arrivee, User.nom, User.prenom])
+        elif sort_by_filter == 'type':
+            order_criteria.extend([Pointage.type, User.nom, User.prenom, Pointage.date_pointage])
+        elif sort_by_filter == 'status':
+            order_criteria.extend([Pointage.statut, User.nom, User.prenom, Pointage.date_pointage])
+        else: # Default: user_then_date
+            order_criteria.extend([User.nom, User.prenom, Pointage.date_pointage, Pointage.heure_arrivee])
+
+        if sort_direction_filter == 'desc':
+            order_criteria = [criterion.desc() for criterion in order_criteria]
+
+        query = query.order_by(*order_criteria)
+        pointages = query.all()
 
         buffer = BytesIO()
         styles = get_report_styles() # Get styles from pdf_utils
@@ -1279,18 +1328,56 @@ def employee_attendance_report_pdf(employee_id):
 
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
+        pointage_type_filter = request.args.get('pointage_type') # 'office' or 'mission'
+        pointage_status_filter = request.args.get('pointage_status') # 'present', 'retard'
+        # For individual report, user_id is fixed by employee_id
+        sort_by = request.args.get('sort_by', 'date') # e.g., 'date', 'type', 'status'
+        sort_direction = request.args.get('sort_direction', 'asc') # 'asc' or 'desc'
 
         query = Pointage.query.filter_by(user_id=employee_id)
 
-        date_filter_text = "toutes périodes"
-        if start_date_str and end_date_str:
+        report_filters_texts = []
+        if start_date_str:
             start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage >= start_date)
+            report_filters_texts.append(f"Début: {start_date.strftime('%d/%m/%Y')}")
+        if end_date_str:
             end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
-            query = query.filter(Pointage.date_pointage.between(start_date, end_date))
-            date_filter_text = f"du {start_date.strftime('%d/%m/%Y')} au {end_date.strftime('%d/%m/%Y')}"
-        # Add other date filter conditions as in my_attendance_report_pdf if needed
+            query = query.filter(Pointage.date_pointage <= end_date)
+            report_filters_texts.append(f"Fin: {end_date.strftime('%d/%m/%Y')}")
+        if pointage_type_filter:
+            query = query.filter(Pointage.type == pointage_type_filter)
+            report_filters_texts.append(f"Type: {pointage_type_filter}")
+        if pointage_status_filter:
+            query = query.filter(Pointage.statut == pointage_status_filter)
+            report_filters_texts.append(f"Statut Pointage: {pointage_status_filter}")
 
-        pointages = query.order_by(Pointage.date_pointage, Pointage.heure_arrivee).all()
+        date_filter_text = ", ".join(report_filters_texts) if report_filters_texts else "toutes périodes"
+
+        # Sorting logic
+        order_criteria = []
+        if sort_by == 'type':
+            order_criteria.append(Pointage.type)
+        elif sort_by == 'status':
+            order_criteria.append(Pointage.statut)
+
+        # Default sort includes date and time
+        order_criteria.extend([Pointage.date_pointage, Pointage.heure_arrivee])
+
+        if sort_direction == 'desc':
+            final_order_criteria = [criterion.desc() for criterion in order_criteria]
+        else: # asc
+            final_order_criteria = [criterion.asc() for criterion in order_criteria]
+            # Ensure secondary sort (time) matches primary (date) if date is the main sort
+            if Pointage.date_pointage in order_criteria:
+                date_sort_index = order_criteria.index(Pointage.date_pointage)
+                time_sort_index = order_criteria.index(Pointage.heure_arrivee) if Pointage.heure_arrivee in order_criteria else -1
+                if time_sort_index != -1:
+                    final_order_criteria[time_sort_index] = Pointage.heure_arrivee.asc() if final_order_criteria[date_sort_index].direction.name == 'asc' else Pointage.heure_arrivee.desc()
+
+
+        query = query.order_by(*final_order_criteria)
+        pointages = query.all()
 
         buffer = BytesIO()
         styles = get_report_styles()

@@ -80,3 +80,63 @@ if __name__ == '__main__':
     else:
         print("TWO_FACTOR_ENCRYPTION_KEY not set in environment. Skipping encryption/decryption test.")
         print("Generate a key using: Fernet.generate_key().decode()")
+
+import re
+
+def validate_password_strength(password: str) -> list[str]:
+    """
+    Validates password strength based on application configuration.
+    Returns a list of error messages if validation fails, otherwise an empty list.
+    """
+    errors = []
+    if not password: # Should be caught by required fields typically, but good to have
+        errors.append("Le mot de passe ne peut pas être vide.")
+        return errors
+
+    min_length = current_app.config.get('PASSWORD_MIN_LENGTH', 8)
+    req_uppercase = current_app.config.get('PASSWORD_REQUIRE_UPPERCASE', True)
+    req_numbers = current_app.config.get('PASSWORD_REQUIRE_NUMBERS', True)
+    req_special = current_app.config.get('PASSWORD_REQUIRE_SPECIAL_CHAR', True)
+
+    if len(password) < min_length:
+        errors.append(f"Le mot de passe doit contenir au moins {min_length} caractères.")
+
+    if req_uppercase and not re.search(r"[A-Z]", password):
+        errors.append("Le mot de passe doit contenir au moins une lettre majuscule.")
+
+    if req_numbers and not re.search(r"[0-9]", password):
+        errors.append("Le mot de passe doit contenir au moins un chiffre.")
+
+    if req_special and not re.search(r"[!@#$%^&*()\[\]{};':\"\\|,.<>\/?~`_+-=]", password):
+        errors.append("Le mot de passe doit contenir au moins un caractère spécial.")
+
+    # Password history check will be added later, typically integrated into User.set_password
+
+    return errors
+
+# Updated function to include history check
+def validate_password_policy(password: str, user_object=None) -> list[str]:
+    """
+    Validates password based on strength and history policies.
+    Returns a list of error messages if validation fails, otherwise an empty list.
+    `user_object` is required for history check.
+    """
+    strength_errors = validate_password_strength(password)
+    if strength_errors:
+        return strength_errors # Return early if basic strength fails
+
+    history_errors = []
+    if user_object and current_app.config.get('PASSWORD_HISTORY_COUNT', 0) > 0:
+        from backend.models.password_history import PasswordHistory # Corrected import
+        from werkzeug.security import check_password_hash
+
+        recent_hashes = PasswordHistory.query.filter_by(user_id=user_object.id)\
+                                        .order_by(PasswordHistory.created_at.desc())\
+                                        .limit(current_app.config.get('PASSWORD_HISTORY_COUNT'))\
+                                        .all()
+        for entry in recent_hashes:
+            if check_password_hash(entry.password_hash, password):
+                history_errors.append("Le nouveau mot de passe ne peut pas être identique à l'un de vos mots de passe récents.")
+                break
+
+    return history_errors # Returns empty if no history errors
