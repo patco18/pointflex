@@ -143,6 +143,19 @@ def create_company():
             
             # Définir le mot de passe
             admin_password = data.get('admin_password', 'admin123')
+
+            # Validate password before setting it
+            from backend.utils.security_utils import validate_password_policy
+            # For a new admin user, history check is not applicable with user_object=None
+            policy_errors = validate_password_policy(admin_password, user_object=None)
+            if policy_errors:
+                # Important: if this fails, we might have already added the company.
+                # This transaction should be all or nothing.
+                # Consider moving db.session.add(company) and flush after admin creation/validation,
+                # or ensuring rollback if admin creation fails.
+                # For now, this error will prevent commit.
+                return jsonify(message="Validation du mot de passe administrateur échouée.", errors=policy_errors), 400
+
             admin.set_password(admin_password)
             
             db.session.add(admin)
@@ -362,6 +375,10 @@ def update_company(company_id):
                     admin.phone = data['admin_phone']
                 
                 if data.get('admin_password'):
+                    from backend.utils.security_utils import validate_password_policy
+                    policy_errors = validate_password_policy(data['admin_password'], user_object=admin)
+                    if policy_errors:
+                         return jsonify(message="Validation du nouveau mot de passe administrateur échouée.", errors=policy_errors), 400
                     admin.set_password(data['admin_password'])
             else:
                 # Créer un nouvel administrateur si l'email est fourni
@@ -396,6 +413,13 @@ def update_company(company_id):
                     
                     # Définir le mot de passe
                     admin_password = data.get('admin_password', 'admin123')
+
+                    # Validate password before setting it
+                    from backend.utils.security_utils import validate_password_policy
+                    policy_errors = validate_password_policy(admin_password, user_object=None) # New user, no history check against self
+                    if policy_errors:
+                        return jsonify(message="Validation du mot de passe du nouvel administrateur échouée.", errors=policy_errors), 400
+
                     admin.set_password(admin_password)
                     
                     db.session.add(admin)

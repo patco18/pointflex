@@ -26,7 +26,8 @@ import RoleManagementPage from './pages/RoleManagementPage'
 import BillingManagement from './pages/BillingManagement'
 import WebhookManagementPage from './pages/WebhookManagementPage'
 import Missions from './pages/Missions'
-import RequestLeavePage from './pages/RequestLeavePage'; // Added RequestLeavePage
+import RequestLeavePage from './pages/RequestLeavePage';
+import MyLeaveHistoryPage from './pages/MyLeaveHistoryPage'; // Added MyLeaveHistoryPage
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
@@ -249,6 +250,13 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <RequestLeavePage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/my-leave-history" element={
+            <ProtectedRoute>
+              <Layout>
+                <MyLeaveHistoryPage />
               </Layout>
             </ProtectedRoute>
           } />

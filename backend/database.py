@@ -27,7 +27,8 @@ def init_db():
         from models.leave_request import LeaveRequest
         from models.webhook_subscription import WebhookSubscription
         from models.webhook_delivery_log import WebhookDeliveryLog
-        from models.company_holiday import CompanyHoliday # Added CompanyHoliday
+        from models.company_holiday import CompanyHoliday
+        from models.password_history import PasswordHistory # Added PasswordHistory
         
         # Créer toutes les tables
         db.create_all()

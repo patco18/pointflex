@@ -49,6 +49,11 @@ class Config:
     MAX_LOGIN_ATTEMPTS = 5
     LOCKOUT_DURATION = 30  # minutes
 
+    # Enhanced Password Policy
+    PASSWORD_REQUIRE_SPECIAL_CHAR = os.environ.get('PASSWORD_REQUIRE_SPECIAL_CHAR', 'true').lower() in ['true', 'on', '1']
+    PASSWORD_HISTORY_COUNT = int(os.environ.get('PASSWORD_HISTORY_COUNT') or 5) # Number of old passwords to remember
+    # PASSWORD_EXPIRY_DAYS = int(os.environ.get('PASSWORD_EXPIRY_DAYS') or 90) # Deferred for now
+
     # Webhooks
     WEBHOOK_SIGNATURE_HEADER_NAME = os.environ.get('WEBHOOK_SIGNATURE_HEADER_NAME') or 'X-PointFlex-Signature-256'
     WEBHOOK_TIMEOUT_SECONDS = int(os.environ.get('WEBHOOK_TIMEOUT_SECONDS') or 10)
@@ -56,6 +61,14 @@ class Config:
 
     # 2FA
     TWO_FACTOR_ENCRYPTION_KEY = os.environ.get('TWO_FACTOR_ENCRYPTION_KEY') # Loaded in security_utils directly
+
+    # Rate Limiting (Flask-Limiter)
+    RATELIMIT_ENABLED = os.environ.get('RATELIMIT_ENABLED', 'true').lower() in ['true', 'on', '1']
+    RATELIMIT_STORAGE_URL = os.environ.get('RATELIMIT_STORAGE_URL') or "memory://" # Default to memory, recommend Redis for production
+    RATELIMIT_STRATEGY = os.environ.get('RATELIMIT_STRATEGY') or "fixed-window" # "moving-window" is more robust
+    RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT') or "200 per day;50 per hour;20 per minute"
+    RATELIMIT_AUTH_LOGIN = os.environ.get('RATELIMIT_AUTH_LOGIN') or "20 per minute;50 per hour" # Stricter for login
+    RATELIMIT_SENSITIVE_ACTIONS = os.environ.get('RATELIMIT_SENSITIVE_ACTIONS') or "10 per hour" # e.g., password reset, 2FA setup
 
 class DevelopmentConfig(Config):
     """Configuration pour le développement"""

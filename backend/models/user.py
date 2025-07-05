@@ -70,8 +70,45 @@ class User(db.Model):
             self.employee_number = self.generate_employee_number()
     
     def set_password(self, password):
-        """Définit le mot de passe hashé"""
-        self.password_hash = generate_password_hash(password)
+        """Définit le mot de passe hashé et gère l'historique."""
+        from flask import current_app # For config access
+        from backend.models.password_history import PasswordHistory # Corrected import path
+
+        new_hash = generate_password_hash(password)
+
+        # Add to password history
+        # Note: This should ideally be done *after* validation (including history check) passes in the route.
+        # If called here, it means the password has already passed all checks.
+
+        # Create new history entry
+        history_entry = PasswordHistory(user_id=self.id, password_hash=new_hash)
+        db.session.add(history_entry)
+
+        # Prune old history entries
+        history_limit = current_app.config.get('PASSWORD_HISTORY_COUNT', 5)
+        if history_limit > 0:
+            # Get all history entries for the user, ordered by creation date (oldest first)
+            entries_to_prune_query = PasswordHistory.query.filter_by(user_id=self.id)\
+                                            .order_by(PasswordHistory.created_at.asc())
+
+            num_entries = entries_to_prune_query.count()
+
+            if num_entries >= history_limit: # If we have limit or more entries (after adding the new one)
+                # We want to keep `history_limit -1` of the *oldest* ones to delete them,
+                # effectively keeping the newest `history_limit` entries (including the one just added).
+                # More accurately: find count - history_limit oldest entries to delete.
+                # If we have 6 and limit is 5, delete 1 oldest.
+                # If we have 5 and limit is 5, delete 0.
+                num_to_delete = num_entries - history_limit + 1 # +1 because we just added one
+                if num_to_delete > 0:
+                    oldest_entries_to_delete = entries_to_prune_query.limit(num_to_delete).all()
+                    for entry_to_delete in oldest_entries_to_delete:
+                        db.session.delete(entry_to_delete)
+
+        self.password_hash = new_hash
+        if hasattr(self, 'password_last_changed_at'): # If password expiry is implemented
+             self.password_last_changed_at = datetime.utcnow()
+
     
     def check_password(self, password):
         """Vérifie le mot de passe"""
