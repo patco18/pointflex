@@ -437,6 +437,19 @@ export const calendarService = {
       console.error('Get calendar events service error:', error);
       throw error;
     }
+  },
+  calculateLeaveDuration: async (data: {
+    start_date: string;
+    end_date: string;
+    start_day_period?: string;
+    end_day_period?: string;
+  }) => {
+    try {
+      return await api.post('/leave/calculate-duration', data);
+    } catch (error) {
+      console.error('Calculate leave duration error:', error);
+      throw error;
+    }
   }
 };
 

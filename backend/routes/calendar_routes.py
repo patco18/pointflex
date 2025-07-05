@@ -3,10 +3,11 @@ Routes for fetching calendar events (pointages, missions, etc.)
 """
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
-from backend.middleware.auth import get_current_user, require_admin # Or more specific role checks
+from backend.middleware.auth import get_current_user, require_admin
 from backend.models.user import User
 from backend.models.pointage import Pointage
 from backend.models.mission import Mission
+from backend.models.leave_request import LeaveRequest # Added LeaveRequest model
 from backend.database import db
 from datetime import datetime, date, timedelta
 from sqlalchemy import or_, and_
@@ -191,7 +192,56 @@ def get_calendar_events():
                 'color': '#FF9800' # Orange for missions
             })
 
-        # TODO: Fetch Leave Requests once that module is implemented
+        # Fetch Approved Leave Requests
+        leave_request_query = LeaveRequest.query.filter(
+            LeaveRequest.user_id.in_(target_user_ids),
+            LeaveRequest.status == 'approved', # Only show approved leave
+            or_( # Similar date logic as missions to catch overlaps
+                and_(LeaveRequest.start_date <= end_of_month, LeaveRequest.end_date >= start_of_month),
+                and_(LeaveRequest.start_date >= start_of_month, LeaveRequest.start_date <= end_of_month),
+                and_(LeaveRequest.end_date >= start_of_month, LeaveRequest.end_date <= end_of_month)
+            )
+        )
+        approved_leaves = leave_request_query.all()
+
+        for lr in approved_leaves:
+            user_name_for_leave = mission_users_map.get(lr.user_id, f"Utilisateur {lr.user_id}") # Reuse map or fetch if needed
+
+            leave_title = f"Congé: {lr.leave_type.name} - {user_name_for_leave}"
+            if lr.requested_days == 0.5:
+                if lr.start_day_period == 'half_day_morning':
+                    leave_title += " (Matin)"
+                elif lr.start_day_period == 'half_day_afternoon':
+                    leave_title += " (Après-midi)"
+
+            # For multi-day leaves that are partial on start/end, title might need more detail
+            # or rely on allDay=false and specific start/end times if applicable.
+            # For now, simple title augmentation for 0.5 day leaves.
+
+            leave_start_dt = datetime.combine(lr.start_date, datetime.min.time()) # Assume full day for calendar start
+            leave_end_dt = datetime.combine(lr.end_date, datetime.max.time())     # Assume full day for calendar end
+
+            # Adjust start/end times for half-days if we want to show them as partial events on calendar
+            # This requires a decision: are half-leaves "all-day" events for 0.5 days, or timed events?
+            # For simplicity, let's treat them as all-day events for the specified date(s) but the title indicates period.
+            # If they were timed, start/end times would be like 09:00-12:00 or 13:00-17:00.
+
+            calendar_events.append({
+                'id': f'leave_{lr.id}',
+                'title': leave_title,
+                'start': leave_start_dt.isoformat(),
+                'end': (datetime.combine(lr.end_date, datetime.min.time()) + timedelta(days=1)).isoformat(), # FullCalendar end is exclusive for all-day
+                'allDay': True, # Treat leaves as all-day events for now
+                'type': 'leave',
+                'user_id': lr.user_id,
+                'user_name': user_name_for_leave,
+                'leave_type_name': lr.leave_type.name,
+                'requested_days': lr.requested_days,
+                'start_day_period': lr.start_day_period,
+                'end_day_period': lr.end_day_period,
+                'status': lr.status, # Should be 'approved'
+                'color': '#EF5350' # Example: Red for leave
+            })
 
         return jsonify(calendar_events), 200
 

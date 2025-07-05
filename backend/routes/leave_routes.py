@@ -129,7 +129,7 @@ def submit_leave_request():
     # Check balance if leave is paid
     if leave_type.is_paid:
         balance = LeaveBalance.query.filter_by(user_id=current_user.id, leave_type_id=leave_type.id).first()
-        if not balance or balance.balance_days < requested_days:
+        if not balance or balance.balance_days < requested_days: # requested_days is now calculated considering periods by the model's __init__
             return jsonify(message=f"Insufficient leave balance for {leave_type.name}. Available: {balance.balance_days if balance else 0}, Requested: {requested_days}."), 400
 
     leave_request = LeaveRequest(
@@ -137,10 +137,21 @@ def submit_leave_request():
         leave_type_id=data['leave_type_id'],
         start_date=start_date,
         end_date=end_date,
+        start_day_period=data.get('start_day_period', 'full_day'), # Pass to constructor
+        end_day_period=data.get('end_day_period', 'full_day'),     # Pass to constructor
         reason=data.get('reason'),
-        status='pending', # Default, can be auto-approved if leave_type.requires_approval is False
-        requested_days=requested_days
+        status='pending'
+        # requested_days is now calculated in __init__
     )
+    # After __init__, self.requested_days is set. Re-check balance with the model's calculated days.
+    # This is a bit redundant if calculate_workdays was called before __init__.
+    # For safety, or if __init__ is the sole source of truth for requested_days:
+    if leave_type.is_paid:
+        # Re-fetch balance or use existing 'balance' variable
+        final_balance_check = LeaveBalance.query.filter_by(user_id=current_user.id, leave_type_id=leave_type.id).first()
+        if not final_balance_check or final_balance_check.balance_days < leave_request.requested_days:
+             return jsonify(message=f"Insufficient leave balance for {leave_type.name} (final check). Available: {final_balance_check.balance_days if final_balance_check else 0}, Requested: {leave_request.requested_days}."), 400
+
 
     if not leave_type.requires_approval:
         leave_request.status = 'approved'
@@ -514,6 +525,47 @@ def admin_adjust_user_leave_balance(user_id):
 # TODO: Add a decorator @require_superadmin_or_admin for type creation/management.
 # For now, using @jwt_required() and manual role checks.
 # def require_superadmin_or_admin(fn):
+
+@leave_bp.route('/calculate-duration', methods=['POST'])
+@jwt_required()
+def calculate_leave_duration_endpoint():
+    current_user = get_current_user()
+    data = request.get_json()
+
+    start_date_str = data.get('start_date')
+    end_date_str = data.get('end_date')
+    start_day_period = data.get('start_day_period', 'full_day')
+    end_day_period = data.get('end_day_period', 'full_day')
+
+    if not start_date_str or not end_date_str:
+        return jsonify(message="start_date and end_date are required."), 400
+
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        return jsonify(message="Invalid date format. Use YYYY-MM-DD."), 400
+
+    if start_date > end_date:
+        return jsonify(calculated_days=0.0), 200 # Or 400 if preferred for invalid range for calculation
+
+    if not current_user.company_id:
+        return jsonify(message="User must belong to a company for duration calculation."), 400
+
+    try:
+        calculated_days = calculate_workdays(
+            start_date,
+            end_date,
+            current_user.company_id,
+            start_day_period,
+            end_day_period
+        )
+        return jsonify(calculated_days=calculated_days), 200
+    except ValueError as ve: # Catch validation errors from calculate_workdays if any (e.g. invalid period string)
+        return jsonify(message=str(ve)), 400
+    except Exception as e:
+        current_app.logger.error(f"Error in /calculate-duration for user {current_user.id}: {e}", exc_info=True)
+        return jsonify(message="Error calculating leave duration."), 500
 #     @jwt_required()
 #     def wrapper(*args, **kwargs):
 #         current_user = get_current_user()

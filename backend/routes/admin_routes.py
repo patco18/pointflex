@@ -1361,6 +1361,106 @@ def employee_attendance_report_pdf(employee_id):
         current_app.logger.error(f"Erreur génération PDF pour employé {employee_id}: {e}", exc_info=True)
         return jsonify(message="Erreur interne du serveur lors de la génération du PDF."), 500
 
+from backend.models.leave_request import LeaveRequest # For employee leave report
+
+@admin_bp.route('/employees/<int:employee_id>/leave-report/pdf', methods=['GET'])
+@require_admin
+def employee_leave_report_pdf(employee_id):
+    """Génère un rapport PDF de l'historique des congés pour un employé spécifique."""
+    try:
+        current_admin_or_manager = get_current_user()
+        target_employee = User.query.get_or_404(employee_id)
+
+        # Permission Check
+        if current_admin_or_manager.role == 'superadmin':
+            pass # Superadmin can access any employee's report
+        elif current_admin_or_manager.role == 'admin_rh':
+            if target_employee.company_id != current_admin_or_manager.company_id:
+                return jsonify(message="Accès non autorisé à cet employé (hors entreprise)."), 403
+        elif current_admin_or_manager.role == 'manager':
+            if target_employee.manager_id != current_admin_or_manager.id and target_employee.id != current_admin_or_manager.id : # Manager can see own reports too via profile route
+                 # Also check if target_employee is in the manager's reporting line if more complex hierarchy
+                return jsonify(message="Accès non autorisé. Le manager ne peut voir que les rapports de son équipe."), 403
+            if target_employee.company_id != current_admin_or_manager.company_id: # Should be redundant if manager_id check is good
+                 return jsonify(message="Accès non autorisé (hors entreprise)."), 403
+        else: # Other roles
+            return jsonify(message="Permission non accordée."), 403
+
+
+        start_date_str = request.args.get('start_date')
+        end_date_str = request.args.get('end_date')
+        status_filter = request.args.get('status')
+
+        query = LeaveRequest.query.filter_by(user_id=employee_id)
+
+        report_filters_texts = []
+        if start_date_str:
+            start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+            query = query.filter(LeaveRequest.start_date >= start_date)
+            report_filters_texts.append(f"Début: {start_date.strftime('%d/%m/%Y')}")
+        if end_date_str:
+            end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+            query = query.filter(LeaveRequest.end_date <= end_date)
+            report_filters_texts.append(f"Fin: {end_date.strftime('%d/%m/%Y')}")
+        if status_filter:
+            query = query.filter(LeaveRequest.status == status_filter)
+            report_filters_texts.append(f"Statut: {status_filter}")
+
+        period_str = ", ".join(report_filters_texts) if report_filters_texts else "toutes périodes"
+        leave_requests = query.order_by(LeaveRequest.start_date.desc()).all()
+
+        buffer = BytesIO()
+        styles = get_report_styles()
+        story = generate_report_title_elements(
+            title_str=f"Historique de Congés - {target_employee.prenom} {target_employee.nom}",
+            period_str=period_str,
+            company_name=target_employee.company.name if target_employee.company else "N/A"
+        )
+
+        if not leave_requests:
+            story.append(Paragraph("Aucune demande de congé trouvée pour cet employé avec les filtres sélectionnés.", styles['Normal']))
+        else:
+            table_data = [
+                [Paragraph(col, styles['SmallText']) for col in
+                    ["Type Congé", "Début", "Fin", "P.Début", "P.Fin", "Jours Dem.", "Statut", "Motif", "Approuvé par", "Comm. Approb."]]
+            ]
+            for lr in leave_requests:
+                approver_name = f"{lr.approved_by.prenom} {lr.approved_by.nom}" if lr.approved_by else "N/A"
+                table_data.append([
+                    Paragraph(lr.leave_type.name if lr.leave_type else "N/A", styles['SmallText']),
+                    lr.start_date.strftime('%d/%m/%y'),
+                    lr.end_date.strftime('%d/%m/%y'),
+                    Paragraph(lr.start_day_period.replace('_', ' ').replace('half day ', '½j '), styles['SmallText']),
+                    Paragraph(lr.end_day_period.replace('_', ' ').replace('half day ', '½j '), styles['SmallText']),
+                    str(lr.requested_days),
+                    Paragraph(lr.status, styles['SmallText']),
+                    Paragraph(lr.reason or "", styles['SmallText']),
+                    Paragraph(approver_name, styles['SmallText']),
+                    Paragraph(lr.approver_comments or "", styles['SmallText'])
+                ])
+            col_widths = [1*inch, 0.6*inch, 0.6*inch, 0.7*inch, 0.7*inch, 0.5*inch, 0.7*inch, 1.2*inch, 1*inch, 1.3*inch]
+            custom_table_styles = [
+                ('FONTSIZE', (0,0), (-1,-1), 7), ('VALIGN', (0,0), (-1,-1), 'TOP'),
+                ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, colors.HexColor('#FAFAFA')]),
+                ('ALIGN', (1,1), (6, -1), 'CENTER'), ('ALIGN', (0,1), (0, -1), 'LEFT'),
+                ('ALIGN', (7,1), (-1, -1), 'LEFT'),
+            ]
+            leave_table = create_styled_table(table_data, col_widths=col_widths, style_commands=custom_table_styles)
+            story.append(leave_table)
+
+        final_pdf_buffer = build_pdf_document(
+            buffer, story,
+            title=f"Historique Congés - {target_employee.prenom} {target_employee.nom}",
+            author="PointFlex Application"
+        )
+        return send_file(final_pdf_buffer, mimetype='application/pdf',
+                         as_attachment=True,
+                         download_name=f'historique_conges_{target_employee.nom.lower()}_{employee_id}_{datetime.now().strftime("%Y%m%d")}.pdf')
+
+    except Exception as e:
+        current_app.logger.error(f"Erreur génération PDF historique congés pour employé {employee_id}: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur lors de la génération du PDF."), 500
+
 # --- Company Leave Policy Management ---
 from backend.models.company_holiday import CompanyHoliday
 
