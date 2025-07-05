@@ -24,8 +24,9 @@ import OrganizationManagement from './pages/OrganizationManagement'
 import AdvancedFeatures from './pages/AdvancedFeatures'
 import RoleManagementPage from './pages/RoleManagementPage'
 import BillingManagement from './pages/BillingManagement'
-import WebhookManagementPage from './pages/WebhookManagementPage' // Added Webhook Page
+import WebhookManagementPage from './pages/WebhookManagementPage'
 import Missions from './pages/Missions'
+import RequestLeavePage from './pages/RequestLeavePage'; // Added RequestLeavePage
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
@@ -241,6 +242,13 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Profile />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/request-leave" element={
+            <ProtectedRoute>
+              <Layout>
+                <RequestLeavePage />
               </Layout>
             </ProtectedRoute>
           } />

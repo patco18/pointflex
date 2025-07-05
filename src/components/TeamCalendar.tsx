@@ -31,8 +31,11 @@ interface CalendarEvent {
   status?: string; // e.g., pointage status 'present', 'late'
   color?: string;
   allDay?: boolean;
-  // Add other event-specific fields as needed
   mission_status?: string;
+  // Fields for leave periods
+  start_day_period?: 'full_day' | 'half_day_morning' | 'half_day_afternoon';
+  end_day_period?: 'full_day' | 'half_day_morning' | 'half_day_afternoon';
+  requested_days?: number; // Could be useful for display
 }
 
 interface Employee {
@@ -257,10 +260,18 @@ export default function TeamCalendar() {
                               style={{ backgroundColor: event.color || '#777' }}
                               title={event.title}
                             >
-                              {event.type === 'pointage' && event.pointage_type === 'office' && <Home className="h-3 w-3 inline mr-1" />}
-                              {event.type === 'pointage' && event.pointage_type === 'mission' && <Briefcase className="h-3 w-3 inline mr-1" />}
-                              {event.type === 'mission' && <Briefcase className="h-3 w-3 inline mr-1" />}
+                              {event.type === 'pointage' && event.pointage_type === 'office' && <Home size={12} className="inline mr-1 flex-shrink-0" />}
+                              {event.type === 'pointage' && event.pointage_type === 'mission' && <Briefcase size={12} className="inline mr-1 flex-shrink-0" />}
+                              {event.type === 'mission' && <Briefcase size={12} className="inline mr-1 flex-shrink-0" />}
+                              {event.type === 'leave' && <Calendar size={12} className="inline mr-1 flex-shrink-0" />}
+
                               {event.title}
+                              {event.type === 'leave' && event.requested_days === 0.5 && (
+                                <span className="ml-1 text-gray-200 text-[10px]">
+                                  {event.start_day_period === 'half_day_morning' && '(Matin)'}
+                                  {event.start_day_period === 'half_day_afternoon' && '(A-M)'}
+                                </span>
+                              )}
                             </div>
                           ))}
                           {dayEvents.length > 3 && (
@@ -297,16 +308,33 @@ export default function TeamCalendar() {
             {getEventsForDay(selectedDate).length > 0 ? (
               getEventsForDay(selectedDate).map(event => (
                 <div key={event.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg border" style={{borderColor: event.color || '#ccc'}}>
-                  <div className="mt-1">
+                  <div className="mt-1 flex-shrink-0">
                     {event.type === 'pointage' && event.pointage_type === 'office' && <Home className="h-5 w-5" style={{color: event.color}} />}
                     {event.type === 'pointage' && event.pointage_type === 'mission' && <Briefcase className="h-5 w-5" style={{color: event.color}} />}
                     {event.type === 'mission' && <Briefcase className="h-5 w-5" style={{color: event.color}} />}
+                    {event.type === 'leave' && <Calendar className="h-5 w-5" style={{color: event.color || '#DC2626' /* Default red for leave */}} />}
                   </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900 text-sm">{event.title}</p>
-                    <p className="text-xs text-gray-600">
-                      {format(parseISO(event.start), 'HH:mm')} - {event.end ? format(parseISO(event.end), 'HH:mm') : 'N/A'}
-                    </p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-gray-900 text-sm truncate">{event.title}</p>
+
+                    {event.type === 'leave' ? (
+                      <>
+                        <p className="text-xs text-gray-600">
+                          Période: {
+                            event.start_day_period === 'half_day_morning' ? 'Matinée uniquement' :
+                            event.start_day_period === 'half_day_afternoon' ? 'Après-midi uniquement' : 'Journée entière'
+                          }
+                        </p>
+                        <p className="text-xs text-gray-600">
+                          Durée: {event.requested_days ? `${event.requested_days} jour(s)` : 'N/A'}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-xs text-gray-600">
+                        {format(parseISO(event.start), 'HH:mm')} - {event.end && !event.allDay ? format(parseISO(event.end), 'HH:mm') : (event.allDay ? 'Toute la journée' : 'N/A')}
+                      </p>
+                    )}
+
                     {event.type === 'pointage' && (
                        <span className={`text-xs px-2 py-0.5 rounded-full ${
                         event.status === 'present' ? 'bg-green-100 text-green-800' :
@@ -317,7 +345,16 @@ export default function TeamCalendar() {
                     )}
                      {event.type === 'mission' && (
                        <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-800">
-                        {event.mission_status}
+                        {event.mission_status || event.status}
+                      </span>
+                    )}
+                     {event.type === 'leave' && (
+                       <span className={`text-xs px-2 py-0.5 rounded-full ${
+                        event.status === 'approved' ? 'bg-green-100 text-green-800' :
+                        event.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        event.status === 'rejected' ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+                       }`}>
+                        Statut: {event.status}
                       </span>
                     )}
                   </div>
