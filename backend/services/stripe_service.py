@@ -81,6 +81,11 @@ def create_invoice_checkout_session(invoice: 'Invoice', success_url: str, cancel
         cancel_url=cancel_url,
     )
 
+
+def create_checkout_session(invoice: 'Invoice', success_url: str, cancel_url: str):
+    """Backward compatible alias for invoice checkout sessions."""
+    return create_invoice_checkout_session(invoice, success_url, cancel_url)
+
 def create_subscription_checkout_session(company: 'Company', stripe_price_id: str, success_url: str, cancel_url: str):
     """Create a Stripe Checkout session for a new subscription."""
     if stripe is None:
