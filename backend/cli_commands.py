@@ -150,6 +150,3 @@ def register_cli_commands(app):
     # leave_cli = AppGroup('leave', help='Leave management commands.')
     # leave_cli.add_command(accrue_leave_command)
     # app.cli.add_command(leave_cli)
-```
-**Note**: I corrected `user_id_filter` to `user_id` in the click options.
-The idempotency check using `AuditLog` is a bit crude due to JSON searching in `details`. A dedicated `LeaveAccrualLog` table or adding an `accrual_year` column to `LeaveBalance` (and making `(user_id, leave_type_id, accrual_year)` unique) would be more robust for tracking annual accruals. For now, this approach with AuditLog provides a basic idempotency.
