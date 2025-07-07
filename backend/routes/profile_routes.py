@@ -2,11 +2,24 @@
 Routes de profil utilisateur
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_jwt_extended import jwt_required
 from middleware.auth import get_current_user
 from middleware.audit import log_user_action
 from database import db
+from backend.models.pointage import Pointage
+from backend.models.leave_request import LeaveRequest
+from backend.utils.pdf_utils import (
+    build_pdf_document,
+    create_styled_table,
+    get_report_styles,
+    generate_report_title_elements,
+)
+from reportlab.platypus import Paragraph, Spacer
+from reportlab.lib.units import inch
+from reportlab.lib import colors
+from io import BytesIO
+from datetime import datetime
 
 profile_bp = Blueprint('profile', __name__)
 
@@ -151,15 +164,7 @@ def export_profile_data():
         print(f"Erreur lors de l'export du profil: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
 
-# Imports for PDF generation (ensure these are at the top of the file or consolidated)
-# from io import BytesIO
-# from flask import send_file, current_app, request # request is already imported
-# from datetime import datetime
-# from backend.models.pointage import Pointage
-# from backend.utils.pdf_utils import build_pdf_document, create_styled_table, get_report_styles, generate_report_title_elements
-# from reportlab.platypus import Paragraph
-# from reportlab.lib.units import inch
-# from reportlab.lib import colors # If using colors directly in styles
+
 
 @profile_bp.route('/my-attendance-report/pdf', methods=['GET'])
 @jwt_required()
@@ -280,13 +285,7 @@ def my_attendance_report_pdf(): # Renamed to avoid conflict if my_leave_history_
         current_app.logger.error(f"Erreur génération PDF présence pour utilisateur {current_user.id if 'current_user' in locals() and current_user else 'N/A'}: {e}", exc_info=True)
         return jsonify(message="Erreur interne du serveur lors de la génération du PDF."), 500
 
-from backend.models.leave_request import LeaveRequest # Already imported for /my-leave-requests practically
-from backend.utils.pdf_utils import build_pdf_document, create_styled_table, get_report_styles, generate_report_title_elements
-from reportlab.platypus import Paragraph, Spacer # Already imported
-from reportlab.lib.units import inch # Already imported
-from io import BytesIO # Already imported
-from flask import send_file, current_app # Already imported for other pdfs, ensure here
-# from datetime import datetime # Already imported
+
 
 @profile_bp.route('/my-leave-report/pdf', methods=['GET'])
 @jwt_required()
@@ -299,9 +298,11 @@ def my_leave_history_pdf():
 
         start_date_str = request.args.get('start_date')
         end_date_str = request.args.get('end_date')
+        # Optional filters for status/type if needed in future
         pointage_type_filter = request.args.get('pointage_type')
-        pointage_status_filter = request.args.get('pointage_status') # 'present', 'retard'
-        sort_by = request.args.get('sort_by', 'date') # Default sort by date for personal report
+        pointage_status_filter = request.args.get('pointage_status')
+        status_filter = request.args.get('status')
+        sort_by = request.args.get('sort_by', 'date')  # Default sort by date for personal report
         sort_direction = request.args.get('sort_direction', 'desc')
 
 
