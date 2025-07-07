@@ -3,6 +3,12 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_sse import sse
 import os
+import sys
+
+# Ensure the project root is on sys.path so imports using the
+# "backend." prefix work even when running this file directly from
+# the backend directory.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import configuration
 from config import Config
