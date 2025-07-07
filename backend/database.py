@@ -213,11 +213,8 @@ def init_db():
             # Créer l'utilisateur sans le mot de passe dans le constructeur
             user = User(**user_data)
 
-            # Ajouter l'utilisateur à la session pour obtenir un ID
-            db.session.add(user)
-            db.session.flush()
-
-            # Définir le mot de passe séparément (mettra à jour l'historique)
+            # Définir le mot de passe avant d'insérer en base
+            # `set_password` ajoute l'utilisateur à la session et flush si nécessaire
             user.set_password(password)
         
         # Créer les paramètres système par défaut
