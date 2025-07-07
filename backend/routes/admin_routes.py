@@ -6,13 +6,13 @@ from flask import Blueprint, request, jsonify, send_file
 from flask_jwt_extended import jwt_required
 from middleware.auth import require_admin, require_manager_or_above, get_current_user
 from middleware.audit import log_user_action
-from models.user import User
-from models.company import Company
-from models.office import Office
-from models.department import Department
-from models.service import Service
-from models.position import Position
-from models.pointage import Pointage
+from backend.models.user import User
+from backend.models.company import Company
+from backend.models.office import Office
+from backend.models.department import Department
+from backend.models.service import Service
+from backend.models.position import Position
+from backend.models.pointage import Pointage
 from io import BytesIO
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4

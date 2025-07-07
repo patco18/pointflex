@@ -5,7 +5,7 @@ Gestionnaire d'erreurs centralisé
 from flask import jsonify, request
 from werkzeug.exceptions import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
-from models.audit_log import AuditLog
+from backend.models.audit_log import AuditLog
 from database import db
 import traceback
 

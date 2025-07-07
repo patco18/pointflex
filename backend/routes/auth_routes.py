@@ -4,8 +4,8 @@ Routes d'authentification
 
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
-from models.user import User
-from models.audit_log import AuditLog
+from backend.models.user import User
+from backend.models.audit_log import AuditLog
 from middleware.auth import get_current_user
 from middleware.audit import log_user_action
 from database import db

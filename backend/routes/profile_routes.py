@@ -251,7 +251,7 @@ def export_profile_data():
         if not current_user:
             return jsonify(message="Utilisateur non trouvé"), 401
 
-        from models.pointage import Pointage
+        from backend.models.pointage import Pointage
 
         pointages = Pointage.query.filter_by(user_id=current_user.id).order_by(
             Pointage.date_pointage

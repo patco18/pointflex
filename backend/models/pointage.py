@@ -56,7 +56,7 @@ class Pointage(db.Model):
     
     def calculate_status(self):
         """Calcule le statut du pointage (présent/retard)"""
-        from models.user import User
+        from backend.models.user import User
         
         user = User.query.get(self.user_id)
         if not user or not user.company:

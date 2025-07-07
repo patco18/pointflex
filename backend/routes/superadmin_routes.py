@@ -6,13 +6,13 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
 from middleware.auth import require_superadmin, get_current_user
 from middleware.audit import log_user_action
-from models.company import Company
-from models.user import User
-from models.pointage import Pointage
-from models.system_settings import SystemSettings
-from models.audit_log import AuditLog
-from models.invoice import Invoice
-from models.payment import Payment
+from backend.models.company import Company
+from backend.models.user import User
+from backend.models.pointage import Pointage
+from backend.models.system_settings import SystemSettings
+from backend.models.audit_log import AuditLog
+from backend.models.invoice import Invoice
+from backend.models.payment import Payment
 from services.stripe_service import create_checkout_session, verify_webhook
 from database import db
 from datetime import datetime, timedelta

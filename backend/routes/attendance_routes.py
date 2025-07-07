@@ -7,10 +7,10 @@ from flask_jwt_extended import jwt_required
 from middleware.auth import get_current_user
 from middleware.audit import log_user_action
 from utils.notification_utils import send_notification
-from models.pointage import Pointage
-from models.user import User
-from models.mission import Mission
-from models.office import Office
+from backend.models.pointage import Pointage
+from backend.models.user import User
+from backend.models.mission import Mission
+from backend.models.office import Office
 from database import db
 from datetime import datetime, date, timedelta
 import math

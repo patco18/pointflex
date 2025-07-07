@@ -3,10 +3,10 @@ from flask.cli import with_appcontext
 from datetime import datetime, date
 
 from database import db
-from models.user import User
-from models.leave_type import LeaveType
-from models.leave_balance import LeaveBalance
-from models.audit_log import AuditLog # For logging the accrual action
+from backend.models.user import User
+from backend.models.leave_type import LeaveType
+from backend.models.leave_balance import LeaveBalance
+from backend.models.audit_log import AuditLog # For logging the accrual action
 
 def register_cli_commands(app):
     @app.cli.command('accrue-leave')
