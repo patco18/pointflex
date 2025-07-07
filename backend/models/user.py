@@ -76,9 +76,11 @@ class User(db.Model):
 
         new_hash = generate_password_hash(password)
 
-        # Add to password history
-        # Note: This should ideally be done *after* validation (including history check) passes in the route.
-        # If called here, it means the password has already passed all checks.
+        # Set the password hash **before** any flush occurs to avoid NULL
+        # values when SQLAlchemy inserts the row. Flushing without a password
+        # hash would violate the NOT NULL constraint on the `password_hash`
+        # column.
+        self.password_hash = new_hash
 
         # Ensure the user has an ID so password history can reference it
         if self.id is None:
@@ -86,7 +88,7 @@ class User(db.Model):
                 db.session.add(self)
             db.session.flush()
 
-        # Create new history entry now that the user has an ID
+        # Now that the user has an ID and the password is set, record history
         history_entry = PasswordHistory(user_id=self.id, password_hash=new_hash)
         db.session.add(history_entry)
 
