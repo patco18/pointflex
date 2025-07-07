@@ -4,10 +4,10 @@ LeaveRequest Model - Represents an employee's request for leave
 from database import db # Corrected import path
 from datetime import datetime, date, timedelta # Added timedelta
 import holidays # For calculating workdays, may need to add to requirements.txt
-from backend.models.user import User # Added User import
+from .user import User  # Added User import
 
-from backend.models.company import Company # To fetch company policy
-from backend.models.company_holiday import CompanyHoliday # To fetch company specific holidays
+from .company import Company  # To fetch company policy
+from .company_holiday import CompanyHoliday  # To fetch company specific holidays
 
 # Updated function to calculate working days considering company policies and partial days
 def calculate_workdays(
