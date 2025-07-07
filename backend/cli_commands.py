@@ -14,7 +14,7 @@ def register_cli_commands(app):
     @click.option('--month', type=int, default=None, help="Accrue for a specific month (1-12). If provided with year, used for monthly accrual simulation (not standard annual).")
     @click.option('--day', type=int, default=None, help="Accrue for a specific day. Typically used with year and month for specific date trigger.")
     @click.option('--company_id', type=int, default=None, help="Accrue for a specific company ID.")
-    @click.option('--user_id', type_int, default=None, help="Accrue for a specific user ID.") # Corrected to user_id
+    @click.option('--user_id', type=int, default=None, help="Accrue for a specific user ID.")
     @click.option('--leave_type_id', type=int, default=None, help="Accrue for a specific leave type ID.")
     @click.option('--dry-run', is_flag=True, help="Simulate accrual without committing changes.")
     def accrue_leave_command(year, month, day, company_id, user_id, leave_type_id, dry_run):
