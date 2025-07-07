@@ -11,24 +11,24 @@ db = SQLAlchemy()
 def init_db():
     """Initialise la base de données avec les données de test"""
     try:
-        from models.user import User
-        from models.company import Company
-        from models.pointage import Pointage
-        from models.system_settings import SystemSettings
-        from models.audit_log import AuditLog
-        from models.office import Office
-        from models.mission import Mission
-        from models.invoice import Invoice
-        from models.payment import Payment
-        from models.notification import Notification
-        from models.push_subscription import PushSubscription
-        from models.leave_type import LeaveType
-        from models.leave_balance import LeaveBalance
-        from models.leave_request import LeaveRequest
-        from models.webhook_subscription import WebhookSubscription
-        from models.webhook_delivery_log import WebhookDeliveryLog
-        from models.company_holiday import CompanyHoliday
-        from models.password_history import PasswordHistory # Added PasswordHistory
+        from backend.models.user import User
+        from backend.models.company import Company
+        from backend.models.pointage import Pointage
+        from backend.models.system_settings import SystemSettings
+        from backend.models.audit_log import AuditLog
+        from backend.models.office import Office
+        from backend.models.mission import Mission
+        from backend.models.invoice import Invoice
+        from backend.models.payment import Payment
+        from backend.models.notification import Notification
+        from backend.models.push_subscription import PushSubscription
+        from backend.models.leave_type import LeaveType
+        from backend.models.leave_balance import LeaveBalance
+        from backend.models.leave_request import LeaveRequest
+        from backend.models.webhook_subscription import WebhookSubscription
+        from backend.models.webhook_delivery_log import WebhookDeliveryLog
+        from backend.models.company_holiday import CompanyHoliday
+        from backend.models.password_history import PasswordHistory # Added PasswordHistory
         
         # Créer toutes les tables
         db.create_all()

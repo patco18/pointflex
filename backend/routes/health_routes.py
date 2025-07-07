@@ -5,9 +5,9 @@ Routes de santé et monitoring
 from flask import Blueprint, jsonify
 from datetime import datetime
 from database import db
-from models.user import User
-from models.company import Company
-from models.pointage import Pointage
+from backend.models.user import User
+from backend.models.company import Company
+from backend.models.pointage import Pointage
 from sqlalchemy import text
 
 health_bp = Blueprint('health', __name__)

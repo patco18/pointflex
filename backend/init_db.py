@@ -13,9 +13,9 @@ from werkzeug.security import generate_password_hash
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from app import app, db
-from models.user import User
-from models.company import Company
-from models.system_settings import SystemSettings
+from backend.models.user import User
+from backend.models.company import Company
+from backend.models.system_settings import SystemSettings
 
 def init_database():
     """Initialise la base de données avec les données de base"""

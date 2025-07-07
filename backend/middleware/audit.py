@@ -3,7 +3,7 @@ Middleware d'audit automatique
 """
 
 from flask import request, g
-from models.audit_log import AuditLog
+from backend.models.audit_log import AuditLog
 from database import db
 from datetime import datetime
 

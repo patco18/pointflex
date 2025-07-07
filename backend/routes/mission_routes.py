@@ -3,9 +3,9 @@
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 from middleware.auth import get_current_user, require_admin
-from models.mission import Mission
-from models.mission_user import MissionUser
-from models.user import User
+from backend.models.mission import Mission
+from backend.models.mission_user import MissionUser
+from backend.models.user import User
 from database import db
 from backend.middleware.audit import log_user_action # Added for audit logging
 from flask import current_app # For logging

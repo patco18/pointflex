@@ -44,5 +44,9 @@ __all__ = [
     'PushSubscription',
     'LeaveType',
     'LeaveBalance',
-    'LeaveRequest'
+    'LeaveRequest',
+    'WebhookSubscription',
+    'WebhookDeliveryLog',
+    'CompanyHoliday',
+    'PasswordHistory'
 ]
