@@ -203,18 +203,22 @@ def init_db():
         
         for user_data in users_data:
             # Extraire le mot de passe avant de créer l'utilisateur
-            password = 'superadmin123' if user_data['email'] == 'superadmin@pointflex.com' else \
-                      'admin123' if user_data['email'] == 'admin@pointflex.com' else \
-                      'employee123' if user_data['email'] == 'employee@pointflex.com' else \
-                      'manager123'
-            
+            password = (
+                'superadmin123' if user_data['email'] == 'superadmin@pointflex.com' else
+                'admin123' if user_data['email'] == 'admin@pointflex.com' else
+                'employee123' if user_data['email'] == 'employee@pointflex.com' else
+                'manager123'
+            )
+
             # Créer l'utilisateur sans le mot de passe dans le constructeur
             user = User(**user_data)
-            
-            # Définir le mot de passe séparément
-            user.set_password(password)
-            
+
+            # Ajouter l'utilisateur à la session pour obtenir un ID
             db.session.add(user)
+            db.session.flush()
+
+            # Définir le mot de passe séparément (mettra à jour l'historique)
+            user.set_password(password)
         
         # Créer les paramètres système par défaut
         default_settings = [

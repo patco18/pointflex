@@ -80,7 +80,13 @@ class User(db.Model):
         # Note: This should ideally be done *after* validation (including history check) passes in the route.
         # If called here, it means the password has already passed all checks.
 
-        # Create new history entry
+        # Ensure the user has an ID so password history can reference it
+        if self.id is None:
+            if self not in db.session:
+                db.session.add(self)
+            db.session.flush()
+
+        # Create new history entry now that the user has an ID
         history_entry = PasswordHistory(user_id=self.id, password_hash=new_hash)
         db.session.add(history_entry)
 
