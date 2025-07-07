@@ -117,6 +117,10 @@ def require_admin(f):
     """Décorateur pour exiger un rôle admin (superadmin ou admin_rh)"""
     return require_role(['superadmin', 'admin_rh'])(f)
 
+def require_superadmin_or_admin(f):
+    """Décorateur pour exiger le rôle SuperAdmin ou Admin RH"""
+    return require_admin(f)
+
 def require_manager_or_above(f):
     """Décorateur pour exiger un rôle manager ou supérieur"""
     return require_role(['superadmin', 'admin_rh', 'chef_service', 'chef_projet', 'manager'])(f)
