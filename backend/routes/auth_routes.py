@@ -2,175 +2,20 @@
 Routes d'authentification
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from models.user import User
 from models.audit_log import AuditLog
 from middleware.auth import get_current_user
+from middleware.audit import log_user_action
 from database import db
 from datetime import datetime
+from extensions import limiter
 
 auth_bp = Blueprint('auth', __name__)
 
-# It's better to get the limiter from current_app during route definition or request context
-# However, for applying decorator at definition time, we often import it if app is structured that way.
-# Assuming 'app.limiter' was set during app creation.
-# from flask import current_app # To access current_app.limiter if needed inside functions
-# For decorators, we need to apply it when blueprint is defined or routes are added.
-# A common way is to get it from the app object.
-# If app.py defines `app = create_app()` and then `limiter = Limiter(app, ...)`,
-# we might need to pass 'limiter' to routes or access it via current_app.
-# For simplicity, let's assume the limiter can be imported or accessed.
-# A better pattern is often to apply limits when registering blueprint or directly in app.py for specific routes.
-
-# Simplest for now, assuming app.limiter exists and can be accessed when routes are decorated.
-# This requires app to be created and limiter initialized before this module is fully imported/used.
-# This can be tricky with circular imports.
-# A safer way: apply limits in app.py after blueprint registration.
-# from ..app import app # This creates potential circular import if app imports blueprints before limiter init.
-
-# Let's assume we can get it from current_app contextually or it's passed.
-# For direct decorator use as planned, we might need to do:
-# from backend.app import limiter # if limiter is a global in app.py after app creation.
-
-# Given current structure, will try to use current_app.limiter conceptually.
-# Decorator needs to be applied at function definition.
-# This implies the limiter object must be accessible at import time of this file.
-# This is often solved by having `limiter = Limiter()` in extensions.py and then `limiter.init_app(app)` in app factory.
-# For now, let's try a direct import assuming app.py makes `limiter` available.
-# This part is highly dependent on Flask app structure for extensions.
-
-# Let's assume a hypothetical `extensions.py` where limiter is initialized:
-# # extensions.py
-# from flask_limiter import Limiter
-# from flask_limiter.util import get_remote_address
-# limiter = Limiter(key_func=get_remote_address)
-#
-# # app.py
-# from .extensions import limiter
-# def create_app():
-#   app = ...
-#   limiter.init_app(app)
-#   return app
-
-# For this exercise, I will apply the decorator conceptually.
-# The user will need to ensure `limiter` is correctly initialized and accessible.
-# I will use a placeholder `limiter_instance_placeholder` which should be replaced by the actual Limiter instance.
-
-# Let's assume the Limiter instance is available via current_app.limiter
-# and the decorator can be dynamically fetched.
-# This is not standard. Standard is @limiter.limit("...")
-# To make this work, the limiter object needs to be accessible.
-# For this step, I will write the decorator as if `limiter` is available globally.
-# The user must ensure Flask-Limiter is initialized on `app` and `limiter` refers to that instance.
-# A common way is from flask import current_app and then use current_app.limiter inside the route if needed,
-# but decorators are applied at definition time.
-# For now, will assume `limiter` is a globally available instance post-init.
-# This is a simplification due to not being able to modify app factory structure easily here.
-
-# Let's assume `app.py` makes `limiter` available like this for blueprint registration:
-# from .routes.auth_routes import auth_bp, apply_auth_limits
-# apply_auth_limits(limiter) # And then inside auth_routes.py:
-# limiter_instance = None
-# def apply_auth_limits(limiter_from_app):
-#   global limiter_instance
-#   limiter_instance = limiter_from_app
-
-# Given the constraints, I will write it as if a 'limiter' object is imported/available.
-# The user MUST ensure this 'limiter' object is the one initialized with their Flask app.
-# This will likely require them to instantiate Limiter globally in an `extensions.py`
-# and then call `init_app` in their `create_app` factory.
-
-from flask import current_app # For config values
-
-# Placeholder: User needs to ensure 'limiter' is their Flask-Limiter instance
-# from some_extensions_module import limiter # This is the ideal way
-# For now, we'll try to fetch from current_app dynamically, which is not how decorators work directly.
-# This will be a conceptual application of the decorator.
-
-# Correct approach would be to pass the limiter instance to the blueprint
-# or decorate routes after app initialization if routes are defined in app.py.
-# Since routes are in blueprints, the blueprint can be decorated, or individual routes.
-
-# Let's assume the limiter is attached to the blueprint later or app.
-# For now, I'll just add the decorator to the function.
-# This will require `limiter` to be defined and initialized when this module is loaded.
-# A common pattern:
-# In app.py:
-# limiter = Limiter(key_func=get_remote_address)
-# def create_app():
-#    app = Flask()
-#    limiter.init_app(app) # Configure with app-specific settings
-#    from .routes.auth_routes import auth_bp
-#    app.register_blueprint(auth_bp)
-#    return app
-# Then in auth_routes.py:
-# from ..app import limiter # if limiter is defined in app.py before create_app() or globally
-
-# Given the current project structure, the easiest way to make the limiter instance
-# available to route decorators is to initialize it in `app.py` and then import it
-# into the route files. This might create a circular dependency if not careful.
-# The `app.limiter = limiter` approach in `create_app` is good for access within functions,
-# but for decorators, it's more direct.
-
-# I will proceed by adding the decorator conceptually.
-# User will need to ensure `limiter` is the Flask-Limiter instance.
-# from backend.app import limiter # This is a common pattern if limiter is initialized in app.py
-
-# To avoid breaking current structure, I'll write the decorator and user must ensure 'limiter' is defined.
-# For this exercise, I'll assume a global 'limiter' instance will be made available by the user.
-# This is a placeholder for the actual limiter instance.
-# A better way is to decorate the entire blueprint if all routes need similar limits,
-# or apply decorators in app.py after blueprint registration.
-
-# Let's assume a simple (though not always ideal) global setup for this example:
-# In app.py:
-# limiter = Limiter(get_remote_address, default_limits=["..."], storage_uri="...")
-# def create_app():
-#    app = Flask(...)
-#    limiter.init_app(app) # Initialize with app-specific settings if not done at instantiation
-#    ...
-#    return app
-# And then in routes: from ..app import limiter (if app.py is one level up)
-# Or if same level: from .app import limiter (less likely for blueprints)
-
-# Given the tools, I'll use a placeholder. The user must make the actual limiter instance available.
-# For the purpose of this tool, I will assume 'limiter' is a valid Flask-Limiter instance.
-# This means the user has to set it up in their app factory and ensure it's importable here.
-# E.g., in app.py:
-# `limiter = Limiter(get_remote_address)`
-# `def create_app(): app = Flask(); limiter.init_app(app); return app`
-# Then in routes: `from ..app import limiter` (if routes are in a subfolder)
-
-# Let's assume a simple way to get the limiter from app.py
-# This is still not ideal for decorators. Decorators need the object at definition time.
-# The most straightforward way if routes are in blueprints is to decorate the blueprint itself
-# or specific routes when the blueprint is registered with the app, or pass the limiter to the blueprint.
-
-# Given the limitations, I will add the decorator as if `limiter` is an available object.
-# The user will need to ensure this. A common pattern is to define extensions in a separate file.
-# For now, let's assume `from backend.extensions import limiter` would work if user creates `extensions.py`.
-# I will write the code assuming `limiter` is a valid instance.
-
-# This is very tricky with the current setup and tool limitations.
-# The most robust way is to apply limits in create_app to specific blueprints/routes
-# or pass the limiter instance to the blueprint.
-
-# Let's try a different approach for the tool:
-# I will modify the route and the user should manually add the @limiter.limit decorator
-# using their actual limiter instance. I will provide the string for the limit.
-
-auth_bp = Blueprint('auth', __name__)
-
-# USER ACTION: Import your initialized 'limiter' instance here.
-# Example: from ..extensions import limiter
-#
-# @limiter.limit(lambda: current_app.config.get('RATELIMIT_AUTH_LOGIN')) # Use lambda to access app.config
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_AUTH_LOGIN'))
 @auth_bp.route('/login', methods=['POST'])
-# Note: If using a global limiter instance, it might be:
-# @limiter.limit(app.config.get('RATELIMIT_AUTH_LOGIN')) if app config is accessible at definition,
-# or more robustly, apply limits to blueprint in app.py or pass limiter to blueprint.
-# For now, showing conceptual placement. User needs to integrate their limiter.
 def login():
     """Connexion utilisateur"""
     try:
