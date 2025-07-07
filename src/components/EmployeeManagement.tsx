@@ -393,24 +393,24 @@ export default function EmployeeManagement() {
                 </div>
               </>
             )}
-+            {/* Manager Selection Dropdown */}
-+            <div className="md:col-span-2"> {/* Span across two columns if layout allows */}
-+              <label className="block text-sm font-medium text-gray-700 mb-1">Manager</label>
-+              <select
-+                value={form.manager_id}
-+                onChange={(e) => setForm(prev => ({ ...prev, manager_id: e.target.value }))}
-+                className="input-field"
-+              >
-+                <option value="">Aucun manager</option>
-+                {potentialManagers
-+                  .filter(manager => !editingEmployee || manager.id !== editingEmployee.id) // Prevent self-assignment
-+                  .map((manager) => (
-+                    <option key={manager.id} value={manager.id}>
-+                      {manager.prenom} {manager.nom} ({manager.email})
-+                    </option>
-+                ))}
-+              </select>
-+            </div>
+            {/* Manager Selection Dropdown */}
+            <div className="md:col-span-2"> {/* Span across two columns if layout allows */}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Manager</label>
+              <select
+                value={form.manager_id}
+                onChange={(e) => setForm(prev => ({ ...prev, manager_id: e.target.value }))}
+                className="input-field"
+              >
+                <option value="">Aucun manager</option>
+                {potentialManagers
+                  .filter(manager => !editingEmployee || manager.id !== editingEmployee.id) // Prevent self-assignment
+                  .map((manager) => (
+                    <option key={manager.id} value={manager.id}>
+                      {manager.prenom} {manager.nom} ({manager.email})
+                    </option>
+                  ))}
+              </select>
+            </div>
           </div>
           <div className="flex justify-end space-x-3 mt-6 pt-6 border-t">
             <button type="button" onClick={() => setShowModal(false)} className="btn-secondary" disabled={saving}>

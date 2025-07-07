@@ -12,7 +12,6 @@ interface LoginForm {
 }
 
 export default function Login() {
-  const { login, serverStatus } = useAuth()
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false) // For primary login
   const [showPassword, setShowPassword] = useState(false)
