@@ -212,7 +212,6 @@ export default function Login() {
           )}
 
           {is2FARequired ? (
-            // --- 2FA OTP Form ---
             <form className="space-y-6" onSubmit={handle2FASubmit}>
               <div className="text-center">
                 <ShieldCheck className="h-10 w-10 text-blue-600 mx-auto mb-2" />
@@ -264,7 +263,7 @@ export default function Login() {
               </button>
             </form>
           ) : (
-            // --- Original Email/Password Form ---
+            <>
             <form className="space-y-6" onSubmit={handleSubmit(handlePrimaryLogin)}> {/* Use handlePrimaryLogin */}
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -538,8 +537,10 @@ export default function Login() {
               </div>
             </div>
           </div>
+        </>
+        )}
 
-          {/* Footer */}
+        {/* Footer */}
           <div className="mt-8 pt-6 border-t border-gray-200 text-center">
             <p className="text-xs text-gray-500">
               © 2024 PointFlex SaaS - Solution de pointage intelligente

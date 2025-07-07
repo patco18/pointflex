@@ -29,6 +29,7 @@ interface AuthContextType {
   isAuditeur: boolean
   isAdmin: boolean // Garde la compatibilité - inclut admin_rh
   serverStatus: 'checking' | 'online' | 'offline'
+  checkServerStatus: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -173,7 +174,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isEmployee,
     isAuditeur,
     isAdmin,
-    serverStatus
+    serverStatus,
+    checkServerStatus: checkServerHealth
   }
 
   return (
