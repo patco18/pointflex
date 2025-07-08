@@ -81,7 +81,7 @@ def init_database():
             is_active=True,
             office_latitude=48.8566,  # Paris
             office_longitude=2.3522,
-            office_radius=100,
+            office_radius=200,
             work_start_time=time(9, 0),  # 09:00
             late_threshold=15
         )

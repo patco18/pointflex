@@ -23,7 +23,8 @@ class Office(db.Model):
     # Coordonnées géographiques
     latitude = db.Column(db.Float, nullable=False)
     longitude = db.Column(db.Float, nullable=False)
-    radius = db.Column(db.Integer, default=100, nullable=False)  # Rayon en mètres
+    # Rayon autorisé pour le pointage en mètres
+    radius = db.Column(db.Integer, default=200, nullable=False)
     
     # Informations complémentaires
     timezone = db.Column(db.String(50), default='Europe/Paris', nullable=False)
