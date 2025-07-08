@@ -34,6 +34,9 @@ class Pointage(db.Model):
     
     # Mission (pour pointage mission)
     mission_order_number = db.Column(db.String(100), nullable=True)
+
+    # Indique si l'heure d'arrivée a été égalisée au début de journée
+    is_equalized = db.Column(db.Boolean, default=False)
     
     # Métadonnées
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -78,6 +81,12 @@ class Pointage(db.Model):
             self.statut = 'present'
         else:
             self.statut = 'retard'
+
+        # Appliquer l'égalisation si configurée
+        equal_thresh = getattr(company, 'equalization_threshold', 0)
+        if 0 < delay_minutes <= equal_thresh:
+            self.heure_arrivee = work_start
+            self.is_equalized = True
     
     def calculate_worked_hours(self):
         """Calcule les heures travaillées si heure de départ renseignée"""
@@ -125,6 +134,7 @@ class Pointage(db.Model):
             'mission_order_number': self.mission_order_number,
             'worked_hours': self.calculate_worked_hours(),
             'delay_minutes': self.delay_minutes,
+            'is_equalized': self.is_equalized,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

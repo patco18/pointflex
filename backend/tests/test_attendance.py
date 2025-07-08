@@ -15,6 +15,7 @@ def test_office_checkin(client):
     assert resp.status_code == 201
     body = resp.get_json()
     assert body['pointage']['type'] == 'office'
+    assert 'is_equalized' in body['pointage']
 
 
 def test_get_attendance_stats(client):

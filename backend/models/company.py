@@ -35,6 +35,8 @@ class Company(db.Model):
     office_radius = db.Column(db.Integer, default=100)  # mètres
     work_start_time = db.Column(db.Time, default=datetime.strptime('09:00', '%H:%M').time())
     late_threshold = db.Column(db.Integer, default=15)  # minutes
+    # Minutes de tolérance pour l'égalisation de l'heure d'arrivée
+    equalization_threshold = db.Column(db.Integer, default=0)
 
     # Personnalisation d'entreprise
     logo_url = db.Column(db.String(255), nullable=True)
@@ -175,6 +177,7 @@ class Company(db.Model):
                 'office_radius': self.office_radius,
                 'work_start_time': self.work_start_time.strftime('%H:%M') if self.work_start_time else None,
                 'late_threshold': self.late_threshold,
+                'equalization_threshold': self.equalization_threshold,
                 'work_days': self.work_days, # Add new leave policy fields
                 'default_country_code_for_holidays': self.default_country_code_for_holidays, # Add new leave policy fields
                 'plan_limits': self.get_plan_limits(),

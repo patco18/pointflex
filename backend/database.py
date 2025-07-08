@@ -56,7 +56,8 @@ def init_db():
                 'subscription_status': 'active',
                 'max_employees': 50,
                 'is_active': True,
-                'notes': 'Entreprise de démonstration pour PointFlex'
+                'notes': 'Entreprise de démonstration pour PointFlex',
+                'equalization_threshold': 5
             },
             {
                 'name': 'TechCorp Solutions',
@@ -72,7 +73,8 @@ def init_db():
                 'subscription_status': 'active',
                 'max_employees': 200,
                 'is_active': True,
-                'notes': 'Grande entreprise technologique'
+                'notes': 'Grande entreprise technologique',
+                'equalization_threshold': 5
             }
         ]
         
