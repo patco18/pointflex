@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import toast from 'react-hot-toast'
 
 interface NotificationData {
@@ -8,6 +8,14 @@ interface NotificationData {
 }
 
 export function useNotificationStream(userId?: number, onMessage?: (data: NotificationData) => void) {
+  const onMessageRef = useRef<typeof onMessage>()
+
+  // Keep the latest callback in a ref so that the EventSource doesn't need to
+  // be re-created on each render
+  useEffect(() => {
+    onMessageRef.current = onMessage
+  }, [onMessage])
+
   useEffect(() => {
     if (!userId) return
 
@@ -16,7 +24,7 @@ export function useNotificationStream(userId?: number, onMessage?: (data: Notifi
       try {
         const data: NotificationData = JSON.parse(event.data)
         toast.success(data.message)
-        onMessage && onMessage(data)
+        onMessageRef.current && onMessageRef.current(data)
       } catch (e) {
         console.error('Failed to parse notification', e)
       }
@@ -27,5 +35,5 @@ export function useNotificationStream(userId?: number, onMessage?: (data: Notifi
     return () => {
       source.close()
     }
-  }, [userId, onMessage])
+  }, [userId])
 }
