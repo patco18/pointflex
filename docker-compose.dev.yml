@@ -18,9 +18,18 @@ services:
       - FLASK_ENV=development
       - FLASK_DEBUG=1
       - DATABASE_URL=sqlite:///instance/pointflex.db
+      - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./backend:/app
       - ./backend/instance:/app/instance
+    networks:
+      - pointflex-dev
+
+  redis:
+    image: redis:7
+    restart: always
+    ports:
+      - "6379:6379"
     networks:
       - pointflex-dev
 
