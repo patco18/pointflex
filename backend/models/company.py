@@ -32,7 +32,8 @@ class Company(db.Model):
     # Paramètres de pointage
     office_latitude = db.Column(db.Float, default=48.8566)  # Paris par défaut
     office_longitude = db.Column(db.Float, default=2.3522)
-    office_radius = db.Column(db.Integer, default=100)  # mètres
+    # Rayon par défaut autorisé autour du siège (en mètres)
+    office_radius = db.Column(db.Integer, default=200)
     work_start_time = db.Column(db.Time, default=datetime.strptime('09:00', '%H:%M').time())
     late_threshold = db.Column(db.Integer, default=15)  # minutes
     # Minutes de tolérance pour l'égalisation de l'heure d'arrivée

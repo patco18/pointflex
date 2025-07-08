@@ -49,46 +49,50 @@ def office_checkin():
                 company_id=current_user.company_id,
                 is_active=True
             ).all()
-            
-            # Vérifier si l'utilisateur est à proximité d'un bureau
+
             nearest_office = None
             min_distance = float('inf')
-            
+
             for office in offices:
                 distance = calculate_distance(
                     coordinates['latitude'], coordinates['longitude'],
                     office.latitude, office.longitude
                 )
-                
+
                 if distance < min_distance:
                     min_distance = distance
                     nearest_office = office
-            
-            # Vérifier si l'utilisateur est dans le rayon autorisé
-            if nearest_office and min_distance <= nearest_office.radius:
-                # Créer le pointage avec référence au bureau
-                pointage = Pointage(
-                    user_id=current_user.id,
-                    type='office',
-                    latitude=coordinates['latitude'],
-                    longitude=coordinates['longitude'],
-                    office_id=nearest_office.id,
-                    distance=min_distance
-                )
+
+            if offices:
+                # Lorsqu'il existe des bureaux configurés, se baser uniquement sur ceux-ci
+                if nearest_office and min_distance <= nearest_office.radius:
+                    # Créer le pointage avec référence au bureau
+                    pointage = Pointage(
+                        user_id=current_user.id,
+                        type='office',
+                        latitude=coordinates['latitude'],
+                        longitude=coordinates['longitude'],
+                        office_id=nearest_office.id,
+                        distance=min_distance
+                    )
+                else:
+                    return jsonify(
+                        message=f"Vous êtes trop loin du bureau ({int(min_distance)}m). Rayon autorisé: {nearest_office.radius if nearest_office else 'N/A'}m"
+                    ), 403
             else:
-                # Vérifier avec les coordonnées de l'entreprise
+                # Aucun bureau n'est configuré, utiliser les paramètres globaux de l'entreprise
                 company = current_user.company
                 if company and company.office_latitude and company.office_longitude:
                     distance = calculate_distance(
                         coordinates['latitude'], coordinates['longitude'],
                         company.office_latitude, company.office_longitude
                     )
-                    
+
                     if distance > company.office_radius:
                         return jsonify(
                             message=f"Vous êtes trop loin du bureau ({int(distance)}m). Rayon autorisé: {company.office_radius}m"
                         ), 403
-                
+
                 # Créer le pointage sans référence à un bureau spécifique
                 pointage = Pointage(
                     user_id=current_user.id,
