@@ -437,6 +437,43 @@ export const calendarService = {
       console.error('Get calendar events service error:', error);
       throw error;
     }
+  }
+};
+
+export const leaveService = {
+  getLeaveTypes: async () => {
+    try {
+      return await api.get('/leave/types');
+    } catch (error) {
+      console.error('Get leave types error:', error);
+      throw error;
+    }
+  },
+  getLeaveBalances: async () => {
+    try {
+      return await api.get('/leave/balances');
+    } catch (error) {
+      console.error('Get leave balances error:', error);
+      throw error;
+    }
+  },
+  submitLeaveRequest: async (data: any) => {
+    try {
+      return await api.post('/leave/requests', data);
+    } catch (error) {
+      console.error('Submit leave request error:', error);
+      throw error;
+    }
+  },
+  getMyLeaveRequests: async (page: number = 1, perPage: number = 10, status?: string) => {
+    try {
+      const params: any = { page, per_page: perPage };
+      if (status) params.status = status;
+      return await api.get('/leave/requests', { params });
+    } catch (error) {
+      console.error('Get my leave requests error:', error);
+      throw error;
+    }
   },
   calculateLeaveDuration: async (data: {
     start_date: string;
@@ -455,7 +492,7 @@ export const calendarService = {
     try {
       return await api.get('/profile/my-leave-report/pdf', {
         params: filters,
-        responseType: 'blob' // Important for file downloads
+        responseType: 'blob'
       });
     } catch (error) {
       console.error('Download my leave report error:', error);
