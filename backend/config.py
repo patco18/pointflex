@@ -34,6 +34,9 @@ class Config:
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+
+    # Push Notifications
+    FCM_SERVER_KEY = os.environ.get('FCM_SERVER_KEY')
     
     # Limites système
     MAX_COMPANIES = 1000

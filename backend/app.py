@@ -45,6 +45,14 @@ def create_app():
     
     # Load configuration
     app.config.from_object(Config)
+
+    # Warn if critical environment variables are missing
+    if not app.config.get('FCM_SERVER_KEY'):
+        app.logger.warning('FCM_SERVER_KEY is not set. Push notifications will be disabled.')
+    if not app.config.get('TWO_FACTOR_ENCRYPTION_KEY'):
+        app.logger.warning('TWO_FACTOR_ENCRYPTION_KEY is not configured. 2FA encryption will fail.')
+    if app.config.get('RATELIMIT_STORAGE_URL', '').startswith('memory'):
+        app.logger.warning('RATELIMIT_STORAGE_URL uses local memory. Configure Redis for production use.')
     
     # Initialize CORS
     CORS(app, origins=["http://localhost:5173", "https://localhost:5173"])
