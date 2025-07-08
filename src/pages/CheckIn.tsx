@@ -36,16 +36,19 @@ export default function CheckIn() {
         longitude: position.coords.longitude
       }
 
-      await attendanceService.checkInOffice(coordinates)
-      toast.success('Pointage bureau enregistré avec succès!')
+      const { data } = await attendanceService.checkInOffice(coordinates)
+      const respMessage = data?.message || 'Pointage bureau enregistré avec succès!'
+      if (data?.pointage?.statut === 'retard') {
+        const delay = data.pointage.delay_minutes || 0
+        toast.success(`${respMessage} Vous êtes en retard de ${delay} min.`)
+      } else {
+        toast.success(respMessage)
+      }
     } catch (error: any) {
       if (error.message.includes('Géolocalisation')) {
-        toast.error('Veuillez autoriser l\'accès à votre position')
-      } else if (error.response?.data?.message) {
-        toast.error(error.response.data.message)
-      } else {
-        toast.error('Erreur lors du pointage bureau')
+        toast.error("Veuillez autoriser l'accès à votre position")
       }
+      // les autres erreurs sont gérées par l'intercepteur API
     } finally {
       setLoading(false)
     }
@@ -65,17 +68,23 @@ export default function CheckIn() {
         longitude: position.coords.longitude
       }
 
-      await attendanceService.checkInMission(missionOrderNumber.trim(), coordinates)
-      toast.success('Pointage mission enregistré avec succès!')
+      const { data } = await attendanceService.checkInMission(
+        missionOrderNumber.trim(),
+        coordinates
+      )
+      const respMessage = data?.message || 'Pointage mission enregistré avec succès!'
+      if (data?.pointage?.statut === 'retard') {
+        const delay = data.pointage.delay_minutes || 0
+        toast.success(`${respMessage} Vous êtes en retard de ${delay} min.`)
+      } else {
+        toast.success(respMessage)
+      }
       setMissionOrderNumber('')
     } catch (error: any) {
       if (error.message.includes('Géolocalisation')) {
         toast.error("Veuillez autoriser l'accès à votre position")
-      } else if (error.response?.data?.message) {
-        toast.error(error.response.data.message)
-      } else {
-        toast.error('Erreur lors du pointage mission')
       }
+      // autres erreurs gérées par l'intercepteur API
     } finally {
       setLoading(false)
     }
