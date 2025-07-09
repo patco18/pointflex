@@ -14,8 +14,10 @@ from flask_sse import sse
 FCM_API_KEY = os.getenv("FCM_SERVER_KEY")
 if FCM_API_KEY:
     push_service = FCMNotification(api_key=FCM_API_KEY)
+    _push_warning_logged = True  # prevent warning when send_notification called
 else:
     push_service = None
+    _push_warning_logged = False
     print("⚠️ FCM_SERVER_KEY not set. Push notifications will be disabled.")
 
 
@@ -106,6 +108,11 @@ def send_notification(
         else:
             current_app.logger.info(f"📱 No active push subscriptions found for user {user_id}.")
     elif send_push and not push_service:
-        current_app.logger.warning("Push service not initialized (FCM_SERVER_KEY missing). Skipping push notification.")
+        global _push_warning_logged
+        if not _push_warning_logged:
+            current_app.logger.warning(
+                "Push service not initialized (FCM_SERVER_KEY missing). Skipping push notification."
+            )
+            _push_warning_logged = True
 
     return notification
