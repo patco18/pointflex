@@ -11,6 +11,7 @@ import AuditeurDashboard from './pages/AuditeurDashboard'
 import CheckIn from './pages/CheckIn'
 import Checkout from './pages/Checkout'
 import PausePage from './pages/Pause'
+import AttendancePage from './pages/Attendance'
 import Profile from './pages/Profile'
 import History from './pages/History'
 import Settings from './pages/Settings'
@@ -217,6 +218,13 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Dashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/attendance" element={
+            <ProtectedRoute>
+              <Layout>
+                <AttendancePage />
               </Layout>
             </ProtectedRoute>
           } />
