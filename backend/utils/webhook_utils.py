@@ -6,7 +6,7 @@ import requests
 from datetime import datetime, timedelta
 from flask import current_app
 
-from database import db # Corrected import
+from backend.database import db # Corrected import
 from backend.models.webhook_subscription import WebhookSubscription # This import is fine as it's a sibling package
 from backend.models.webhook_delivery_log import WebhookDeliveryLog # This import is fine
 

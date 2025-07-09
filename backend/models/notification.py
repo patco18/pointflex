@@ -2,7 +2,7 @@
 Notification Model - Gestion des notifications utilisateur
 """
 
-from database import db
+from backend.database import db
 from datetime import datetime
 
 class Notification(db.Model):

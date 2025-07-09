@@ -2,7 +2,7 @@
 Modèle Company - Gestion des entreprises
 """
 
-from database import db
+from backend.database import db
 from datetime import datetime, timedelta
 
 class Company(db.Model):

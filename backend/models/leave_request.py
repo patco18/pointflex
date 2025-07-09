@@ -1,7 +1,7 @@
 """
 LeaveRequest Model - Represents an employee's request for leave
 """
-from database import db # Corrected import path
+from backend.database import db # Corrected import path
 from datetime import datetime, date, timedelta # Added timedelta
 import holidays # For calculating workdays, may need to add to requirements.txt
 from .user import User  # Added User import

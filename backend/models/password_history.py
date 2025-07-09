@@ -1,7 +1,7 @@
 """
 PasswordHistory Model - Stores recent password hashes for users to prevent reuse.
 """
-from database import db
+from backend.database import db
 from datetime import datetime
 
 class PasswordHistory(db.Model):

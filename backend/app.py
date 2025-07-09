@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from config import Config
 
 # Import database
-from database import db, init_db
+from backend.database import db, init_db
 
 # Import route blueprints
 from routes.auth_routes import auth_bp

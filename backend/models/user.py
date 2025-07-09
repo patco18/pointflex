@@ -2,7 +2,7 @@
 Modèle User - Gestion des utilisateurs
 """
 
-from database import db
+from backend.database import db
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime
 import secrets

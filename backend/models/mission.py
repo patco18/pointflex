@@ -1,6 +1,6 @@
 """Mission model for managing mission orders"""
 
-from database import db
+from backend.database import db
 from .mission_user import MissionUser
 from datetime import datetime
 

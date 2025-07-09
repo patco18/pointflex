@@ -4,7 +4,7 @@ Routes de santé et monitoring
 
 from flask import Blueprint, jsonify
 from datetime import datetime
-from database import db
+from backend.database import db
 from backend.models.user import User
 from backend.models.company import Company
 from backend.models.pointage import Pointage
