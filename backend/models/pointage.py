@@ -2,7 +2,7 @@
 Modèle Pointage - Gestion des pointages
 """
 
-from database import db
+from backend.database import db
 from datetime import datetime, time
 
 class Pointage(db.Model):

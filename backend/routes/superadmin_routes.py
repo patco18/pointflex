@@ -14,7 +14,7 @@ from backend.models.audit_log import AuditLog
 from backend.models.invoice import Invoice
 from backend.models.payment import Payment
 from services.stripe_service import create_checkout_session, verify_webhook
-from database import db
+from backend.database import db
 from datetime import datetime, timedelta
 import json
 

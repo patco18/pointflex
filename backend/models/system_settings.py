@@ -2,7 +2,7 @@
 Modèle SystemSettings - Paramètres système configurables
 """
 
-from database import db
+from backend.database import db
 from datetime import datetime
 import json
 
@@ -108,7 +108,7 @@ class SystemSettings(db.Model):
         cls.query.delete()
         
         # Recréer les paramètres par défaut
-        from database import init_db
+        from backend.database import init_db
         # Note: Cette méthode nécessiterait une refactorisation pour éviter la dépendance circulaire
         
     def to_dict(self):
@@ -123,5 +123,4 @@ class SystemSettings(db.Model):
             'updated_at': self.updated_at.isoformat()
         }
     
-    def __repr__(self):
-        return f'<SystemSettings {self.category}.{self.key}>'
+    def __repr__(self):        return f'<SystemSettings {self.category}.{self.key}>'

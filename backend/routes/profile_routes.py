@@ -6,7 +6,7 @@ from flask import Blueprint, request, jsonify, send_file, current_app
 from flask_jwt_extended import jwt_required
 from middleware.auth import get_current_user
 from middleware.audit import log_user_action
-from database import db
+from backend.database import db
 from backend.models.pointage import Pointage
 from backend.models.leave_request import LeaveRequest
 from backend.utils.pdf_utils import (

@@ -1,7 +1,7 @@
 """Position model for employee roles."""
 
 from datetime import datetime
-from database import db
+from backend.database import db
 
 
 class Position(db.Model):

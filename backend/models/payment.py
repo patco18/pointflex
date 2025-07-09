@@ -2,7 +2,7 @@
 Model Payment - Enregistrement des paiements
 """
 
-from database import db
+from backend.database import db
 from datetime import datetime
 
 class Payment(db.Model):

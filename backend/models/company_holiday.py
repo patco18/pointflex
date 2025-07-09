@@ -1,7 +1,7 @@
 """
 CompanyHoliday Model - Stores company-specific holidays
 """
-from database import db # Assuming database.py is in the root of 'backend'
+from backend.database import db # Assuming database.py is in the root of 'backend'
 from datetime import datetime
 
 class CompanyHoliday(db.Model):

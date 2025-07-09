@@ -1,7 +1,7 @@
 """
 LeaveType Model - Defines different types of leave available
 """
-from database import db # Corrected import path
+from backend.database import db # Corrected import path
 from datetime import datetime
 
 class LeaveType(db.Model):

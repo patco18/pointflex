@@ -6,7 +6,7 @@ from flask import jsonify, request
 from werkzeug.exceptions import HTTPException
 from sqlalchemy.exc import SQLAlchemyError
 from backend.models.audit_log import AuditLog
-from database import db
+from backend.database import db
 import traceback
 
 def init_error_handlers(app):

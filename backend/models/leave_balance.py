@@ -1,7 +1,7 @@
 """
 LeaveBalance Model - Tracks available leave for users
 """
-from database import db # Corrected import path
+from backend.database import db # Corrected import path
 from datetime import datetime
 
 class LeaveBalance(db.Model):

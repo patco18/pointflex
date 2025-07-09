@@ -8,7 +8,7 @@ from backend.models.user import User
 from backend.models.audit_log import AuditLog
 from middleware.auth import get_current_user
 from middleware.audit import log_user_action
-from database import db
+from backend.database import db
 from datetime import datetime
 from extensions import limiter
 

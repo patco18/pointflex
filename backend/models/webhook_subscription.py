@@ -1,7 +1,7 @@
 """
 WebhookSubscription Model - Manages webhook configurations for companies
 """
-from database import db # Corrected import
+from backend.database import db # Corrected import
 from datetime import datetime
 import secrets # For generating secrets
 import hmac

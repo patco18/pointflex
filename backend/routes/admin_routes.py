@@ -21,7 +21,7 @@ from reportlab.lib.units import inch # Keep only what's directly used here
 # Removed other direct reportlab imports as they are now in pdf_utils
 from datetime import datetime
 from backend.utils.pdf_utils import build_pdf_document, create_styled_table, get_report_styles, generate_report_title_elements
-from database import db
+from backend.database import db
 import json
 from flask import current_app # Added for FRONTEND_URL
 

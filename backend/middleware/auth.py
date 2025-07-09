@@ -7,7 +7,7 @@ from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity, get_jwt
 from functools import wraps
 from backend.models.user import User
 from backend.models.audit_log import AuditLog
-from database import db
+from backend.database import db
 
 def init_auth_middleware(app, jwt):
     """Initialise le middleware d'authentification"""

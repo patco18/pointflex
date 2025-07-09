@@ -1,7 +1,7 @@
 """Department model for company organization structure."""
 
 from datetime import datetime
-from database import db
+from backend.database import db
 
 
 class Department(db.Model):

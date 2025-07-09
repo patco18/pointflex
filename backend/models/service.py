@@ -1,7 +1,7 @@
 """Service model belonging to a department."""
 
 from datetime import datetime
-from database import db
+from backend.database import db
 
 
 class Service(db.Model):

@@ -2,7 +2,7 @@ import click
 from flask.cli import with_appcontext
 from datetime import datetime, date
 
-from database import db
+from backend.database import db
 from backend.models.user import User
 from backend.models.leave_type import LeaveType
 from backend.models.leave_balance import LeaveBalance

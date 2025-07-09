@@ -1,7 +1,7 @@
 """
 PushSubscription Model - Manages device tokens for push notifications
 """
-from database import db
+from backend.database import db
 from datetime import datetime
 
 class PushSubscription(db.Model):
