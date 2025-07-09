@@ -109,11 +109,9 @@ export default function Layout({ children }: LayoutProps) {
       }
     }
 
-    // Pointage pour tous (sauf auditeur)
+    // Pointage regroupé pour tous (sauf auditeur)
     if (permissions.canSelfCheckIn) {
-      nav.push({ name: 'Arrivée', href: '/checkin', icon: Clock, priority: false, permission: null })
-      nav.push({ name: 'Départ', href: '/checkout', icon: LogOut, priority: false, permission: null })
-      nav.push({ name: 'Pause', href: '/pause', icon: Coffee, priority: false, permission: null })
+      nav.push({ name: 'Pointage', href: '/attendance', icon: Clock, priority: false, permission: null })
     }
 
     // Historique personnel pour tous
