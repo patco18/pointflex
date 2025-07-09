@@ -6,9 +6,9 @@ import Modal from './shared/Modal'
 import LoadingSpinner from './shared/LoadingSpinner'
 import StatusBadge from './shared/StatusBadge'
 import DataTable from './shared/DataTable'
-import { 
-  Users, Plus, Edit, Trash2, Mail, Phone, Building, 
-  Briefcase, UserCheck, Shield, Save, FileText, Download // Added FileText, Download
+import {
+  Users, Plus, Edit, Trash2, Mail, Phone, Building,
+  Briefcase, UserCheck, Shield, Save, FileText, Download, Eye
 } from 'lucide-react'
 
 interface Employee {
@@ -236,6 +236,9 @@ export default function EmployeeManagement() {
 
   const actions = (emp: Employee) => (
     <div className="flex space-x-2">
+      <button onClick={() => window.location.href = `/admin/employees/${emp.id}`} className="text-gray-600 hover:text-gray-900 p-1" title="Voir">
+        <Eye className="h-4 w-4" />
+      </button>
       <button onClick={() => startEdit(emp)} className="text-blue-600 hover:text-blue-900 p-1" title="Modifier Employé">
         <Edit className="h-4 w-4" />
       </button>

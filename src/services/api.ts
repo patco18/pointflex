@@ -215,6 +215,24 @@ export const attendanceService = {
       throw error
     }
   },
+
+  startPause: async () => {
+    try {
+      return await api.post('/attendance/pause/start')
+    } catch (error) {
+      console.error('Start pause service error:', error)
+      throw error
+    }
+  },
+
+  endPause: async () => {
+    try {
+      return await api.post('/attendance/pause/end')
+    } catch (error) {
+      console.error('End pause service error:', error)
+      throw error
+    }
+  },
 }
 
 // Services SuperAdmin
@@ -659,6 +677,32 @@ export const adminService = {
       return await api.delete(`/admin/employees/${employeeId}`)
     } catch (error) {
       console.error('Delete employee service error:', error)
+      throw error
+    }
+  },
+
+  getCompanyAttendance: async (params?: { startDate?: string; endDate?: string }) => {
+    try {
+      const query = {
+        start_date: params?.startDate,
+        end_date: params?.endDate
+      }
+      return await api.get('/admin/attendance', { params: query })
+    } catch (error) {
+      console.error('Get company attendance service error:', error)
+      throw error
+    }
+  },
+
+  getEmployeeAttendance: async (employeeId: number, params?: { startDate?: string; endDate?: string }) => {
+    try {
+      const query = {
+        start_date: params?.startDate,
+        end_date: params?.endDate
+      }
+      return await api.get(`/admin/employees/${employeeId}/attendance`, { params: query })
+    } catch (error) {
+      console.error('Get employee attendance service error:', error)
       throw error
     }
   },

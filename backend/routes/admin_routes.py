@@ -411,6 +411,43 @@ def delete_employee(employee_id):
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 
+
+@admin_bp.route('/attendance', methods=['GET'])
+@require_manager_or_above
+def get_company_attendance():
+    """Retourne tous les pointages des utilisateurs de l'entreprise"""
+    try:
+        current_user = get_current_user()
+
+        query = Pointage.query.join(User)
+
+        if current_user.role != 'superadmin':
+            query = query.filter(User.company_id == current_user.company_id)
+
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        if start_date:
+            start_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage >= start_obj)
+        if end_date:
+            end_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage <= end_obj)
+
+        pointages = query.order_by(Pointage.date_pointage.desc()).all()
+
+        records = []
+        for p in pointages:
+            data = p.to_dict()
+            data['user_name'] = f"{p.user.prenom} {p.user.nom}" if p.user else str(p.user_id)
+            records.append(data)
+
+        return jsonify({'records': records}), 200
+
+    except Exception as e:
+        print(f"Erreur get_company_attendance: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
 @admin_bp.route('/organization-data', methods=['GET'])
 @require_admin
 def get_organization_data():
@@ -1547,6 +1584,38 @@ def employee_leave_report_pdf(employee_id):
     except Exception as e:
         current_app.logger.error(f"Erreur génération PDF historique congés pour employé {employee_id}: {e}", exc_info=True)
         return jsonify(message="Erreur interne du serveur lors de la génération du PDF."), 500
+
+
+@admin_bp.route('/employees/<int:employee_id>/attendance', methods=['GET'])
+@require_manager_or_above
+def employee_attendance(employee_id):
+    """Renvoie l'historique des pointages pour un employé"""
+    try:
+        current_user = get_current_user()
+        employee = User.query.get_or_404(employee_id)
+
+        if current_user.role != 'superadmin' and employee.company_id != current_user.company_id:
+            return jsonify(message="Accès non autorisé"), 403
+
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+
+        query = Pointage.query.filter_by(user_id=employee_id)
+        if start_date:
+            start_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage >= start_obj)
+        if end_date:
+            end_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            query = query.filter(Pointage.date_pointage <= end_obj)
+
+        pointages = query.order_by(Pointage.date_pointage.desc()).all()
+        records = [p.to_dict() for p in pointages]
+
+        return jsonify({'employee': employee.to_dict(), 'records': records}), 200
+
+    except Exception as e:
+        print(f"Erreur employee_attendance: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
 
 # --- Company Leave Policy Management ---
 from backend.models.company_holiday import CompanyHoliday

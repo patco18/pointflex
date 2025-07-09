@@ -122,6 +122,7 @@ class Pointage(db.Model):
         data = {
             'id': self.id,
             'user_id': self.user_id,
+            'user_name': f"{self.user.prenom} {self.user.nom}" if self.user else None,
             'type': self.type,
             'date_pointage': self.date_pointage.isoformat(),
             'heure_arrivee': self.heure_arrivee.strftime('%H:%M'),
