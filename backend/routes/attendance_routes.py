@@ -8,6 +8,7 @@ from middleware.auth import get_current_user
 from middleware.audit import log_user_action
 from utils.notification_utils import send_notification
 from backend.models.pointage import Pointage
+from backend.models.pause import Pause
 from backend.models.user import User
 from backend.models.mission import Mission
 from backend.models.office import Office
@@ -296,6 +297,58 @@ def checkout():
 
     except Exception as e:
         print(f"Erreur lors du checkout: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@attendance_bp.route('/pause/start', methods=['POST'])
+@jwt_required()
+def start_pause():
+    """Enregistre le début d'une pause"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify(message="Utilisateur non trouvé"), 401
+
+        today = date.today()
+        # Vérifier si une pause est déjà en cours
+        existing = Pause.query.filter_by(user_id=current_user.id, date_pause=today, end_time=None).first()
+        if existing:
+            return jsonify(message="Une pause est déjà en cours"), 409
+
+        pause = Pause(user_id=current_user.id)
+        db.session.add(pause)
+        db.session.commit()
+
+        return jsonify({'message': 'Pause démarrée', 'pause': pause.to_dict()}), 201
+
+    except Exception as e:
+        print(f"Erreur start pause: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@attendance_bp.route('/pause/end', methods=['POST'])
+@jwt_required()
+def end_pause():
+    """Enregistre la fin d'une pause"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify(message="Utilisateur non trouvé"), 401
+
+        today = date.today()
+        pause = Pause.query.filter_by(user_id=current_user.id, date_pause=today, end_time=None).first()
+        if not pause:
+            return jsonify(message="Aucune pause en cours"), 404
+
+        pause.end_time = datetime.utcnow().time()
+        db.session.commit()
+
+        return jsonify({'message': 'Pause terminée', 'pause': pause.to_dict()}), 200
+
+    except Exception as e:
+        print(f"Erreur end pause: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 

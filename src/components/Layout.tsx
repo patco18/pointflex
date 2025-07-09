@@ -5,8 +5,9 @@ import { usePermissions } from '../hooks/usePermissions'
 import RealtimeNotifications from './RealtimeNotifications'
 import { 
   Home, 
-  Clock, 
-  User, 
+  Clock,
+  Coffee,
+  User,
   LogOut, 
   Menu,
   X,
@@ -110,8 +111,9 @@ export default function Layout({ children }: LayoutProps) {
 
     // Pointage pour tous (sauf auditeur)
     if (permissions.canSelfCheckIn) {
-      nav.push({ name: 'Pointage', href: '/checkin', icon: Clock, priority: false, permission: null })
-      nav.push({ name: 'Sortie', href: '/checkout', icon: LogOut, priority: false, permission: null })
+      nav.push({ name: 'Arrivée', href: '/checkin', icon: Clock, priority: false, permission: null })
+      nav.push({ name: 'Départ', href: '/checkout', icon: LogOut, priority: false, permission: null })
+      nav.push({ name: 'Pause', href: '/pause', icon: Coffee, priority: false, permission: null })
     }
 
     // Historique personnel pour tous

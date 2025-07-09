@@ -10,12 +10,14 @@ import ManagerDashboard from './pages/ManagerDashboard'
 import AuditeurDashboard from './pages/AuditeurDashboard'
 import CheckIn from './pages/CheckIn'
 import Checkout from './pages/Checkout'
+import PausePage from './pages/Pause'
 import Profile from './pages/Profile'
 import History from './pages/History'
 import Settings from './pages/Settings'
 import SuperAdminDashboard from './pages/SuperAdminDashboard'
 import CompanyManagement from './pages/CompanyManagement'
 import EmployeeManagement from './pages/EmployeeManagement'
+import EmployeeDetailsPage from './pages/EmployeeDetailsPage'
 import Reports from './pages/Reports'
 import TeamCalendarPage from './pages/TeamCalendarPage'
 import GeofencingPage from './pages/GeofencingPage'
@@ -97,6 +99,13 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <EmployeeManagement />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/employees/:id" element={
+            <ProtectedRoute>
+              <Layout>
+                <EmployeeDetailsPage />
               </Layout>
             </ProtectedRoute>
           } />
@@ -222,6 +231,13 @@ function App() {
             <ProtectedRoute>
               <Layout>
                 <Checkout />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/pause" element={
+            <ProtectedRoute>
+              <Layout>
+                <PausePage />
               </Layout>
             </ProtectedRoute>
           } />

@@ -4,7 +4,7 @@ import { Calendar, Clock, MapPin, Filter, Download, Search } from 'lucide-react'
 import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import { fr } from 'date-fns/locale'
 
-interface AttendanceRecord {
+export interface AttendanceRecord {
   id: number
   type: 'office' | 'mission'
   date_pointage: string
@@ -16,9 +16,14 @@ interface AttendanceRecord {
   longitude?: number
 }
 
-export default function AttendanceHistory() {
-  const [records, setRecords] = useState<AttendanceRecord[]>([])
-  const [loading, setLoading] = useState(true)
+interface Props {
+  records?: AttendanceRecord[]
+  hideFilters?: boolean
+}
+
+export default function AttendanceHistory({ records: propRecords, hideFilters }: Props) {
+  const [records, setRecords] = useState<AttendanceRecord[]>(propRecords || [])
+  const [loading, setLoading] = useState(!propRecords)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
@@ -28,8 +33,12 @@ export default function AttendanceHistory() {
   })
 
   useEffect(() => {
-    loadAttendanceHistory()
-  }, [dateRange])
+    if (!propRecords) {
+      loadAttendanceHistory()
+    } else {
+      setLoading(false)
+    }
+  }, [dateRange, propRecords])
 
   const loadAttendanceHistory = async () => {
     setLoading(true)
@@ -42,6 +51,12 @@ export default function AttendanceHistory() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (propRecords) {
+      setRecords(propRecords)
+    }
+  }, [propRecords])
 
   const filteredRecords = records.filter(record => {
     const matchesSearch = searchTerm === '' || 
@@ -129,6 +144,7 @@ export default function AttendanceHistory() {
       </div>
 
       {/* Filtres */}
+      {!hideFilters && (
       <div className="card">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Recherche */}
@@ -235,6 +251,7 @@ export default function AttendanceHistory() {
           </div>
         </div>
       </div>
+      )}
 
       {/* Résultats */}
       <div className="card">
