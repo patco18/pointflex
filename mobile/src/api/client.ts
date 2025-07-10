@@ -1,8 +1,8 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage'; // For token storage
 
-// TODO: User should set this via .env or other config mechanism
-const API_BASE_URL = 'http://YOUR_LOCAL_IP_OR_DOMAIN:5000/api'; // Replace with actual backend URL
+// API base URL can be overridden via a .env file. See mobile/.env.example
+const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:5000/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -38,13 +38,29 @@ apiClient.interceptors.response.use(
     console.error(`[API Response Error] ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status || 'NETWORK_ERROR'}`);
 
     if (error.response?.status === 401) {
-      // Token might be invalid or expired
-      // TODO: Implement token refresh logic or navigate to login
-      console.log('API Error 401: Unauthorized. Token may be invalid.');
-      await AsyncStorage.removeItem('token'); // Clear invalid token
-      // Potentially navigate to Login screen here using a navigation service
-      // This is a common place for a global navigation handler or event emitter.
-      // Example: navigationService.navigate('Login');
+      // Attempt to refresh the token. If it fails, clear storage so the
+      // AuthContext will redirect the user to the login screen on next render.
+      try {
+        const currentToken = await AsyncStorage.getItem('token');
+        if (currentToken && !error.config.__isRetryRequest && !error.config.url?.includes('/auth/refresh')) {
+          const refreshResp = await apiClient.post('/auth/refresh');
+          const newToken = refreshResp.data.token;
+          if (newToken) {
+            await AsyncStorage.setItem('token', newToken);
+            apiClient.defaults.headers.common['Authorization'] = `Bearer ${newToken}`;
+            error.config.headers.Authorization = `Bearer ${newToken}`;
+            error.config.__isRetryRequest = true;
+            return apiClient(error.config); // retry original request
+          }
+        }
+      } catch (refreshError) {
+        console.log('Token refresh failed, redirecting to login');
+      }
+
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('user');
+      delete apiClient.defaults.headers.common['Authorization'];
+      // Implement navigation to Login screen in your app if desired
     }
 
     // You might want to show a global toast message for other errors
