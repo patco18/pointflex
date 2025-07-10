@@ -48,7 +48,7 @@ jobs:
     - name: Test backend
       run: |
         cd backend
-        python -c "import app; print('Backend imports successfully')"
+        pytest -q
 
   docker-build:
     runs-on: ubuntu-latest
