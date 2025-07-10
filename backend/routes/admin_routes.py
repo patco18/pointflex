@@ -8,6 +8,7 @@ from middleware.auth import require_admin, require_manager_or_above, get_current
 from middleware.audit import log_user_action
 from backend.models.user import User
 from backend.models.company import Company
+from backend.models.subscription_extension_request import SubscriptionExtensionRequest
 from backend.models.office import Office
 from backend.models.department import Department
 from backend.models.service import Service
@@ -172,6 +173,41 @@ def create_company_customer_portal_session():
     except Exception as e:
         current_app.logger.error(f"Error creating customer portal for company {company.id}: {e}")
         return jsonify(message="Erreur interne du serveur lors de la création du portail client."), 500
+
+
+@admin_bp.route('/subscription/extension-request', methods=['POST'])
+@require_admin
+def request_subscription_extension():
+    """Crée une demande de prolongation d'abonnement qui devra être validée par le superadmin."""
+    current_admin = get_current_user()
+    if not current_admin.company_id:
+        return jsonify(message="Aucune entreprise associée"), 400
+
+    data = request.get_json() or {}
+    months = data.get('months', 1)
+    reason = data.get('reason', '')
+
+    if months < 1 or months > 24:
+        return jsonify(message="Le nombre de mois doit être entre 1 et 24."), 400
+
+    extension_req = SubscriptionExtensionRequest(
+        company_id=current_admin.company_id,
+        months=months,
+        reason=reason,
+        status='pending'
+    )
+    db.session.add(extension_req)
+    db.session.commit()
+
+    log_user_action(
+        action='REQUEST_SUBSCRIPTION_EXTENSION',
+        resource_type='SubscriptionExtensionRequest',
+        resource_id=extension_req.id,
+        new_values=extension_req.to_dict(),
+        details={'company_id': current_admin.company_id}
+    )
+
+    return jsonify({'request': extension_req.to_dict()}), 201
 
 
 @admin_bp.route('/employees', methods=['GET'])
@@ -1039,7 +1075,13 @@ def update_company_settings():
         
         for field in updatable_fields:
             if field in data:
-                setattr(company, field, data[field])
+                value = data[field]
+                if field == 'work_start_time' and isinstance(value, str):
+                    try:
+                        value = datetime.strptime(value, '%H:%M').time()
+                    except ValueError:
+                        return jsonify(message="Format d'heure invalide"), 400
+                setattr(company, field, value)
         
         # Logger l'action
         log_user_action(
