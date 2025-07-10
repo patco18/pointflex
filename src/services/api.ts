@@ -917,6 +917,71 @@ export const adminService = {
     }
   },
 
+  // Subscription management for company admins
+  getCompanySubscription: async () => {
+    try {
+      return await api.get('/admin/subscription')
+    } catch (error) {
+      console.error('Get company subscription service error:', error)
+      throw error
+    }
+  },
+
+  createSubscriptionCheckoutSession: async (stripePriceId: string) => {
+    try {
+      return await api.post('/admin/subscription/checkout-session', { stripe_price_id: stripePriceId })
+    } catch (error) {
+      console.error('Create subscription checkout session service error:', error)
+      throw error
+    }
+  },
+
+  createCustomerPortalSession: async () => {
+    try {
+      return await api.post('/admin/subscription/customer-portal')
+    } catch (error) {
+      console.error('Create customer portal session service error:', error)
+      throw error
+    }
+  },
+
+  // Leave policy management
+  getCompanyLeavePolicy: async () => {
+    try {
+      return await api.get('/admin/company/leave-policy')
+    } catch (error) {
+      console.error('Get company leave policy error:', error)
+      throw error
+    }
+  },
+
+  updateCompanyLeavePolicy: async (policyData: { work_days?: string; default_country_code_for_holidays?: string }) => {
+    try {
+      return await api.put('/admin/company/leave-policy', policyData)
+    } catch (error) {
+      console.error('Update company leave policy error:', error)
+      throw error
+    }
+  },
+
+  addCompanyHoliday: async (holidayData: { date: string; name: string }) => {
+    try {
+      return await api.post('/admin/company/holidays', holidayData)
+    } catch (error) {
+      console.error('Add company holiday error:', error)
+      throw error
+    }
+  },
+
+  deleteCompanyHoliday: async (holidayId: number) => {
+    try {
+      return await api.delete(`/admin/company/holidays/${holidayId}`)
+    } catch (error) {
+      console.error('Delete company holiday error:', error)
+      throw error
+    }
+  },
+
   downloadAttendancePdf: async (params?: { startDate?: string; endDate?: string }) => {
     try {
       return await api.get('/admin/attendance-report/pdf', {
