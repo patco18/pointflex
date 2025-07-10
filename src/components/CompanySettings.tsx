@@ -51,6 +51,8 @@ export default function CompanySettings() {
   const [subscriptionLoading, setSubscriptionLoading] = useState(true);
   const [subscriptionData, setSubscriptionData] = useState<SubscriptionData | null>(null);
   const [actionLoading, setActionLoading] = useState(false); // For button actions like subscribe/portal
+  const [extensionMonths, setExtensionMonths] = useState(1);
+  const [extensionReason, setExtensionReason] = useState('');
 
   // State for Leave Policy
   const [leavePolicyLoading, setLeavePolicyLoading] = useState(true);
@@ -160,6 +162,21 @@ export default function CompanySettings() {
       }
     } catch (error) {
       console.error('Erreur création portail client:', error);
+    } finally {
+      setActionLoading(false);
+    }
+  }
+
+  const handleExtensionRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionLoading(true);
+    try {
+      await adminService.requestSubscriptionExtension(extensionMonths, extensionReason);
+      toast.success('Demande de prolongation envoyée');
+      setExtensionReason('');
+      setExtensionMonths(1);
+    } catch (error) {
+      console.error('Erreur demande prolongation:', error);
     } finally {
       setActionLoading(false);
     }
@@ -571,6 +588,23 @@ export default function CompanySettings() {
               ) : (
                  <p className="text-gray-500 text-sm">Aucun autre plan n'est disponible pour le moment.</p>
               )}
+            </div>
+
+            <div className="card mt-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-3">Prolonger l'abonnement</h3>
+              <form onSubmit={handleExtensionRequest} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre de mois</label>
+                  <input type="number" min={1} max={24} value={extensionMonths} onChange={(e) => setExtensionMonths(parseInt(e.target.value))} className="input-field w-32" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Raison (optionnel)</label>
+                  <textarea value={extensionReason} onChange={(e) => setExtensionReason(e.target.value)} className="input-field" rows={2} />
+                </div>
+                <button type="submit" disabled={actionLoading} className="btn-primary">
+                  {actionLoading ? 'Envoi...' : 'Envoyer la demande'}
+                </button>
+              </form>
             </div>
           </div>
         ) : (

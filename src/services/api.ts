@@ -433,6 +433,15 @@ export const superAdminService = {
     }
   },
 
+  requestSubscriptionExtension: async (months: number, reason?: string) => {
+    try {
+      return await api.post('/admin/subscription/extension-request', { months, reason })
+    } catch (error) {
+      console.error('Request subscription extension error:', error)
+      throw error
+    }
+  },
+
   setEmployeeManager: async (employeeId: number, managerId: number | null) => {
     try {
       return await api.put(`/admin/employees/${employeeId}/manager`, { manager_id: managerId });
