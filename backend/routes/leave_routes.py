@@ -37,9 +37,8 @@ def list_leave_types():
     return jsonify([lt.to_dict() for lt in leave_types]), 200
 
 @leave_bp.route('/types', methods=['POST'])
-@jwt_required() # require_superadmin_or_admin would be better
+@require_superadmin_or_admin
 def create_leave_type():
-    # TODO: Add role check (SuperAdmin or Company Admin)
     current_user = get_current_user()
     data = request.get_json()
 
@@ -522,9 +521,6 @@ def admin_adjust_user_leave_balance(user_id):
         return jsonify(message="Failed to adjust leave balance."), 500
 
 
-# TODO: Add a decorator @require_superadmin_or_admin for type creation/management.
-# For now, using @jwt_required() and manual role checks.
-# def require_superadmin_or_admin(fn):
 
 @leave_bp.route('/calculate-duration', methods=['POST'])
 @jwt_required()
