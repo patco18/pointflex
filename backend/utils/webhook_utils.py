@@ -10,6 +10,9 @@ from backend.database import db # Corrected import
 from backend.models.webhook_subscription import WebhookSubscription # This import is fine as it's a sibling package
 from backend.models.webhook_delivery_log import WebhookDeliveryLog # This import is fine
 
+# Queue name used for webhook dispatch jobs
+WEBHOOK_QUEUE_NAME = "pointflex_webhooks"
+
 # Configuration for webhook delivery
 WEBHOOK_TIMEOUT_SECONDS = 10
 WEBHOOK_MAX_RETRIES = 3 # For a more advanced system; initial implementation might not auto-retry
@@ -67,7 +70,7 @@ def dispatch_webhook_event(event_type: str, payload_data: dict, company_id: int 
         redis_url = current_app.config.get('REDIS_URL', os.environ.get('REDIS_URL', 'redis://localhost:6379/0'))
         redis_conn = Redis.from_url(redis_url)
         # Using a dedicated queue for webhooks
-        webhook_queue = Queue("pointflex_webhooks", connection=redis_conn)
+        webhook_queue = Queue(WEBHOOK_QUEUE_NAME, connection=redis_conn)
     except Exception as e:
         current_app.logger.error(f"Failed to connect to Redis for RQ: {e}. Webhooks will not be queued.")
         return
