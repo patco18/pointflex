@@ -24,8 +24,11 @@ chmod +x quick-install.sh && ./quick-install.sh
 cd backend
 python app.py
 
-# Terminal 2 - Frontend  
+# Terminal 2 - Frontend
 npm run dev
+
+# Terminal 3 - RQ Worker (webhooks)
+python run_worker.py
 ```
 
 **Accès:**
@@ -110,6 +113,9 @@ nano .env  # Modifier les clés secrètes
 
 # Déployer
 docker-compose up -d
+
+# Démarrer ensuite le worker RQ pour les webhooks
+docker-compose exec backend python run_worker.py
 ```
 
 ### Option 2: Hébergement Gratuit

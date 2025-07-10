@@ -258,6 +258,7 @@ docker-compose up --build -d
 # Ensuite démarrer les services
 npm run dev                # Frontend sur :5173
 cd backend && python app.py  # Backend sur :5000
+python run_worker.py         # Worker RQ pour les webhooks
 ```
 
 #### Ou avec Docker
@@ -302,6 +303,9 @@ nano .env  # Modifier les clés secrètes
 
 # Déployer
 docker-compose up -d
+
+# Démarrer ensuite le worker RQ pour les webhooks
+docker-compose exec backend python run_worker.py
 
 Cette configuration inclut également un service **redis** nécessaire au bon fonctionnement des notifications SSE et du système de tâches.
 
