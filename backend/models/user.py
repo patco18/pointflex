@@ -195,3 +195,27 @@ class User(db.Model):
     
     def __repr__(self):
         return f'<User {self.email}>'
+
+    @staticmethod
+    def would_create_manager_cycle(employee_id: int, new_manager_id: int) -> bool:
+        """Return True if assigning ``new_manager_id`` as manager of ``employee_id``
+        would introduce a management cycle."""
+
+        if employee_id == new_manager_id:
+            return True
+
+        manager = User.query.get(new_manager_id)
+        visited = set()
+
+        # Walk up the management chain from the potential manager. If we
+        # encounter the employee or loop back to a visited user, a cycle would
+        # be created.
+        while manager:
+            if manager.id == employee_id:
+                return True
+            if manager.id in visited:
+                return True
+            visited.add(manager.id)
+            manager = manager.manager
+
+        return False
