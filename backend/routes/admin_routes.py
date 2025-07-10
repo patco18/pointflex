@@ -25,10 +25,9 @@ from backend.database import db
 import json
 from flask import current_app # Added for FRONTEND_URL
 
-# Import stripe service and mapping (assuming it's moved or accessible)
-# For now, direct import, consider refactoring STRIPE_PRICE_TO_PLAN_MAPPING if it grows
+# Stripe utilities
 from backend.services import stripe_service
-from backend.routes.stripe_routes import STRIPE_PRICE_TO_PLAN_MAPPING
+from backend.routes.stripe_routes import get_stripe_price_to_plan_mapping
 
 
 admin_bp = Blueprint('admin', __name__)
@@ -53,7 +52,7 @@ def get_company_subscription():
         return error_response
 
     available_plans = []
-    for price_id, details in STRIPE_PRICE_TO_PLAN_MAPPING.items():
+    for price_id, details in get_stripe_price_to_plan_mapping().items():
         available_plans.append({
             "stripe_price_id": price_id,
             "name": details["name"],
@@ -92,7 +91,8 @@ def create_company_subscription_checkout_session():
     data = request.get_json()
     stripe_price_id = data.get('stripe_price_id')
 
-    if not stripe_price_id or stripe_price_id not in STRIPE_PRICE_TO_PLAN_MAPPING:
+    mapping = get_stripe_price_to_plan_mapping()
+    if not stripe_price_id or stripe_price_id not in mapping:
         return jsonify(message="ID de plan Stripe (stripe_price_id) valide requis."), 400
 
     frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')

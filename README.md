@@ -281,7 +281,12 @@ JWT_SECRET_KEY=your-jwt-secret-key-here
 DATABASE_URL=sqlite:///instance/pointflex.db
 CORS_ORIGINS=http://localhost,https://yourdomain.com
 REDIS_URL=redis://localhost:6379/0
+STRIPE_API_KEY=your-stripe-key
+STRIPE_WEBHOOK_SECRET=your-webhook-secret
+STRIPE_PRICE_MAP={"price_basic_monthly_test":{"name":"basic","max_employees":10,"amount_eur":10,"interval_months":1}}
 ```
+`STRIPE_PRICE_MAP` doit être un objet JSON mapant les identifiants de tarifs Stripe
+aux informations de vos plans (nom, montant, durée, etc.).
 
 ### Production (Serveur)
 
