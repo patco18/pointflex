@@ -24,3 +24,49 @@ def test_get_employees_as_manager(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert 'employees' in data
+
+
+def get_user_id(client, token, email):
+    headers = {"Authorization": f"Bearer {token}"}
+    resp = client.get("/api/admin/employees", headers=headers)
+    assert resp.status_code == 200
+    employees = resp.get_json()["employees"]
+    return next(emp["id"] for emp in employees if emp["email"] == email)
+
+
+def test_prevent_manager_cycle(client):
+    token = login_admin(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    manager_id = get_user_id(client, token, "manager@pointflex.com")
+    employee_id = get_user_id(client, token, "employee@pointflex.com")
+
+    # Assign manager as the supervisor of the employee
+    resp = client.put(f"/api/admin/employees/{employee_id}/manager", json={"manager_id": manager_id}, headers=headers)
+    assert resp.status_code == 200
+
+    # Attempt to assign the employee back as manager of the manager -> should fail
+    resp = client.put(f"/api/admin/employees/{manager_id}/manager", json={"manager_id": employee_id}, headers=headers)
+    assert resp.status_code == 400
+
+
+def test_prevent_indirect_manager_cycle(client):
+    token = login_admin(client)
+    headers = {"Authorization": f"Bearer {token}"}
+
+    admin_id = get_user_id(client, token, "admin@pointflex.com")
+    manager_id = get_user_id(client, token, "manager@pointflex.com")
+    employee_id = get_user_id(client, token, "employee@pointflex.com")
+
+    # employee -> manager
+    resp = client.put(f"/api/admin/employees/{employee_id}/manager", json={"manager_id": manager_id}, headers=headers)
+    assert resp.status_code == 200
+
+    # manager -> admin
+    resp = client.put(f"/api/admin/employees/{manager_id}/manager", json={"manager_id": admin_id}, headers=headers)
+    assert resp.status_code == 200
+
+    # Attempt to set admin -> employee (which would create a cycle)
+    resp = client.put(f"/api/admin/employees/{admin_id}/manager", json={"manager_id": employee_id}, headers=headers)
+    assert resp.status_code == 400
+

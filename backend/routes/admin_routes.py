@@ -1300,7 +1300,9 @@ def set_employee_manager(employee_id):
             return jsonify(message=f"Manager avec ID {new_manager_id} non trouvé."), 404
         if new_manager.company_id != current_admin.company_id:
             return jsonify(message="Le manager sélectionné n'appartient pas à la même entreprise."), 403
-        # TODO: Check for circular dependencies (e.g., A manages B, B manages A) - more complex logic needed
+        # Prevent circular management relations
+        if User.would_create_manager_cycle(employee_id, new_manager_id):
+            return jsonify(message="Cette relation de gestion créerait une boucle."), 400
 
         target_employee.manager_id = new_manager_id
         new_values_details = {'manager_id': new_manager_id, 'manager_name': f"{new_manager.prenom} {new_manager.nom}"}
