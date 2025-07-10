@@ -181,13 +181,21 @@ export default function EmployeeManagement() {
 
   const startEdit = (emp: Employee) => {
     setEditingEmployee(emp)
+    const dept = orgData?.departments?.find((d: any) => d.name === emp.department_name)
+    const service = orgData?.services?.find((s: any) => s.name === emp.service_name)
+    const position = orgData?.positions?.find((p: any) => p.name === emp.position_name)
+
     setForm({
-      email: emp.email, nom: emp.nom, prenom: emp.prenom, role: emp.role,
-      password: '', phone: emp.phone || '',
-      department_id: '', // TODO: Populate these from emp if available and needed for edit
-      service_id: '',
-      position_id: '',
-      manager_id: emp.manager_id ? String(emp.manager_id) : '' // Populate manager_id
+      email: emp.email,
+      nom: emp.nom,
+      prenom: emp.prenom,
+      role: emp.role,
+      password: '',
+      phone: emp.phone || '',
+      department_id: dept ? String(dept.id) : '',
+      service_id: service ? String(service.id) : '',
+      position_id: position ? String(position.id) : '',
+      manager_id: emp.manager_id ? String(emp.manager_id) : ''
     })
     setShowModal(true)
   }
