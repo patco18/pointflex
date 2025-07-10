@@ -35,7 +35,7 @@ interface SubscriptionData {
 export default function CompanySettings() {
   const navigate = useNavigate(); // For clearing query params
   const [searchParams] = useSearchParams();
-  const { isAdmin } = useAuth()
+  const { isAdmin, fetchUser } = useAuth()
   const [settings, setSettings] = useState({
     office_latitude: 48.8566,
     office_longitude: 2.3522,
@@ -108,6 +108,9 @@ export default function CompanySettings() {
       // Appel API pour sauvegarder les paramètres
       await adminService.updateCompanySettings(settings)
       toast.success('Paramètres sauvegardés avec succès!')
+      if (fetchUser) {
+        await fetchUser()
+      }
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error)
       toast.error('Erreur lors de la sauvegarde')

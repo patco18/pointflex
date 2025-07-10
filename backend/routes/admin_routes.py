@@ -1039,7 +1039,13 @@ def update_company_settings():
         
         for field in updatable_fields:
             if field in data:
-                setattr(company, field, data[field])
+                value = data[field]
+                if field == 'work_start_time' and isinstance(value, str):
+                    try:
+                        value = datetime.strptime(value, '%H:%M').time()
+                    except ValueError:
+                        return jsonify(message="Format d'heure invalide"), 400
+                setattr(company, field, value)
         
         # Logger l'action
         log_user_action(
