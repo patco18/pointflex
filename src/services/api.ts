@@ -856,16 +856,6 @@ export const adminService = {
     }
   },
   
-  getCompanyAttendance: async (date?: string) => {
-    try {
-      console.log('🕒 Récupération des pointages de l\'entreprise...')
-      const params = date ? { date } : undefined
-      return await api.get('/attendance', { params })
-    } catch (error) {
-      console.error('Get company attendance service error:', error)
-      throw error
-    }
-  },
   
   getOffices: async () => {
     try {
