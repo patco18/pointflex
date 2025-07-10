@@ -3,7 +3,8 @@ Routes for managing Webhook Subscriptions and viewing Delivery Logs
 """
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required
-import jsonschema # For validating subscribed_events structure
+import jsonschema  # For validating subscribed_events structure
+from datetime import datetime
 
 from backend.middleware.auth import get_current_user, require_admin
 from backend.models.company import Company
@@ -22,7 +23,8 @@ VALID_EVENT_TYPES = [
     "invoice.created", "invoice.paid", "invoice.payment_failed",
     "subscription.created", "subscription.updated", "subscription.cancelled",
     "leave_request.created", "leave_request.approved", "leave_request.rejected",
-    "mission.created", "mission.updated"
+    "mission.created", "mission.updated",
+    "ping.test"
     # Add more as your system evolves
 ]
 
@@ -171,7 +173,6 @@ def update_webhook_subscription(sub_id):
         return jsonify(message="Failed to update webhook subscription."), 500
 
 
-# TODO: Implement other CRUD endpoints for subscriptions:
 @webhook_bp.route('/subscriptions/<int:sub_id>', methods=['DELETE'])
 @require_admin
 def delete_webhook_subscription(sub_id):
@@ -248,7 +249,8 @@ def ping_webhook_subscription(sub_id):
         return jsonify(message="Cannot ping an inactive webhook subscription."), 400
 
     try:
-        from backend.utils.webhook_utils import dispatch_webhook_event # Re-import for clarity or if moved
+        from backend.utils.webhook_utils import dispatch_webhook_event
+        from backend.middleware.audit import log_user_action
 
         test_event_type = "ping.test"
         test_payload = {
@@ -257,27 +259,11 @@ def ping_webhook_subscription(sub_id):
             "timestamp": datetime.utcnow().isoformat()
         }
 
-        # Dispatch a single event directly to this subscription's URL
-        # We can reuse dispatch_webhook_event, but it queries for subscriptions.
-        # A more direct call to send_single_webhook might be cleaner if available,
-        # or adapt dispatch_webhook_event to take a single subscription.
-        # For now, we'll use a conceptual direct send or a specific utility for ping.
-
-        # Let's use a slightly modified approach for a single ping for clarity here,
-        # though in a real app, send_single_webhook from webhook_utils would be ideal.
-        from backend.utils.webhook_utils import send_single_webhook # Assuming this can be imported
-        import json # for payload_json_bytes
-
-        full_ping_payload = {
-            "event_id": f"evt_ping_{datetime.utcnow().timestamp()}_{subscription.id}",
-            "event_type": test_event_type,
-            "created_at": datetime.utcnow().isoformat(),
-            "data": test_payload,
-            "company_id": subscription.company_id
-        }
-        payload_json_bytes = json.dumps(full_ping_payload, sort_keys=True, default=str).encode('utf-8')
-
-        send_single_webhook(subscription, test_event_type, full_ping_payload, payload_json_bytes)
+        dispatch_webhook_event(
+            event_type=test_event_type,
+            payload_data=test_payload,
+            company_id=subscription.company_id
+        )
 
         log_user_action(
             action='PING_WEBHOOK_SUBSCRIPTION',
@@ -285,12 +271,8 @@ def ping_webhook_subscription(sub_id):
             resource_id=sub_id,
             details={'target_url': subscription.target_url}
         )
-        # db.session.commit() # Covered by send_single_webhook's internal commit for the log
 
-        return jsonify(message=f"Test ping event sent to {subscription.target_url}. Check delivery logs for status."), 200
-    except ImportError:
-        current_app.logger.error("webhook_utils.send_single_webhook not found or importable for ping.")
-        return jsonify(message="Error sending ping: Utility not found."), 500
+        return jsonify(message=f"Test ping event dispatched to {subscription.target_url}. Check delivery logs for status."), 200
     except Exception as e:
         current_app.logger.error(f"Error sending ping for webhook subscription {sub_id}: {e}", exc_info=True)
         return jsonify(message="Failed to send ping test event."), 500
