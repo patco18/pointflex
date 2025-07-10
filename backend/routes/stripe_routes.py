@@ -5,25 +5,41 @@ from flask import Blueprint, request, jsonify, current_app
 from werkzeug.exceptions import BadRequest
 import stripe
 from datetime import datetime, timedelta
+import os
+import json
 
 from backend.services import stripe_service
 from backend.database import db
 from backend.models.invoice import Invoice
 from backend.models.payment import Payment
-from backend.models.company import Company # Added Company model
+from backend.models.company import Company  # Added Company model
+from backend.models.system_settings import SystemSettings
 
 stripe_bp = Blueprint('stripe_bp', __name__)
 
-# This is a placeholder. In a real app, this might come from config or a database table
-# mapping Stripe Price IDs to your internal plan details.
-# Ensure these Price IDs are configured in your Stripe Dashboard.
-STRIPE_PRICE_TO_PLAN_MAPPING = {
-    # Example: "price_1PEXAMPLE..." : {"name": "basic", "max_employees": 10, "monthly_amount_eur": 29},
-    # Example: "price_1PEXAMPLE..." : {"name": "premium", "max_employees": 50, "monthly_amount_eur": 99},
-    # TODO: Populate with actual Stripe Price IDs and plan details
-    "price_basic_monthly_test": {"name": "basic", "max_employees": 10, "amount_eur": 10, "interval_months": 1},
-    "price_premium_monthly_test": {"name": "premium", "max_employees": 50, "amount_eur": 50, "interval_months": 1},
-}
+
+def get_stripe_price_to_plan_mapping():
+    """Return mapping of Stripe price IDs to internal plan details.
+
+    The function first checks the application configuration or environment
+    variable ``STRIPE_PRICE_MAP`` for a JSON mapping. If not found, it falls
+    back to the ``SystemSettings`` table under the ``billing`` category with
+    the key ``stripe_price_mapping``.
+    """
+    mapping_json = (
+        current_app.config.get('STRIPE_PRICE_MAP')
+        or os.getenv('STRIPE_PRICE_MAP')
+    )
+    if mapping_json:
+        try:
+            if isinstance(mapping_json, str):
+                return json.loads(mapping_json)
+            return mapping_json
+        except json.JSONDecodeError as e:
+            current_app.logger.error(f"Invalid STRIPE_PRICE_MAP JSON: {e}")
+
+    # Fallback to SystemSettings stored configuration
+    return SystemSettings.get_setting('billing', 'stripe_price_mapping', {})
 
 
 @stripe_bp.route('/webhook', methods=['POST'])
@@ -73,7 +89,7 @@ def stripe_webhook():
         # --- Handle Subscription Payment ---
         if payment_type == 'subscription':
             stripe_price_id = metadata.get('stripe_price_id')
-            plan_details = STRIPE_PRICE_TO_PLAN_MAPPING.get(stripe_price_id)
+            plan_details = get_stripe_price_to_plan_mapping().get(stripe_price_id)
 
             if not stripe_price_id or not plan_details:
                 current_app.logger.error(f"Stripe Webhook: Invalid or missing stripe_price_id ('{stripe_price_id}') for subscription.")
@@ -217,7 +233,9 @@ def stripe_webhook():
                                               stripe_subscription_id=stripe_subscription_id).first()
             if company:
                 # Create a new Invoice and Payment record for the renewal
-                plan_details = STRIPE_PRICE_TO_PLAN_MAPPING.get(company.active_stripe_price_id or "") # Need to store active price_id on company
+                plan_details = get_stripe_price_to_plan_mapping().get(
+                    company.active_stripe_price_id or ""
+                )  # Need to store active price_id on company
                 # For now, let's use a generic amount and description
                 renewal_amount = invoice_object.amount_paid / 100.0
                 renewal_months = 1 # This needs to be derived from the plan/subscription interval
@@ -365,8 +383,9 @@ def stripe_webhook():
                 company.subscription_status = stripe_subscription.status # e.g., active, past_due, canceled
                 company.active_stripe_price_id = stripe_subscription.items.data[0].price.id if stripe_subscription.items.data else None
                 # Update plan name based on new price ID if mapping exists
-                if company.active_stripe_price_id and company.active_stripe_price_id in STRIPE_PRICE_TO_PLAN_MAPPING:
-                    plan_details = STRIPE_PRICE_TO_PLAN_MAPPING[company.active_stripe_price_id]
+                mapping = get_stripe_price_to_plan_mapping()
+                if company.active_stripe_price_id and company.active_stripe_price_id in mapping:
+                    plan_details = mapping[company.active_stripe_price_id]
                     company.subscription_plan = plan_details['name']
                     company.max_employees = plan_details['max_employees']
 
