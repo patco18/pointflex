@@ -305,6 +305,36 @@ export const superAdminService = {
     }
   },
 
+  // Gestion des demandes de prolongation d'abonnement
+  listSubscriptionExtensionRequests: async (status?: string) => {
+    try {
+      const params: any = {}
+      if (status) params.status = status
+      return await api.get('/superadmin/subscription-extension-requests', { params })
+    } catch (error) {
+      console.error('List subscription extension requests error:', error)
+      throw error
+    }
+  },
+
+  approveSubscriptionExtensionRequest: async (reqId: number) => {
+    try {
+      return await api.put(`/superadmin/subscription-extension-requests/${reqId}/approve`)
+    } catch (error) {
+      console.error('Approve subscription extension request error:', error)
+      throw error
+    }
+  },
+
+  rejectSubscriptionExtensionRequest: async (reqId: number) => {
+    try {
+      return await api.put(`/superadmin/subscription-extension-requests/${reqId}/reject`)
+    } catch (error) {
+      console.error('Reject subscription extension request error:', error)
+      throw error
+    }
+  },
+
   // ===== FACTURATION =====
   getCompanyInvoices: async (companyId: number) => {
     try {
@@ -429,6 +459,15 @@ export const superAdminService = {
       return await api.post('/admin/subscription/customer-portal')
     } catch (error) {
       console.error('Create customer portal session service error:', error)
+      throw error
+    }
+  },
+
+  requestSubscriptionExtension: async (months: number, reason?: string) => {
+    try {
+      return await api.post('/admin/subscription/extension-request', { months, reason })
+    } catch (error) {
+      console.error('Request subscription extension error:', error)
       throw error
     }
   },
