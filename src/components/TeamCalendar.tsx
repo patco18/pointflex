@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
-import { 
-  Calendar, 
-  ChevronLeft, 
+import {
+  Calendar,
+  ChevronLeft,
   ChevronRight,
   Users,
   Clock,
@@ -9,6 +9,7 @@ import {
   Filter,
   Briefcase, // For mission type
   Home, // For office type
+  Download,
   Sunrise, Sunset, Sun, Moon // For half-day leave indicators
 } from 'lucide-react';
 import {
@@ -122,6 +123,25 @@ export default function TeamCalendar() {
     );
   };
 
+  const handleDownloadICal = async () => {
+    if (!calendarService.downloadICal) {
+      toast.error('Export iCal non disponible');
+      return;
+    }
+    try {
+      const resp = await calendarService.downloadICal();
+      const url = window.URL.createObjectURL(new Blob([resp.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'events.ics');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (error) {
+      toast.error("Erreur lors de l'export iCal");
+    }
+  };
+
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -161,7 +181,9 @@ export default function TeamCalendar() {
           <h1 className="text-2xl font-bold text-gray-900">Calendrier d'Équipe</h1>
           <p className="text-gray-600">Vue d'ensemble des activités de l'équipe.</p>
         </div>
-        {/* TODO: Add button for iCal export here */}
+        <button onClick={handleDownloadICal} className="btn-secondary flex items-center">
+          <Download className="h-4 w-4 mr-2" /> Export iCal
+        </button>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">

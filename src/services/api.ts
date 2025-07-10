@@ -455,6 +455,15 @@ export const calendarService = {
       console.error('Get calendar events service error:', error);
       throw error;
     }
+  },
+  downloadICal: async () => {
+    try {
+      console.log('📅 Téléchargement du calendrier des événements...');
+      return await api.get('/calendar/events/ical', { responseType: 'blob' });
+    } catch (error) {
+      console.error('Download calendar iCal service error:', error);
+      throw error;
+    }
   }
 };
 
