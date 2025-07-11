@@ -463,24 +463,6 @@ export const superAdminService = {
     }
   },
 
-  getCompanyInvoices: async () => {
-    try {
-      return await api.get('/admin/company/invoices')
-    } catch (error) {
-      console.error('Get company invoices error:', error)
-      throw error
-    }
-  },
-
-  createInvoiceCheckoutSession: async (invoiceId: number) => {
-    try {
-      return await api.post(`/admin/invoices/${invoiceId}/stripe-session`)
-    } catch (error) {
-      console.error('Create invoice checkout session error:', error)
-      throw error
-    }
-  },
-
   requestSubscriptionExtension: async (months: number, reason?: string) => {
     try {
       return await api.post('/admin/subscription/extension-request', { months, reason })
@@ -974,19 +956,6 @@ export const adminService = {
     }
   },
 
-  uploadCompanyLogo: async (file: File) => {
-    try {
-      const formData = new FormData()
-      formData.append('logo', file)
-      console.log('⬆️ Téléversement du logo de l\'entreprise...')
-      return await api.post('/admin/company/logo', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-    } catch (error) {
-      console.error('Upload company logo service error:', error)
-      throw error
-    }
-  },
 
   // Subscription management for company admins
   getCompanySubscription: async () => {

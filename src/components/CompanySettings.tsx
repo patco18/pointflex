@@ -62,8 +62,7 @@ export default function CompanySettings() {
   const [actionLoading, setActionLoading] = useState(false); // For button actions like subscribe/portal
   const [extensionMonths, setExtensionMonths] = useState(1);
   const [extensionReason, setExtensionReason] = useState('');
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [invoicesLoading, setInvoicesLoading] = useState(true);
+
 
   // State for Leave Policy
   const [leavePolicyLoading, setLeavePolicyLoading] = useState(true);
@@ -210,33 +209,6 @@ export default function CompanySettings() {
     }
   }
 
-  const loadInvoices = async () => {
-    setInvoicesLoading(true);
-    try {
-      const resp = await adminService.getCompanyInvoices();
-      setInvoices(resp.data.invoices);
-    } catch (error) {
-      console.error('Erreur chargement factures:', error);
-    } finally {
-      setInvoicesLoading(false);
-    }
-  }
-
-  const handlePayInvoice = async (invoiceId: number) => {
-    setActionLoading(true);
-    try {
-      const resp = await adminService.createInvoiceCheckoutSession(invoiceId);
-      if (resp.data.checkout_url) {
-        window.location.href = resp.data.checkout_url;
-      } else {
-        toast.error("Impossible d'ouvrir la page de paiement");
-      }
-    } catch (error) {
-      console.error('Erreur création session de paiement:', error);
-    } finally {
-      setActionLoading(false);
-    }
-  }
 
   const loadLeavePolicy = async () => {
     setLeavePolicyLoading(true);
@@ -677,43 +649,6 @@ export default function CompanySettings() {
               </form>
             </div>
 
-            <div className="card mt-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-3">Vos factures</h3>
-              {invoicesLoading ? (
-                <p className="text-sm text-gray-500">Chargement...</p>
-              ) : invoices.length > 0 ? (
-                <table className="min-w-full text-sm">
-                  <thead>
-                    <tr>
-                      <th className="px-2 py-1 text-left">ID</th>
-                      <th className="px-2 py-1 text-left">Montant</th>
-                      <th className="px-2 py-1 text-left">Mois</th>
-                      <th className="px-2 py-1 text-left">Statut</th>
-                      <th className="px-2 py-1"></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.map((inv) => (
-                      <tr key={inv.id} className="border-t">
-                        <td className="px-2 py-1">{inv.id}</td>
-                        <td className="px-2 py-1">{inv.amount}€</td>
-                        <td className="px-2 py-1">{inv.months}</td>
-                        <td className="px-2 py-1 capitalize">{inv.status}</td>
-                        <td className="px-2 py-1">
-                          {inv.status !== 'paid' && (
-                            <button onClick={() => handlePayInvoice(inv.id)} className="btn-primary btn-xs">
-                              Payer
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              ) : (
-                <p className="text-sm text-gray-500">Aucune facture disponible.</p>
-              )}
-            </div>
           </div>
         ) : (
           <div className="card text-center py-10">

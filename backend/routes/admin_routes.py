@@ -8,7 +8,7 @@ from middleware.auth import require_admin, require_manager_or_above, get_current
 from middleware.audit import log_user_action
 from backend.models.user import User
 from backend.models.company import Company
-from backend.models.invoice import Invoice
+
 from backend.models.subscription_extension_request import SubscriptionExtensionRequest
 from backend.models.office import Office
 from backend.models.department import Department
@@ -211,41 +211,6 @@ def request_subscription_extension():
 
     return jsonify({'request': extension_req.to_dict()}), 201
 
-
-@admin_bp.route('/company/invoices', methods=['GET'])
-@require_admin
-def list_company_invoices():
-    """Liste les factures de l'entreprise de l'administrateur."""
-    current_user = get_current_user()
-    if not current_user.company_id:
-        return jsonify(message="Aucune entreprise associée"), 400
-    invoices = (
-        Invoice.query.filter_by(company_id=current_user.company_id)
-        .order_by(Invoice.created_at.desc())
-        .all()
-    )
-    return jsonify({'invoices': [inv.to_dict() for inv in invoices]}), 200
-
-
-@admin_bp.route('/invoices/<int:invoice_id>/stripe-session', methods=['POST'])
-@require_admin
-def create_invoice_checkout_session_admin(invoice_id):
-    """Crée une session Stripe pour payer une facture."""
-    current_user = get_current_user()
-    invoice = Invoice.query.get_or_404(invoice_id)
-    if current_user.role != 'superadmin' and invoice.company_id != current_user.company_id:
-        return jsonify(message="Accès non autorisé"), 403
-
-    data = request.get_json() or {}
-    frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
-    success_url = data.get('success_url', f"{frontend_url}/company/billing?status=paid")
-    cancel_url = data.get('cancel_url', f"{frontend_url}/company/billing?status=cancel")
-    try:
-        session = create_checkout_session(invoice, success_url, cancel_url)
-        return jsonify({'session_id': session.id, 'checkout_url': session.url}), 200
-    except Exception as e:
-        print(f"Erreur lors de la création de session Stripe: {e}")
-        return jsonify(message="Erreur interne du serveur"), 500
 
 
 @admin_bp.route('/employees', methods=['GET'])
