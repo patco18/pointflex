@@ -47,6 +47,9 @@ export default function CheckIn() {
     } catch (error: any) {
       if (error.message.includes('Géolocalisation')) {
         toast.error("Veuillez autoriser l'accès à votre position")
+      } else if (error.response?.data?.message) {
+        // Afficher le message d'erreur retourné par l'API (ex: trop loin du bureau)
+        toast.error(error.response.data.message)
       }
       // les autres erreurs sont gérées par l'intercepteur API
     } finally {
@@ -83,6 +86,9 @@ export default function CheckIn() {
     } catch (error: any) {
       if (error.message.includes('Géolocalisation')) {
         toast.error("Veuillez autoriser l'accès à votre position")
+      } else if (error.response?.data?.message) {
+        // Afficher le message d'erreur retourné par l'API (ex: mission non autorisée)
+        toast.error(error.response.data.message)
       }
       // autres erreurs gérées par l'intercepteur API
     } finally {
