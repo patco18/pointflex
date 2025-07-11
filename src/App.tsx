@@ -28,6 +28,7 @@ import AdvancedFeatures from './pages/AdvancedFeatures'
 import RoleManagementPage from './pages/RoleManagementPage'
 import BillingManagement from './pages/BillingManagement'
 import WebhookManagementPage from './pages/WebhookManagementPage'
+import ExtensionRequestsPage from './pages/ExtensionRequests'
 import Missions from './pages/Missions'
 import RequestLeavePage from './pages/RequestLeavePage';
 import MyLeaveHistoryPage from './pages/MyLeaveHistoryPage'; // Added MyLeaveHistoryPage
@@ -84,6 +85,13 @@ function App() {
             <ProtectedRoute requiredRole="superadmin">
               <Layout>
                 <BillingManagement />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/extension-requests" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <ExtensionRequestsPage />
               </Layout>
             </ProtectedRoute>
           } />
