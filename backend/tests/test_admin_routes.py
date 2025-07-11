@@ -1,4 +1,5 @@
 from backend.tests.test_reports import login_admin
+from backend.tests.test_attendance import login_employee
 
 
 def login_manager(client):
@@ -69,4 +70,24 @@ def test_prevent_indirect_manager_cycle(client):
     # Attempt to set admin -> employee (which would create a cycle)
     resp = client.put(f"/api/admin/employees/{admin_id}/manager", json={"manager_id": employee_id}, headers=headers)
     assert resp.status_code == 400
+
+
+def test_get_company_attendance(client):
+    admin_token = login_admin(client)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    employee_token = login_employee(client)
+    employee_headers = {"Authorization": f"Bearer {employee_token}"}
+
+    # Employee performs a check-in so there is at least one attendance record
+    client.post(
+        "/api/attendance/checkin/office",
+        json={"coordinates": {"latitude": 48.8566, "longitude": 2.3522}},
+        headers=employee_headers,
+    )
+
+    resp = client.get("/api/admin/attendance", headers=admin_headers)
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert any(r["user_name"] == "Test Employé" for r in data["records"])
 

@@ -19,9 +19,10 @@ export interface AttendanceRecord {
 interface Props {
   records?: AttendanceRecord[]
   hideFilters?: boolean
+  fetchRecords?: (startDate: string, endDate: string) => Promise<{ data: { records: AttendanceRecord[] } }>
 }
 
-export default function AttendanceHistory({ records: propRecords, hideFilters }: Props) {
+export default function AttendanceHistory({ records: propRecords, hideFilters, fetchRecords }: Props) {
   const [records, setRecords] = useState<AttendanceRecord[]>(propRecords || [])
   const [loading, setLoading] = useState(!propRecords)
   const [searchTerm, setSearchTerm] = useState('')
@@ -33,17 +34,21 @@ export default function AttendanceHistory({ records: propRecords, hideFilters }:
   })
 
   useEffect(() => {
-    if (!propRecords) {
+    if (fetchRecords) {
+      loadAttendanceHistory()
+    } else if (!propRecords) {
       loadAttendanceHistory()
     } else {
       setLoading(false)
     }
-  }, [dateRange, propRecords])
+  }, [dateRange, propRecords, fetchRecords])
 
   const loadAttendanceHistory = async () => {
     setLoading(true)
     try {
-      const response = await attendanceService.getAttendance(dateRange.start, dateRange.end)
+      const response = fetchRecords
+        ? await fetchRecords(dateRange.start, dateRange.end)
+        : await attendanceService.getAttendance(dateRange.start, dateRange.end)
       setRecords(response.data.records)
     } catch (error) {
       console.error('Erreur lors du chargement de l\'historique:', error)
@@ -53,10 +58,10 @@ export default function AttendanceHistory({ records: propRecords, hideFilters }:
   }
 
   useEffect(() => {
-    if (propRecords) {
+    if (propRecords && !fetchRecords) {
       setRecords(propRecords)
     }
-  }, [propRecords])
+  }, [propRecords, fetchRecords])
 
   const filteredRecords = records.filter(record => {
     const matchesSearch = searchTerm === '' || 
