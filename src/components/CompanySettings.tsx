@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { adminService } from '../services/api'
 import {
@@ -118,6 +118,22 @@ export default function CompanySettings() {
       toast.error('Erreur lors de la sauvegarde')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleLogoFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      try {
+        const resp = await adminService.uploadCompanyLogo(e.target.files[0])
+        setSettings(prev => ({ ...prev, logo_url: resp.data.logo_url }))
+        toast.success('Logo mis à jour')
+        if (fetchUser) {
+          await fetchUser()
+        }
+      } catch (error) {
+        console.error('Erreur upload logo:', error)
+        toast.error('Erreur lors du téléversement du logo')
+      }
     }
   }
 
@@ -414,6 +430,20 @@ export default function CompanySettings() {
                 onChange={(e) => setSettings(prev => ({ ...prev, logo_url: e.target.value }))}
                 className="input-field"
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Téléverser un logo
+              </label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleLogoFileChange}
+                className="input-field"
+              />
+              {settings.logo_url && (
+                <img src={settings.logo_url} alt="Logo" className="h-16 mt-2 object-contain" />
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">

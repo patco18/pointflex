@@ -2,7 +2,7 @@
 Routes Admin - Gestion des entreprises
 """
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, send_from_directory, current_app
 from flask_jwt_extended import jwt_required
 from middleware.auth import require_admin, require_manager_or_above, get_current_user
 from middleware.audit import log_user_action
@@ -24,7 +24,8 @@ from datetime import datetime
 from backend.utils.pdf_utils import build_pdf_document, create_styled_table, get_report_styles, generate_report_title_elements
 from backend.database import db
 import json
-from flask import current_app # Added for FRONTEND_URL
+from werkzeug.utils import secure_filename
+import os
 
 # Stripe utilities
 from backend.services import stripe_service
@@ -1111,6 +1112,57 @@ def update_company_settings():
         
     except Exception as e:
         print(f"Erreur lors de la mise à jour des paramètres: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/company/logo', methods=['POST'])
+@require_admin
+def upload_company_logo():
+    """Upload a new logo for the company and update the URL."""
+    try:
+        current_user = get_current_user()
+        if not current_user.company_id:
+            return jsonify(message="Aucune entreprise associée à cet utilisateur"), 400
+
+        if 'logo' not in request.files:
+            return jsonify(message="Fichier logo manquant"), 400
+
+        file = request.files['logo']
+        if file.filename == '':
+            return jsonify(message="Nom de fichier vide"), 400
+
+        allowed_ext = {'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'}
+        if '.' not in file.filename or file.filename.rsplit('.', 1)[1].lower() not in allowed_ext:
+            return jsonify(message="Format de fichier non supporté"), 400
+
+        filename = secure_filename(file.filename)
+        logo_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'company_logos')
+        os.makedirs(logo_folder, exist_ok=True)
+        filename = f"{current_user.company_id}_{filename}"
+        file_path = os.path.join(logo_folder, filename)
+        file.save(file_path)
+
+        url = f"/uploads/company_logos/{filename}"
+
+        company = Company.query.get_or_404(current_user.company_id)
+        old_values = company.to_dict()
+        company.logo_url = url
+
+        log_user_action(
+            action='UPDATE_COMPANY_LOGO',
+            resource_type='Company',
+            resource_id=company.id,
+            old_values=old_values,
+            new_values=company.to_dict(),
+        )
+
+        db.session.commit()
+
+        return jsonify({'logo_url': url, 'message': 'Logo mis à jour'}), 200
+
+    except Exception as e:
+        print(f"Erreur lors du téléversement du logo: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 
