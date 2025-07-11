@@ -956,19 +956,6 @@ export const adminService = {
     }
   },
 
-  uploadCompanyLogo: async (file: File) => {
-    try {
-      const formData = new FormData()
-      formData.append('logo', file)
-      console.log('⬆️ Téléversement du logo de l\'entreprise...')
-      return await api.post('/admin/company/logo', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      })
-    } catch (error) {
-      console.error('Upload company logo service error:', error)
-      throw error
-    }
-  },
 
   // Subscription management for company admins
   getCompanySubscription: async () => {
