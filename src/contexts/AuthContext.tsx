@@ -19,6 +19,7 @@ interface AuthContextType {
   user: User | null
   login: (email: string, password: string) => Promise<void>
   logout: () => void
+  fetchUser?: () => Promise<void>
   loading: boolean
   isSuperAdmin: boolean
   isAdminRH: boolean
@@ -149,6 +150,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log('Déconnexion terminée')
   }
 
+  // Rafraîchir les informations utilisateur depuis l'API
+  const fetchUser = async () => {
+    try {
+      const resp = await authService.me()
+      setUser(resp.data.user)
+    } catch (error) {
+      console.error('Erreur lors du rafraîchissement utilisateur:', error)
+    }
+  }
+
   // Définition des rôles avec le nouveau système
   const isSuperAdmin = user?.role === 'superadmin'
   const isAdminRH = user?.role === 'admin_rh'
@@ -165,6 +176,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     login,
     logout,
+    fetchUser,
     loading,
     isSuperAdmin,
     isAdminRH,
