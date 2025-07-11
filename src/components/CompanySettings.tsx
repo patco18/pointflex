@@ -32,6 +32,15 @@ interface SubscriptionData {
   billing_portal_enabled: boolean;
 }
 
+interface Invoice {
+  id: number;
+  amount: number;
+  months: number;
+  status: string;
+  due_date?: string;
+  paid_date?: string;
+}
+
 export default function CompanySettings() {
   const navigate = useNavigate(); // For clearing query params
   const [searchParams] = useSearchParams();
@@ -54,6 +63,7 @@ export default function CompanySettings() {
   const [extensionMonths, setExtensionMonths] = useState(1);
   const [extensionReason, setExtensionReason] = useState('');
 
+
   // State for Leave Policy
   const [leavePolicyLoading, setLeavePolicyLoading] = useState(true);
   const [workDays, setWorkDays] = useState<number[]>([0, 1, 2, 3, 4]); // Default Mon-Fri (0=Mon, 6=Sun)
@@ -68,6 +78,7 @@ export default function CompanySettings() {
       loadCompanySettings();
       loadSubscriptionData();
       loadLeavePolicy();
+      loadInvoices();
     }
   }, [isAdmin]);
 
@@ -197,6 +208,7 @@ export default function CompanySettings() {
       setActionLoading(false);
     }
   }
+
 
   const loadLeavePolicy = async () => {
     setLeavePolicyLoading(true);
@@ -636,6 +648,7 @@ export default function CompanySettings() {
                 </button>
               </form>
             </div>
+
           </div>
         ) : (
           <div className="card text-center py-10">

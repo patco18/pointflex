@@ -8,6 +8,7 @@ from middleware.auth import require_admin, require_manager_or_above, get_current
 from middleware.audit import log_user_action
 from backend.models.user import User
 from backend.models.company import Company
+
 from backend.models.subscription_extension_request import SubscriptionExtensionRequest
 from backend.models.office import Office
 from backend.models.department import Department
@@ -29,7 +30,7 @@ import os
 
 # Stripe utilities
 from backend.services import stripe_service
-from backend.routes.stripe_routes import get_stripe_price_to_plan_mapping
+from backend.routes.stripe_routes import get_stripe_price_to_plan_mapping, create_checkout_session
 
 
 admin_bp = Blueprint('admin', __name__)
@@ -209,6 +210,7 @@ def request_subscription_extension():
     )
 
     return jsonify({'request': extension_req.to_dict()}), 201
+
 
 
 @admin_bp.route('/employees', methods=['GET'])
