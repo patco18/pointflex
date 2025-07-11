@@ -30,7 +30,7 @@ import os
 
 # Stripe utilities
 from backend.services import stripe_service
-from backend.routes.stripe_routes import get_stripe_price_to_plan_mapping, create_checkout_session
+from backend.routes.stripe_routes import get_stripe_price_to_plan_mapping
 
 
 admin_bp = Blueprint('admin', __name__)
