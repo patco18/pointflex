@@ -1,7 +1,7 @@
 """
 Routes for fetching calendar events (pointages, missions, etc.)
 """
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, Response
 from flask_jwt_extended import jwt_required
 from backend.middleware.auth import get_current_user, require_admin
 from backend.models.user import User
@@ -250,3 +250,67 @@ def get_calendar_events():
     except Exception as e:
         # Log the exception e
         return jsonify(message="Erreur interne du serveur lors de la récupération des événements du calendrier."), 500
+
+
+@calendar_bp.route('/events/ical', methods=['GET'])
+@jwt_required()
+def download_calendar_events_ical():
+    """Génère un fichier iCalendar avec les événements du calendrier d'équipe"""
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify(message="Utilisateur non authentifié."), 401
+
+    try:
+        year_str = request.args.get('year')
+        month_str = request.args.get('month')
+        user_ids_str = request.args.get('user_ids')
+
+        if not year_str or not month_str:
+            return jsonify(message="Les paramètres 'year' et 'month' sont requis."), 400
+
+        # Reuse the JSON endpoint logic to collect events
+        response = get_calendar_events()
+        if isinstance(response, tuple):
+            events, status = response
+            if status != 200:
+                return events, status
+        else:
+            events = response.get_json()
+
+        calendar_events = events if isinstance(events, list) else events.get('calendar_events', events)
+
+        lines = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//PointFlex//Team Calendar//FR",
+            "CALSCALE:GREGORIAN",
+        ]
+
+        for ev in calendar_events:
+            try:
+                start_dt = datetime.fromisoformat(ev['start'])
+                end_dt = datetime.fromisoformat(ev['end'])
+            except Exception:
+                continue
+
+            lines.extend([
+                "BEGIN:VEVENT",
+                f"UID:{ev['id']}@pointflex",
+                f"DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}",
+                f"DTSTART:{start_dt.strftime('%Y%m%dT%H%M%S')}",
+                f"DTEND:{end_dt.strftime('%Y%m%dT%H%M%S')}",
+                f"SUMMARY:{ev['title']}",
+                f"DESCRIPTION:{ev.get('status', '')}",
+                "END:VEVENT",
+            ])
+
+        lines.append("END:VCALENDAR")
+        ics_data = "\r\n".join(lines) + "\r\n"
+        response = Response(ics_data, mimetype='text/calendar')
+        response.headers['Content-Disposition'] = 'attachment; filename=team_events.ics'
+        return response
+
+    except ValueError as ve:
+        return jsonify(message=f"Paramètre invalide: {ve}"), 400
+    except Exception as e:
+        return jsonify(message="Erreur interne du serveur lors de l'export iCal du calendrier."), 500
