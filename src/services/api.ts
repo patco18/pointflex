@@ -17,7 +17,11 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error(`❌ ${error.config?.method?.toUpperCase()} ${error.config?.url} - ${error.response?.status || 'NETWORK_ERROR'}`)
-    console.error('Détails de l\'erreur API:', error)
+    if (error.response?.data?.message) {
+      console.error("Détails de l'erreur API:", error.response.data.message)
+    } else {
+      console.error("Détails de l'erreur API:", error)
+    }
     
     if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
       toast.error('Impossible de se connecter au serveur. Veuillez vérifier que le backend est démarré.')
@@ -149,8 +153,12 @@ export const attendanceService = {
     try {
       console.log('🏢 Pointage bureau avec coordonnées:', coordinates)
       return await api.post('/attendance/checkin/office', { coordinates })
-    } catch (error) {
-      console.error('Office checkin service error:', error)
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        console.error('Office checkin service error:', error.response.data.message)
+      } else {
+        console.error('Office checkin service error:', error)
+      }
       throw error
     }
   },
@@ -166,8 +174,12 @@ export const attendanceService = {
       }
       
       return await api.post('/attendance/checkin/mission', data)
-    } catch (error) {
-      console.error('Mission checkin service error:', error)
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        console.error('Mission checkin service error:', error.response.data.message)
+      } else {
+        console.error('Mission checkin service error:', error)
+      }
       throw error
     }
   },
