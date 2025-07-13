@@ -1,4 +1,4 @@
-from flask import Flask, jsonify
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from flask_sse import sse
@@ -100,7 +100,18 @@ def create_app():
     app.register_blueprint(leave_bp, url_prefix='/api/leave') # Registered Leave blueprint
     app.register_blueprint(webhook_bp, url_prefix='/api/webhooks') # Registered Webhook blueprint
     app.register_blueprint(two_factor_bp, url_prefix='/api/auth/2fa') # Registered 2FA blueprint under /auth path
-    
+
+    # Ensure upload folder exists and expose uploads route
+    upload_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', app.config['UPLOAD_FOLDER']))
+    os.makedirs(upload_folder, exist_ok=True)
+    # Store absolute path back in config for other modules
+    app.config['UPLOAD_FOLDER'] = upload_folder
+
+    @app.route('/uploads/<path:filename>')
+    def uploaded_file(filename):
+        """Serve files from the uploads directory."""
+        return send_from_directory(upload_folder, filename)
+
     # Create database tables
     with app.app_context():
         init_db()

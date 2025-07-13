@@ -2,12 +2,14 @@
 Routes Admin - Gestion des entreprises
 """
 
-from flask import Blueprint, request, jsonify, send_file
+from flask import Blueprint, request, jsonify, send_file, send_from_directory, current_app
 from flask_jwt_extended import jwt_required
 from middleware.auth import require_admin, require_manager_or_above, get_current_user
 from middleware.audit import log_user_action
 from backend.models.user import User
 from backend.models.company import Company
+from backend.models.invoice import Invoice
+from backend.models.subscription_extension_request import SubscriptionExtensionRequest
 from backend.models.office import Office
 from backend.models.department import Department
 from backend.models.service import Service
@@ -23,11 +25,13 @@ from datetime import datetime
 from backend.utils.pdf_utils import build_pdf_document, create_styled_table, get_report_styles, generate_report_title_elements
 from backend.database import db
 import json
-from flask import current_app # Added for FRONTEND_URL
+from werkzeug.utils import secure_filename
+import os
 
 # Stripe utilities
 from backend.services import stripe_service
 from backend.routes.stripe_routes import get_stripe_price_to_plan_mapping
+from backend.services.stripe_service import create_checkout_session
 
 
 admin_bp = Blueprint('admin', __name__)
@@ -172,6 +176,77 @@ def create_company_customer_portal_session():
     except Exception as e:
         current_app.logger.error(f"Error creating customer portal for company {company.id}: {e}")
         return jsonify(message="Erreur interne du serveur lors de la création du portail client."), 500
+
+
+@admin_bp.route('/subscription/extension-request', methods=['POST'])
+@require_admin
+def request_subscription_extension():
+    """Crée une demande de prolongation d'abonnement qui devra être validée par le superadmin."""
+    current_admin = get_current_user()
+    if not current_admin.company_id:
+        return jsonify(message="Aucune entreprise associée"), 400
+
+    data = request.get_json() or {}
+    months = data.get('months', 1)
+    reason = data.get('reason', '')
+
+    if months < 1 or months > 24:
+        return jsonify(message="Le nombre de mois doit être entre 1 et 24."), 400
+
+    extension_req = SubscriptionExtensionRequest(
+        company_id=current_admin.company_id,
+        months=months,
+        reason=reason,
+        status='pending'
+    )
+    db.session.add(extension_req)
+    db.session.commit()
+
+    log_user_action(
+        action='REQUEST_SUBSCRIPTION_EXTENSION',
+        resource_type='SubscriptionExtensionRequest',
+        resource_id=extension_req.id,
+        new_values=extension_req.to_dict(),
+        details={'company_id': current_admin.company_id}
+    )
+
+    return jsonify({'request': extension_req.to_dict()}), 201
+
+
+@admin_bp.route('/company/invoices', methods=['GET'])
+@require_admin
+def list_company_invoices():
+    """Liste les factures de l'entreprise de l'administrateur."""
+    current_user = get_current_user()
+    if not current_user.company_id:
+        return jsonify(message="Aucune entreprise associée"), 400
+    invoices = (
+        Invoice.query.filter_by(company_id=current_user.company_id)
+        .order_by(Invoice.created_at.desc())
+        .all()
+    )
+    return jsonify({'invoices': [inv.to_dict() for inv in invoices]}), 200
+
+
+@admin_bp.route('/invoices/<int:invoice_id>/stripe-session', methods=['POST'])
+@require_admin
+def create_invoice_checkout_session_admin(invoice_id):
+    """Crée une session Stripe pour payer une facture."""
+    current_user = get_current_user()
+    invoice = Invoice.query.get_or_404(invoice_id)
+    if current_user.role != 'superadmin' and invoice.company_id != current_user.company_id:
+        return jsonify(message="Accès non autorisé"), 403
+
+    data = request.get_json() or {}
+    frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173')
+    success_url = data.get('success_url', f"{frontend_url}/company/billing?status=paid")
+    cancel_url = data.get('cancel_url', f"{frontend_url}/company/billing?status=cancel")
+    try:
+        session = create_checkout_session(invoice, success_url, cancel_url)
+        return jsonify({'session_id': session.id, 'checkout_url': session.url}), 200
+    except Exception as e:
+        print(f"Erreur lors de la création de session Stripe: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
 
 
 @admin_bp.route('/employees', methods=['GET'])
@@ -1039,7 +1114,13 @@ def update_company_settings():
         
         for field in updatable_fields:
             if field in data:
-                setattr(company, field, data[field])
+                value = data[field]
+                if field == 'work_start_time' and isinstance(value, str):
+                    try:
+                        value = datetime.strptime(value, '%H:%M').time()
+                    except ValueError:
+                        return jsonify(message="Format d'heure invalide"), 400
+                setattr(company, field, value)
         
         # Logger l'action
         log_user_action(
@@ -1069,6 +1150,57 @@ def update_company_settings():
         
     except Exception as e:
         print(f"Erreur lors de la mise à jour des paramètres: {e}")
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/company/logo', methods=['POST'])
+@require_admin
+def upload_company_logo():
+    """Upload a new logo for the company and update the URL."""
+    try:
+        current_user = get_current_user()
+        if not current_user.company_id:
+            return jsonify(message="Aucune entreprise associée à cet utilisateur"), 400
+
+        if 'logo' not in request.files:
+            return jsonify(message="Fichier logo manquant"), 400
+
+        file = request.files['logo']
+        if file.filename == '':
+            return jsonify(message="Nom de fichier vide"), 400
+
+        allowed_ext = {'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp'}
+        if '.' not in file.filename or file.filename.rsplit('.', 1)[1].lower() not in allowed_ext:
+            return jsonify(message="Format de fichier non supporté"), 400
+
+        filename = secure_filename(file.filename)
+        logo_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'company_logos')
+        os.makedirs(logo_folder, exist_ok=True)
+        filename = f"{current_user.company_id}_{filename}"
+        file_path = os.path.join(logo_folder, filename)
+        file.save(file_path)
+
+        url = f"/uploads/company_logos/{filename}"
+
+        company = Company.query.get_or_404(current_user.company_id)
+        old_values = company.to_dict()
+        company.logo_url = url
+
+        log_user_action(
+            action='UPDATE_COMPANY_LOGO',
+            resource_type='Company',
+            resource_id=company.id,
+            old_values=old_values,
+            new_values=company.to_dict(),
+        )
+
+        db.session.commit()
+
+        return jsonify({'logo_url': url, 'message': 'Logo mis à jour'}), 200
+
+    except Exception as e:
+        print(f"Erreur lors du téléversement du logo: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 
