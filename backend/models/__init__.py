@@ -26,6 +26,7 @@ from .webhook_subscription import WebhookSubscription
 from .webhook_delivery_log import WebhookDeliveryLog
 from .company_holiday import CompanyHoliday
 from .password_history import PasswordHistory # Added PasswordHistory
+from .subscription_extension_request import SubscriptionExtensionRequest
 
 __all__ = [
     'User',
@@ -50,5 +51,6 @@ __all__ = [
     'WebhookDeliveryLog',
     'CompanyHoliday',
     'PasswordHistory',
-    'Pause'
+    'Pause',
+    'SubscriptionExtensionRequest'
 ]

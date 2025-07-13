@@ -13,6 +13,7 @@ from backend.models.system_settings import SystemSettings
 from backend.models.audit_log import AuditLog
 from backend.models.invoice import Invoice
 from backend.models.payment import Payment
+from backend.models.subscription_extension_request import SubscriptionExtensionRequest
 from services.stripe_service import create_checkout_session, verify_webhook
 from backend.database import db
 from datetime import datetime, timedelta
@@ -626,6 +627,68 @@ def extend_subscription(company_id):
         print(f"Erreur lors de la prolongation: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
+
+
+@superadmin_bp.route('/subscription-extension-requests', methods=['GET'])
+@require_superadmin
+def list_subscription_extension_requests():
+    """Liste les demandes de prolongation d'abonnement."""
+    status = request.args.get('status')
+    query = SubscriptionExtensionRequest.query
+    if status:
+        query = query.filter_by(status=status)
+    requests_list = query.order_by(SubscriptionExtensionRequest.created_at.desc()).all()
+    return jsonify({'requests': [r.to_dict() for r in requests_list]}), 200
+
+
+@superadmin_bp.route('/subscription-extension-requests/<int:req_id>/approve', methods=['PUT'])
+@require_superadmin
+def approve_subscription_extension_request(req_id):
+    """Approuve une demande de prolongation et étend l'abonnement."""
+    req = SubscriptionExtensionRequest.query.get_or_404(req_id)
+    if req.status != 'pending':
+        return jsonify(message='Demande déjà traitée'), 400
+    company = Company.query.get_or_404(req.company_id)
+
+    old_values = company.to_dict()
+    company.extend_subscription(req.months)
+
+    amount = PLAN_PRICES.get(company.subscription_plan, 10.0) * req.months
+    invoice = Invoice(
+        company_id=company.id,
+        amount=amount,
+        months=req.months,
+        description=req.reason,
+        due_date=datetime.utcnow().date(),
+    )
+    db.session.add(invoice)
+    db.session.flush()
+
+    log_user_action(action='CREATE_INVOICE', resource_type='Invoice', resource_id=None, details=invoice.to_dict())
+    log_user_action(action='EXTEND_SUBSCRIPTION', resource_type='Company', resource_id=company.id, details={'months_added': req.months, 'reason': req.reason}, old_values=old_values, new_values=company.to_dict())
+
+    req.status = 'approved'
+    req.processed_at = datetime.utcnow()
+    req.processed_by = get_current_user().id
+
+    db.session.commit()
+
+    return jsonify({'message': 'Demande approuvée', 'company': company.to_dict(include_sensitive=True), 'invoice': invoice.to_dict(), 'request': req.to_dict()}), 200
+
+
+@superadmin_bp.route('/subscription-extension-requests/<int:req_id>/reject', methods=['PUT'])
+@require_superadmin
+def reject_subscription_extension_request(req_id):
+    """Rejette une demande de prolongation."""
+    req = SubscriptionExtensionRequest.query.get_or_404(req_id)
+    if req.status != 'pending':
+        return jsonify(message='Demande déjà traitée'), 400
+    req.status = 'rejected'
+    req.processed_at = datetime.utcnow()
+    req.processed_by = get_current_user().id
+    db.session.commit()
+    log_user_action(action='REJECT_SUBSCRIPTION_EXTENSION', resource_type='SubscriptionExtensionRequest', resource_id=req.id, old_values=None, new_values=req.to_dict())
+    return jsonify({'message': 'Demande rejetée', 'request': req.to_dict()}), 200
 
 @superadmin_bp.route('/companies/<int:company_id>/status', methods=['PUT'])
 @require_superadmin
