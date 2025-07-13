@@ -305,6 +305,36 @@ export const superAdminService = {
     }
   },
 
+  // Gestion des demandes de prolongation d'abonnement
+  listSubscriptionExtensionRequests: async (status?: string) => {
+    try {
+      const params: any = {}
+      if (status) params.status = status
+      return await api.get('/superadmin/subscription-extension-requests', { params })
+    } catch (error) {
+      console.error('List subscription extension requests error:', error)
+      throw error
+    }
+  },
+
+  approveSubscriptionExtensionRequest: async (reqId: number) => {
+    try {
+      return await api.put(`/superadmin/subscription-extension-requests/${reqId}/approve`)
+    } catch (error) {
+      console.error('Approve subscription extension request error:', error)
+      throw error
+    }
+  },
+
+  rejectSubscriptionExtensionRequest: async (reqId: number) => {
+    try {
+      return await api.put(`/superadmin/subscription-extension-requests/${reqId}/reject`)
+    } catch (error) {
+      console.error('Reject subscription extension request error:', error)
+      throw error
+    }
+  },
+
   // ===== FACTURATION =====
   getCompanyInvoices: async (companyId: number) => {
     try {
@@ -429,6 +459,33 @@ export const superAdminService = {
       return await api.post('/admin/subscription/customer-portal')
     } catch (error) {
       console.error('Create customer portal session service error:', error)
+      throw error
+    }
+  },
+
+  getCompanyInvoices: async () => {
+    try {
+      return await api.get('/admin/company/invoices')
+    } catch (error) {
+      console.error('Get company invoices error:', error)
+      throw error
+    }
+  },
+
+  createInvoiceCheckoutSession: async (invoiceId: number) => {
+    try {
+      return await api.post(`/admin/invoices/${invoiceId}/stripe-session`)
+    } catch (error) {
+      console.error('Create invoice checkout session error:', error)
+      throw error
+    }
+  },
+
+  requestSubscriptionExtension: async (months: number, reason?: string) => {
+    try {
+      return await api.post('/admin/subscription/extension-request', { months, reason })
+    } catch (error) {
+      console.error('Request subscription extension error:', error)
       throw error
     }
   },
@@ -910,9 +967,107 @@ export const adminService = {
   updateCompanySettings: async (settings: any) => {
     try {
       console.log('⚙️ Mise à jour des paramètres de l\'entreprise...', settings)
-      return await api.put('/admin/company/settings', settings)
+
+      // Filter only the allowed fields expected by the backend
+      const allowedFields = [
+        'office_latitude',
+        'office_longitude',
+        'office_radius',
+        'work_start_time',
+        'late_threshold',
+        'logo_url',
+        'theme_color'
+      ] as const
+
+      const payload: any = {}
+      for (const key of allowedFields) {
+        if (key in settings) {
+          payload[key] = (settings as any)[key]
+        }
+      }
+
+      return await api.put('/admin/company/settings', payload)
     } catch (error) {
       console.error('Update company settings service error:', error)
+      throw error
+    }
+  },
+
+  uploadCompanyLogo: async (file: File) => {
+    try {
+      const formData = new FormData()
+      formData.append('logo', file)
+      console.log('⬆️ Téléversement du logo de l\'entreprise...')
+      return await api.post('/admin/company/logo', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      })
+    } catch (error) {
+      console.error('Upload company logo service error:', error)
+      throw error
+    }
+  },
+
+  // Subscription management for company admins
+  getCompanySubscription: async () => {
+    try {
+      return await api.get('/admin/subscription')
+    } catch (error) {
+      console.error('Get company subscription service error:', error)
+      throw error
+    }
+  },
+
+  createSubscriptionCheckoutSession: async (stripePriceId: string) => {
+    try {
+      return await api.post('/admin/subscription/checkout-session', { stripe_price_id: stripePriceId })
+    } catch (error) {
+      console.error('Create subscription checkout session service error:', error)
+      throw error
+    }
+  },
+
+  createCustomerPortalSession: async () => {
+    try {
+      return await api.post('/admin/subscription/customer-portal')
+    } catch (error) {
+      console.error('Create customer portal session service error:', error)
+      throw error
+    }
+  },
+
+  // Leave policy management
+  getCompanyLeavePolicy: async () => {
+    try {
+      return await api.get('/admin/company/leave-policy')
+    } catch (error) {
+      console.error('Get company leave policy error:', error)
+      throw error
+    }
+  },
+
+  updateCompanyLeavePolicy: async (policyData: { work_days?: string; default_country_code_for_holidays?: string }) => {
+    try {
+      return await api.put('/admin/company/leave-policy', policyData)
+    } catch (error) {
+      console.error('Update company leave policy error:', error)
+      throw error
+    }
+  },
+
+  addCompanyHoliday: async (holidayData: { date: string; name: string }) => {
+    try {
+      return await api.post('/admin/company/holidays', holidayData)
+    } catch (error) {
+      console.error('Add company holiday error:', error)
+      throw error
+    }
+  },
+
+  deleteCompanyHoliday: async (holidayId: number) => {
+    try {
+      return await api.delete(`/admin/company/holidays/${holidayId}`)
+    } catch (error) {
+      console.error('Delete company holiday error:', error)
       throw error
     }
   },
