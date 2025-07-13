@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { adminService } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { Link } from 'react-router-dom'
 import { 
   Users, 
   Plus, 
@@ -680,7 +681,12 @@ export default function EmployeeManagement() {
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-gray-900">
-                          {employee.prenom} {employee.nom}
+                          <Link
+                            to={`/admin/employees/${employee.id}`}
+                            className="text-blue-600 hover:underline"
+                          >
+                            {employee.prenom} {employee.nom}
+                          </Link>
                         </div>
                         <div className="text-sm text-gray-500">
                           #{employee.employee_number}
