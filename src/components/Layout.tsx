@@ -58,6 +58,7 @@ export default function Layout({ children }: LayoutProps) {
       nav.push(
         { name: 'Dashboard SuperAdmin', href: '/superadmin', icon: Crown, priority: false, permission: null },
         { name: 'Gestion Entreprises', href: '/superadmin/companies', icon: Building, priority: false, permission: null },
+        { name: 'Demandes Abonnement', href: '/superadmin/extension-requests', icon: Clock, priority: false, permission: null },
         { name: 'Configuration Système', href: '/settings', icon: Settings, priority: false, permission: null },
         { name: 'Rôles & Privilèges', href: '/roles', icon: Shield, priority: false, permission: null },
         { name: 'Analytics Globales', href: '/reports', icon: BarChart3, priority: false, permission: null }
