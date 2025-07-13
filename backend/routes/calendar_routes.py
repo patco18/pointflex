@@ -7,6 +7,7 @@ from backend.middleware.auth import get_current_user, require_admin
 from backend.models.user import User
 from backend.models.pointage import Pointage
 from backend.models.mission import Mission
+from backend.models.mission_user import MissionUser
 from backend.models.leave_request import LeaveRequest # Added LeaveRequest model
 from backend.database import db
 from datetime import datetime, date, timedelta
