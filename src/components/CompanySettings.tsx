@@ -210,6 +210,7 @@ export default function CompanySettings() {
   }
 
 
+
   const loadLeavePolicy = async () => {
     setLeavePolicyLoading(true);
     try {

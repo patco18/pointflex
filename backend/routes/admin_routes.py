@@ -30,8 +30,6 @@ import os
 
 # Stripe utilities
 from backend.services import stripe_service
-from backend.routes.stripe_routes import get_stripe_price_to_plan_mapping, create_checkout_session
-
 
 admin_bp = Blueprint('admin', __name__)
 
@@ -1081,7 +1079,7 @@ def update_company_settings():
                 value = data[field]
                 if field == 'work_start_time' and isinstance(value, str):
                     try:
-                        value = datetime.strptime(value, '%H:%M').time()
+
                     except ValueError:
                         return jsonify(message="Format d'heure invalide"), 400
                 setattr(company, field, value)

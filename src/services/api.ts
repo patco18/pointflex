@@ -475,6 +475,7 @@ export const superAdminService = {
     }
   },
 
+
   requestSubscriptionExtension: async (months: number, reason?: string) => {
     try {
       return await api.post('/admin/subscription/extension-request', { months, reason })
@@ -961,12 +962,32 @@ export const adminService = {
   updateCompanySettings: async (settings: any) => {
     try {
       console.log('⚙️ Mise à jour des paramètres de l\'entreprise...', settings)
-      return await api.put('/admin/company/settings', settings)
+
+      // Filter only the allowed fields expected by the backend
+      const allowedFields = [
+        'office_latitude',
+        'office_longitude',
+        'office_radius',
+        'work_start_time',
+        'late_threshold',
+        'logo_url',
+        'theme_color'
+      ] as const
+
+      const payload: any = {}
+      for (const key of allowedFields) {
+        if (key in settings) {
+          payload[key] = (settings as any)[key]
+        }
+      }
+
+      return await api.put('/admin/company/settings', payload)
     } catch (error) {
       console.error('Update company settings service error:', error)
       throw error
     }
   },
+
 
 
   // Subscription management for company admins
