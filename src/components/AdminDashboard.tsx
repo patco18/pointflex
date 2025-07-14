@@ -105,7 +105,13 @@ export default function AdminDashboard() {
       case 'settings':
         return <CompanySettings />
       case 'attendance':
-        return <AttendanceHistory />
+        return (
+          <AttendanceHistory
+            fetchRecords={(start, end) =>
+              adminService.getCompanyAttendance({ startDate: start, endDate: end })
+            }
+          />
+        )
       case 'organization':
         return (
           <div className="space-y-6">
