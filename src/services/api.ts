@@ -886,12 +886,18 @@ export const adminService = {
       for (const key of allowedFields) {
         if (key in settings) {
           let value = (settings as any)[key]
+
+          if (value === undefined || value === '') {
+            continue
+          }
+
           if (['office_latitude', 'office_longitude'].includes(key)) {
             value = parseFloat(value)
           }
           if (['office_radius', 'late_threshold'].includes(key)) {
             value = parseInt(value)
           }
+
           payload[key] = value
         }
       }
