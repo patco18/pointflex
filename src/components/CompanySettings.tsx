@@ -72,15 +72,25 @@ export default function CompanySettings() {
   const [newHoliday, setNewHoliday] = useState({ date: '', name: '' });
   const [leavePolicySaving, setLeavePolicySaving] = useState(false);
 
-  // Charger les paramètres de l'entreprise, l'abonnement, et la politique de congés
+  // Helper to load invoices
+  const loadInvoices = async () => {
+    setInvoicesLoading(true)
+    try {
+      const resp = await adminService.getCompanyInvoices()
+      setInvoices(resp.data.invoices)
+    } catch (error) {
+      console.error('Erreur chargement factures:', error)
+    } finally {
+      setInvoicesLoading(false)
+    }
+  }
+
+  // Charger les paramètres de l'entreprise, l'abonnement et la politique de congés
   useEffect(() => {
     if (isAdmin) {
-      loadCompanySettings();
-      loadSubscriptionData();
-      loadLeavePolicy();
-      loadInvoices();
+
     }
-  }, [isAdmin]);
+  }, [isAdmin])
 
   // Handle Stripe redirect
   useEffect(() => {
@@ -649,6 +659,7 @@ export default function CompanySettings() {
                 </button>
               </form>
             </div>
+
 
           </div>
         ) : (

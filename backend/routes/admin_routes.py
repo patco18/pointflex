@@ -31,6 +31,7 @@ import os
 # Stripe utilities
 from backend.services import stripe_service
 
+
 admin_bp = Blueprint('admin', __name__)
 
 # Helper to get company for current admin user
@@ -1080,8 +1081,6 @@ def update_company_settings():
                 if field == 'work_start_time' and isinstance(value, str):
                     try:
 
-                    except ValueError:
-                        return jsonify(message="Format d'heure invalide"), 400
                 setattr(company, field, value)
         
         # Logger l'action

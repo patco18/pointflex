@@ -445,53 +445,7 @@ export const superAdminService = {
       console.error('Reset system settings service error:', error)
       throw error
     }
-  },
 
-  // Subscription management for company admins
-  getCompanySubscription: async () => {
-    try {
-      return await api.get('/admin/subscription')
-    } catch (error) {
-      console.error('Get company subscription service error:', error)
-      throw error
-    }
-  },
-
-  createSubscriptionCheckoutSession: async (stripePriceId: string) => {
-    try {
-      return await api.post('/admin/subscription/checkout-session', { stripe_price_id: stripePriceId })
-    } catch (error) {
-      console.error('Create subscription checkout session service error:', error)
-      throw error
-    }
-  },
-
-  createCustomerPortalSession: async () => {
-    try {
-      return await api.post('/admin/subscription/customer-portal')
-    } catch (error) {
-      console.error('Create customer portal session service error:', error)
-      throw error
-    }
-  },
-
-
-  requestSubscriptionExtension: async (months: number, reason?: string) => {
-    try {
-      return await api.post('/admin/subscription/extension-request', { months, reason })
-    } catch (error) {
-      console.error('Request subscription extension error:', error)
-      throw error
-    }
-  },
-
-  setEmployeeManager: async (employeeId: number, managerId: number | null) => {
-    try {
-      return await api.put(`/admin/employees/${employeeId}/manager`, { manager_id: managerId });
-    } catch (error) {
-      console.error('Set employee manager service error:', error);
-      throw error;
-    }
   }
 }
 
@@ -666,39 +620,6 @@ export const missionService = {
     }
   },
 
-  // Leave Policy Management
-  getCompanyLeavePolicy: async () => {
-    try {
-      return await api.get('/admin/company/leave-policy');
-    } catch (error) {
-      console.error('Get company leave policy error:', error);
-      throw error;
-    }
-  },
-  updateCompanyLeavePolicy: async (policyData: { work_days?: string; default_country_code_for_holidays?: string }) => {
-    try {
-      return await api.put('/admin/company/leave-policy', policyData);
-    } catch (error) {
-      console.error('Update company leave policy error:', error);
-      throw error;
-    }
-  },
-  addCompanyHoliday: async (holidayData: { date: string; name: string }) => {
-    try {
-      return await api.post('/admin/company/holidays', holidayData);
-    } catch (error) {
-      console.error('Add company holiday error:', error);
-      throw error;
-    }
-  },
-  deleteCompanyHoliday: async (holidayId: number) => {
-    try {
-      return await api.delete(`/admin/company/holidays/${holidayId}`);
-    } catch (error) {
-      console.error('Delete company holiday error:', error);
-      throw error;
-    }
-  },
 }
 
 // Services Admin
@@ -977,7 +898,7 @@ export const adminService = {
       const payload: any = {}
       for (const key of allowedFields) {
         if (key in settings) {
-          payload[key] = (settings as any)[key]
+
         }
       }
 
@@ -1017,6 +938,7 @@ export const adminService = {
       throw error
     }
   },
+
 
   // Leave policy management
   getCompanyLeavePolicy: async () => {
