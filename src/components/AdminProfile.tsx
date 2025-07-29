@@ -11,9 +11,11 @@ import {
   Building,
   Users,
   Settings,
-  Download
+  Download,
+  Bell
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import UserNotificationPreferences from './UserNotificationPreferences'
 
 export default function AdminProfile() {
   const { user, isSuperAdmin } = useAuth()
@@ -188,7 +190,7 @@ export default function AdminProfile() {
                     onChange={(e) => setProfileForm(prev => ({ ...prev, phone: e.target.value }))}
                     disabled={!editMode}
                     className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                    placeholder="01 23 45 67 89"
+                    placeholder="27 22 48 75 96"
                   />
                 </div>
 
@@ -202,7 +204,7 @@ export default function AdminProfile() {
                     onChange={(e) => setProfileForm(prev => ({ ...prev, address: e.target.value }))}
                     disabled={!editMode}
                     className="input-field disabled:bg-gray-50 disabled:text-gray-500"
-                    placeholder="123 Rue de la Paix, 75001 Paris"
+                    placeholder="Boulevard Latrille, II Plateaux, Abidjan"
                   />
                 </div>
 
@@ -406,6 +408,18 @@ export default function AdminProfile() {
                 Exporter mes données
               </button>
             </div>
+          </div>
+
+          {/* Préférences de notification */}
+          <div className="card mt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Bell className="h-5 w-5 mr-2 text-indigo-600" />
+              Préférences de notification
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Configurez vos préférences pour les notifications, y compris les alertes d'expiration d'abonnement
+            </p>
+            <UserNotificationPreferences />
           </div>
         </div>
       </div>

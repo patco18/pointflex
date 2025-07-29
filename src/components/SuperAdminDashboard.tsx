@@ -21,7 +21,8 @@ import {
   Server,
   Activity,
   DollarSign,
-  Zap
+  Zap,
+  Bell
 } from 'lucide-react'
 
 interface GlobalStats {
@@ -54,19 +55,32 @@ export default function SuperAdminDashboard() {
     try {
       setLoading(true)
       const response = await superAdminService.getGlobalStats()
-      // Cast or map status fields to the correct union type
-      setStats({
-        ...response,
+      const statsData = response.data.stats || {}
+      
+      // S'assurer que les données ont le bon format avant de mettre à jour l'état
+      const systemHealth = statsData.system_health || {}
+      
+      // Préparation d'un objet conforme au type GlobalStats
+      const formattedStats: GlobalStats = {
+        total_companies: statsData.total_companies || 0,
+        active_companies: statsData.active_companies || 0,
+        total_users: statsData.total_users || 0,
+        total_pointages: statsData.total_pointages || 0,
+        plans_distribution: statsData.plans_distribution || {},
+        revenue_monthly: statsData.revenue_monthly || 0,
         system_health: {
-          ...response.system_health,
-          api_status: (['healthy', 'warning', 'error'].includes(response.system_health.api_status)
-            ? response.system_health.api_status
-            : 'healthy') as 'healthy' | 'warning' | 'error',
-          database_status: (['healthy', 'warning', 'error'].includes(response.system_health.database_status)
-            ? response.system_health.database_status
-            : 'healthy') as 'healthy' | 'warning' | 'error',
+          // La propriété system_health n'est pas encore implémentée côté backend,
+          // donc on utilise des valeurs par défaut pour l'instant
+          api_status: 'healthy',
+          database_status: 'healthy',
+          storage_usage: 45 // pourcentage d'utilisation
         }
-      })
+      }
+      
+      console.log("Stats chargées:", formattedStats);
+      
+      // Mise à jour de l'état avec des données correctement typées
+      setStats(formattedStats)
     } catch (error) {
       console.error('Erreur lors du chargement des statistiques:', error)
     } finally {
@@ -88,22 +102,22 @@ export default function SuperAdminDashboard() {
     return <LoadingSpinner size="lg" text="Chargement des statistiques globales..." />
   }
 
-  // Données simulées enrichies pour le SuperAdmin avec valeurs par défaut sécurisées
-  const mockStats: GlobalStats = stats || {
-    total_companies: 12,
-    active_companies: 10,
-    total_users: 145,
-    total_pointages: 2850,
-    revenue_monthly: 15420,
+  // Si les stats sont null, créer un objet vide avec des valeurs par défaut
+  const dashboardStats: GlobalStats = stats || {
+    total_companies: 0,
+    active_companies: 0,
+    total_users: 0,
+    total_pointages: 0,
+    revenue_monthly: 0,
     plans_distribution: {
-      basic: 5,
-      premium: 4,
-      enterprise: 3
+      basic: 0,
+      premium: 0,
+      enterprise: 0
     },
     system_health: {
       api_status: 'healthy',
       database_status: 'healthy',
-      storage_usage: 65
+      storage_usage: 0
     }
   }
 
@@ -128,7 +142,7 @@ export default function SuperAdminDashboard() {
     const planPrices = { basic: 29, premium: 99, enterprise: 299 }
     let totalRevenue = 0
     
-    for (const [plan, count] of Object.entries(mockStats.plans_distribution)) {
+    for (const [plan, count] of Object.entries(dashboardStats.plans_distribution)) {
       const price = planPrices[plan as keyof typeof planPrices] || 0
       totalRevenue += count * price
     }
@@ -198,7 +212,7 @@ export default function SuperAdminDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Entreprises Totales</p>
-              <p className="text-2xl font-bold text-gray-900">{safeFormatNumber(mockStats.total_companies)}</p>
+              <p className="text-2xl font-bold text-gray-900">{safeFormatNumber(dashboardStats.total_companies)}</p>
               <p className="text-xs text-green-600">+2 ce mois</p>
             </div>
           </div>
@@ -211,10 +225,10 @@ export default function SuperAdminDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Entreprises Actives</p>
-              <p className="text-2xl font-bold text-gray-900">{safeFormatNumber(mockStats.active_companies)}</p>
+              <p className="text-2xl font-bold text-gray-900">{safeFormatNumber(dashboardStats.active_companies)}</p>
               <p className="text-xs text-gray-500">
-                {mockStats.total_companies > 0 
-                  ? Math.round((mockStats.active_companies / mockStats.total_companies) * 100)
+                {dashboardStats.total_companies > 0 
+                  ? Math.round((dashboardStats.active_companies / dashboardStats.total_companies) * 100)
                   : 0
                 }% du total
               </p>
@@ -229,7 +243,7 @@ export default function SuperAdminDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Utilisateurs Totaux</p>
-              <p className="text-2xl font-bold text-gray-900">{safeFormatNumber(mockStats.total_users)}</p>
+              <p className="text-2xl font-bold text-gray-900">{safeFormatNumber(dashboardStats.total_users)}</p>
               <p className="text-xs text-green-600">+12 cette semaine</p>
             </div>
           </div>
@@ -242,7 +256,7 @@ export default function SuperAdminDashboard() {
             </div>
             <div className="ml-4">
               <p className="text-sm font-medium text-gray-600">Pointages Totaux</p>
-              <p className="text-2xl font-bold text-gray-900">{safeFormatNumber(mockStats.total_pointages)}</p>
+              <p className="text-2xl font-bold text-gray-900">{safeFormatNumber(dashboardStats.total_pointages)}</p>
               <p className="text-xs text-green-600">+156 aujourd'hui</p>
             </div>
           </div>
@@ -307,6 +321,19 @@ export default function SuperAdminDashboard() {
               </div>
             </div>
           </a>
+          
+          <a
+            href="/superadmin/notifications"
+            className="p-4 rounded-lg border border-yellow-200 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 transition-all duration-200 hover:shadow-md group"
+          >
+            <div className="flex items-center space-x-3">
+              <Bell className="h-6 w-6 group-hover:scale-110 transition-transform" />
+              <div>
+                <h4 className="font-medium">Notifications</h4>
+                <p className="text-sm opacity-75">Historique des notifications</p>
+              </div>
+            </div>
+          </a>
         </div>
       </div>
 
@@ -317,8 +344,8 @@ export default function SuperAdminDashboard() {
             Distribution des Plans & Revenus
           </h2>
           <div className="space-y-4">
-            {Object.entries(mockStats.plans_distribution || {}).map(([plan, count]) => {
-              const total = Object.values(mockStats.plans_distribution || {}).reduce((a, b) => a + b, 0)
+            {Object.entries(dashboardStats.plans_distribution || {}).map(([plan, count]) => {
+              const total = Object.values(dashboardStats.plans_distribution || {}).reduce((a: number, b: number) => a + b, 0)
               const percentage = total > 0 ? Math.round((count / total) * 100) : 0
               const prices = { basic: 29, premium: 99, enterprise: 299 }
               const revenue = count * (prices[plan as keyof typeof prices] || 0)
@@ -379,9 +406,9 @@ export default function SuperAdminDashboard() {
                   <div className="text-xs text-gray-500">Temps de réponse: 120ms</div>
                 </div>
               </div>
-              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full ${getStatusColor(mockStats.system_health?.api_status || 'healthy')}`}>
-                {getStatusIcon(mockStats.system_health?.api_status || 'healthy')}
-                <span className="text-sm font-medium capitalize">{mockStats.system_health?.api_status || 'healthy'}</span>
+              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full ${getStatusColor(dashboardStats.system_health?.api_status || 'healthy')}`}>
+                {getStatusIcon(dashboardStats.system_health?.api_status || 'healthy')}
+                <span className="text-sm font-medium capitalize">{dashboardStats.system_health?.api_status || 'healthy'}</span>
               </div>
             </div>
 
@@ -393,9 +420,9 @@ export default function SuperAdminDashboard() {
                   <div className="text-xs text-gray-500">Connexions actives: 45/100</div>
                 </div>
               </div>
-              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full ${getStatusColor(mockStats.system_health?.database_status || 'healthy')}`}>
-                {getStatusIcon(mockStats.system_health?.database_status || 'healthy')}
-                <span className="text-sm font-medium capitalize">{mockStats.system_health?.database_status || 'healthy'}</span>
+              <div className={`flex items-center space-x-2 px-3 py-1 rounded-full ${getStatusColor(dashboardStats.system_health?.database_status || 'healthy')}`}>
+                {getStatusIcon(dashboardStats.system_health?.database_status || 'healthy')}
+                <span className="text-sm font-medium capitalize">{dashboardStats.system_health?.database_status || 'healthy'}</span>
               </div>
             </div>
 
@@ -408,16 +435,16 @@ export default function SuperAdminDashboard() {
                     <div className="text-xs text-gray-500">2.4 TB utilisés / 5 TB total</div>
                   </div>
                 </div>
-                <span className="text-sm font-medium text-gray-900">{mockStats.system_health?.storage_usage || 0}%</span>
+                <span className="text-sm font-medium text-gray-900">{dashboardStats.system_health?.storage_usage || 0}%</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">
                 <div 
                   className={`h-2 rounded-full ${
-                    (mockStats.system_health?.storage_usage || 0) > 80 ? 'bg-red-500' :
-                    (mockStats.system_health?.storage_usage || 0) > 60 ? 'bg-yellow-500' :
+                    (dashboardStats.system_health?.storage_usage || 0) > 80 ? 'bg-red-500' :
+                    (dashboardStats.system_health?.storage_usage || 0) > 60 ? 'bg-yellow-500' :
                     'bg-green-500'
                   }`}
-                  style={{ width: `${mockStats.system_health?.storage_usage || 0}%` }}
+                  style={{ width: `${dashboardStats.system_health?.storage_usage || 0}%` }}
                 />
               </div>
             </div>

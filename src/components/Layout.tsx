@@ -2,7 +2,7 @@ import React from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../hooks/usePermissions'
-import RealtimeNotifications from './RealtimeNotifications'
+import NotificationCenter from './NotificationCenter'
 import { 
   Home, 
   Clock,
@@ -27,7 +27,9 @@ import {
   UserCheck,
   Search,
   Crown,
-  Globe
+  Globe,
+  CreditCard,
+  DollarSign
 } from 'lucide-react'
 
 interface LayoutProps {
@@ -58,7 +60,10 @@ export default function Layout({ children }: LayoutProps) {
       nav.push(
         { name: 'Dashboard SuperAdmin', href: '/superadmin', icon: Crown, priority: false, permission: null },
         { name: 'Gestion Entreprises', href: '/superadmin/companies', icon: Building, priority: false, permission: null },
+        { name: 'Gestion Abonnements', href: '/superadmin/subscription', icon: CreditCard, priority: false, permission: null },
+        // L'option Plans Abonnement a été supprimée car elle redirige vers Gestion Abonnements
         { name: 'Demandes Abonnement', href: '/superadmin/extension-requests', icon: Clock, priority: false, permission: null },
+        { name: 'Facturation', href: '/superadmin/billing', icon: DollarSign, priority: false, permission: null },
         { name: 'Configuration Système', href: '/settings', icon: Settings, priority: false, permission: null },
         { name: 'Rôles & Privilèges', href: '/roles', icon: Shield, priority: false, permission: null },
         { name: 'Analytics Globales', href: '/reports', icon: BarChart3, priority: false, permission: null }
@@ -67,24 +72,22 @@ export default function Layout({ children }: LayoutProps) {
 
     // ADMINISTRATEUR ENTREPRISE - Gestion globale de l'entreprise
     else if (permissions.canManageCompanySettings || permissions.canManageTeam) {
-      // Gestion des Utilisateurs de son entreprise
+      // Tableau de bord administratif
+      nav.push({ name: 'Tableau de Bord', href: '/admin', icon: BarChart3, priority: true, permission: null })
+      
+      // Section Gestion du Personnel
       nav.push({ name: 'Gestion Employés', href: '/admin/employees', icon: Users, priority: false, permission: null })
-      
-      // Gestion des Bureaux de l'entreprise
-      nav.push({ name: 'Gestion Bureaux', href: '/admin/offices', icon: Building, priority: false, permission: null })
-      
-      // Gérez les départements, services et postes de son entreprise
       nav.push({ name: 'Organisation', href: '/admin/organization', icon: Layers, priority: false, permission: null })
+      nav.push({ name: 'Calendrier Équipe', href: '/admin/team-calendar', icon: Calendar, priority: false, permission: null })
       
-      // Système de géolocalisation de son entreprise et des bureaux
-      nav.push({ name: 'Géofencing', href: '/geofencing', icon: MapPin, priority: false, permission: null })
+      // Section Infrastructure
+      nav.push({ name: 'Gestion Bureaux', href: '/admin/offices', icon: Building, priority: false, permission: null })
+      nav.push({ name: 'Géofencing', href: '/admin/geofencing', icon: MapPin, priority: false, permission: null })
       
-      // Paramètres d'entreprise
-      nav.push({ name: 'Paramètres Entreprise', href: '/settings', icon: Cog, priority: false, permission: null })
-      
-      // Calendrier équipe et rapports
-      nav.push({ name: 'Calendrier Équipe', href: '/team-calendar', icon: Calendar, priority: false, permission: null })
-      nav.push({ name: 'Rapports Entreprise', href: '/reports', icon: FileText, priority: false, permission: null })
+      // Section Analyses et Paramètres
+      nav.push({ name: 'Rapports Entreprise', href: '/admin/reports', icon: FileText, priority: false, permission: null })
+      nav.push({ name: 'Webhooks', href: '/admin/webhooks', icon: Globe, priority: false, permission: null })
+      nav.push({ name: 'Paramètres Entreprise', href: '/admin/settings', icon: Cog, priority: false, permission: null })
     }
 
     // AUTRES RÔLES - Fonctionnalités selon permissions
@@ -112,7 +115,8 @@ export default function Layout({ children }: LayoutProps) {
 
     // Pointage regroupé pour tous (sauf auditeur)
     if (permissions.canSelfCheckIn) {
-      nav.push({ name: 'Pointage', href: '/attendance', icon: Clock, priority: false, permission: null })
+      nav.push({ name: 'Nouveau Pointage', href: '/attendance/home', icon: Clock, priority: true, permission: null })
+      nav.push({ name: 'Pointage', href: '/checkin', icon: MapPin, priority: false, permission: null })
     }
 
     // Historique personnel pour tous
@@ -394,7 +398,7 @@ export default function Layout({ children }: LayoutProps) {
             </div>
             <div className="flex items-center gap-x-4 lg:gap-x-6">
               {/* Notification Center */}
-              <RealtimeNotifications />
+              <NotificationCenter />
               
               <div className="flex items-center gap-x-2">
                 <div className="text-right">

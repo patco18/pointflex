@@ -1,0 +1,98 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Votre abonnement expire bientôt</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #4338ca;
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 4px 4px 0 0;
+        }
+        .content {
+            background-color: #f9fafb;
+            padding: 20px;
+            border-radius: 0 0 4px 4px;
+            border: 1px solid #e5e7eb;
+            border-top: none;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 12px;
+            color: #6b7280;
+        }
+        .btn {
+            display: inline-block;
+            background-color: #4338ca;
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 4px;
+            margin-top: 15px;
+        }
+        .warning {
+            color: #d97706;
+            font-weight: bold;
+        }
+        .company-info {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f3f4f6;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Votre abonnement expire bientôt</h1>
+        </div>
+        <div class="content">
+            <p>Bonjour Admin Test,</p>
+            
+            <p>Nous vous informons que l'abonnement de <strong>Entreprise Test</strong> au plan <strong>Plan Premium</strong> arrive à expiration dans <span class="warning">7 jours</span>.</p>
+            
+            <div class="company-info">
+                <p><strong>Détails de l'abonnement :</strong></p>
+                <ul>
+                    <li>Entreprise : Entreprise Test</li>
+                    <li>Plan actuel : Plan Premium</li>
+                    <li>Date d'expiration : 31/08/2023</li>
+                </ul>
+            </div>
+            
+            <p>Pour assurer la continuité de vos services, veuillez renouveler votre abonnement avant cette date.</p>
+            
+            <p>Si votre abonnement expire, certaines fonctionnalités pourraient devenir indisponibles.</p>
+            
+            <div style="text-align: center;">
+                <a href="http://localhost:5173/subscription/renew?company_id=1" class="btn">Renouveler mon abonnement</a>
+            </div>
+            
+            <p>Si vous avez des questions concernant votre abonnement, n'hésitez pas à contacter notre équipe support.</p>
+            
+            <p>Cordialement,<br>L'équipe PointFlex</p>
+        </div>
+        <div class="footer">
+            <p>© 2025 PointFlex - Tous droits réservés</p>
+        </div>
+    </div>
+</body>
+</html>

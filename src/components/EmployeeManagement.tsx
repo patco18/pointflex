@@ -1,7 +1,8 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { adminService } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useApi, useAsyncAction } from '../hooks/useApi'
+import toast from 'react-hot-toast'
 import Modal from './shared/Modal'
 import LoadingSpinner from './shared/LoadingSpinner'
 import StatusBadge from './shared/StatusBadge'
@@ -73,27 +74,42 @@ export default function EmployeeManagement() {
     phone: '', department_id: '', service_id: '', position_id: '', manager_id: '' // manager_id can be string here for form
   })
 
-  const { data: employees = [], loading, refetch } = useApi<Employee[]>(() => adminService.getEmployees())
+  const { data: employeesData, loading, refetch } = useApi<any>(() => adminService.getEmployees())
   const { data: orgData } = useApi(() => adminService.getOrganizationData())
   const { loading: saving, execute } = useAsyncAction()
+  
+  // Assurez-vous que employees est toujours un tableau, même si data est null ou undefined
+  // Vérifiez si employeesData est un objet avec une propriété employees ou employees_list
+  let employees: Employee[] = [];
+  if (employeesData) {
+    if (Array.isArray(employeesData)) {
+      employees = employeesData;
+    } else if (employeesData.employees && Array.isArray(employeesData.employees)) {
+      employees = employeesData.employees;
+    } else if (employeesData.employees_list && Array.isArray(employeesData.employees_list)) {
+      employees = employeesData.employees_list;
+    } else if (employeesData.data && Array.isArray(employeesData.data)) {
+      employees = employeesData.data;
+    }
+  }
 
   useEffect(() => {
     // Assuming adminService.getEmployees() returns all employees for the admin's company
     // This list can be used as potential managers.
     // Filter out the employee being currently edited if applicable.
-    if (employees) {
+    if (employees && employees.length > 0) {
         setPotentialManagers(employees);
     }
   }, [employees]);
 
-  const filteredEmployees = employees.filter((emp: Employee) => {
+  const filteredEmployees = Array.isArray(employees) ? employees.filter((emp: Employee) => {
     const matchesSearch = !searchTerm || 
       emp.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.email.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesRole = roleFilter === 'all' || emp.role === roleFilter
     return matchesSearch && matchesRole
-  })
+  }) : [];
 
   const columns = [
     {

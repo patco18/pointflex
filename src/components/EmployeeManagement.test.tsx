@@ -1,3 +1,6 @@
+/// <reference types="@types/jest" />
+/// <reference types="@testing-library/jest-dom" />
+
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import EmployeeManagement from './EmployeeManagement';
 import { adminService } from '../services/api';
@@ -24,9 +27,9 @@ beforeEach(() => {
 const employees = [
   {
     id: 1,
-    email: 'john@example.com',
-    nom: 'Doe',
-    prenom: 'John',
+    email: 'kouassi@entreprise.ci',
+    nom: 'Kouassi',
+    prenom: 'Serge',
     role: 'employee',
     is_active: true,
     employee_number: 'E1',
@@ -49,12 +52,25 @@ const orgData = {
 
 
 test('prefills organization fields when editing an employee', async () => {
-  mockedAdminService.getEmployees.mockResolvedValue({ data: employees });
-  mockedAdminService.getOrganizationData.mockResolvedValue({ data: orgData });
+  mockedAdminService.getEmployees.mockResolvedValue({
+    data: employees,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    config: {} as any
+  });
+  
+  mockedAdminService.getOrganizationData.mockResolvedValue({
+    data: orgData,
+    status: 200,
+    statusText: 'OK',
+    headers: {},
+    config: {} as any
+  });
 
   render(<EmployeeManagement />);
 
-  await waitFor(() => expect(screen.getByText('John Doe')).toBeInTheDocument());
+  await waitFor(() => expect(screen.getByText('Kouassi Serge')).toBeInTheDocument());
 
   fireEvent.click(screen.getByTitle('Modifier Employé'));
 

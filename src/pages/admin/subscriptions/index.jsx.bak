@@ -1,0 +1,20 @@
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import SubscriptionPlansManagement from './SubscriptionPlansManagement';
+import CompanySubscriptionsManagement from './CompanySubscriptionsManagement';
+
+/**
+ * Module de gestion des abonnements pour les administrateurs
+ * Inclut la gestion des plans d'abonnement et des abonnements des entreprises
+ */
+const SubscriptionManagementModule = () => {
+  return (
+    <Routes>
+      <Route path="plans" element={<SubscriptionPlansManagement />} />
+      <Route path="companies" element={<CompanySubscriptionsManagement />} />
+      <Route path="/" element={<Navigate to="plans" replace />} />
+    </Routes>
+  );
+};
+
+export default SubscriptionManagementModule;

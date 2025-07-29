@@ -322,7 +322,7 @@ export default function TeamCalendar() {
         <div className="card">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">
-              Événements du {format(selectedDate, 'dd MMMM yyyy', { locale: fr })}
+              Événements du {format(selectedDate, 'd MMMM yyyy', { locale: fr })}
             </h3>
             <button
               onClick={() => setSelectedDate(null)}

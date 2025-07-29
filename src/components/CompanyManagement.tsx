@@ -1,7 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { usePermissions } from '../hooks/usePermissions'
 import { useApi, useAsyncAction } from '../hooks/useApi'
-import { superAdminService } from '../services/api'
+import { superAdminService, api } from '../services/api'
 import { 
   Building, 
   Plus, 
@@ -22,24 +22,167 @@ import {
   Search,
   Download,
   Briefcase,
-  User
+  User,
+  Clock
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // Liste des pays pour le formulaire
 const COUNTRIES = [
+  // Pays africains
+  { code: 'CI', name: 'Côte d\'Ivoire' },
+  { code: 'BJ', name: 'Bénin' },
+  { code: 'BF', name: 'Burkina Faso' },
+  { code: 'CM', name: 'Cameroun' },
+  { code: 'CF', name: 'République centrafricaine' },
+  { code: 'TD', name: 'Tchad' },
+  { code: 'CG', name: 'Congo' },
+  { code: 'CD', name: 'République démocratique du Congo' },
+  { code: 'DJ', name: 'Djibouti' },
+  { code: 'GQ', name: 'Guinée équatoriale' },
+  { code: 'GA', name: 'Gabon' },
+  { code: 'GH', name: 'Ghana' },
+  { code: 'GN', name: 'Guinée' },
+  { code: 'GW', name: 'Guinée-Bissau' },
+  { code: 'LR', name: 'Libéria' },
+  { code: 'ML', name: 'Mali' },
+  { code: 'MR', name: 'Mauritanie' },
+  { code: 'NE', name: 'Niger' },
+  { code: 'NG', name: 'Nigéria' },
+  { code: 'SN', name: 'Sénégal' },
+  { code: 'SL', name: 'Sierra Leone' },
+  { code: 'TG', name: 'Togo' },
+  { code: 'DZ', name: 'Algérie' },
+  { code: 'EG', name: 'Égypte' },
+  { code: 'LY', name: 'Libye' },
+  { code: 'MA', name: 'Maroc' },
+  { code: 'TN', name: 'Tunisie' },
+  { code: 'AO', name: 'Angola' },
+  { code: 'BW', name: 'Botswana' },
+  { code: 'LS', name: 'Lesotho' },
+  { code: 'MW', name: 'Malawi' },
+  { code: 'MZ', name: 'Mozambique' },
+  { code: 'NA', name: 'Namibie' },
+  { code: 'ZA', name: 'Afrique du Sud' },
+  { code: 'SZ', name: 'Eswatini' },
+  { code: 'ZM', name: 'Zambie' },
+  { code: 'ZW', name: 'Zimbabwe' },
+  { code: 'BI', name: 'Burundi' },
+  { code: 'KM', name: 'Comores' },
+  { code: 'ER', name: 'Érythrée' },
+  { code: 'ET', name: 'Éthiopie' },
+  { code: 'KE', name: 'Kenya' },
+  { code: 'MG', name: 'Madagascar' },
+  { code: 'MU', name: 'Maurice' },
+  { code: 'RW', name: 'Rwanda' },
+  { code: 'SC', name: 'Seychelles' },
+  { code: 'SO', name: 'Somalie' },
+  { code: 'SS', name: 'Soudan du Sud' },
+  { code: 'SD', name: 'Soudan' },
+  { code: 'TZ', name: 'Tanzanie' },
+  { code: 'UG', name: 'Ouganda' },
+  { code: 'CV', name: 'Cap-Vert' },
+  { code: 'GM', name: 'Gambie' },
+  { code: 'ST', name: 'São Tomé-et-Príncipe' },
+  
+  // Europe
   { code: 'FR', name: 'France' },
   { code: 'BE', name: 'Belgique' },
   { code: 'CH', name: 'Suisse' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'US', name: 'États-Unis' },
-  { code: 'GB', name: 'Royaume-Uni' },
   { code: 'DE', name: 'Allemagne' },
   { code: 'ES', name: 'Espagne' },
   { code: 'IT', name: 'Italie' },
   { code: 'PT', name: 'Portugal' },
   { code: 'NL', name: 'Pays-Bas' },
-  { code: 'LU', name: 'Luxembourg' }
+  { code: 'LU', name: 'Luxembourg' },
+  { code: 'GB', name: 'Royaume-Uni' },
+  { code: 'IE', name: 'Irlande' },
+  { code: 'DK', name: 'Danemark' },
+  { code: 'NO', name: 'Norvège' },
+  { code: 'SE', name: 'Suède' },
+  { code: 'FI', name: 'Finlande' },
+  { code: 'IS', name: 'Islande' },
+  { code: 'AT', name: 'Autriche' },
+  { code: 'GR', name: 'Grèce' },
+  { code: 'PL', name: 'Pologne' },
+  { code: 'CZ', name: 'République tchèque' },
+  { code: 'SK', name: 'Slovaquie' },
+  { code: 'HU', name: 'Hongrie' },
+  { code: 'RO', name: 'Roumanie' },
+  { code: 'BG', name: 'Bulgarie' },
+  { code: 'HR', name: 'Croatie' },
+  { code: 'SI', name: 'Slovénie' },
+  { code: 'EE', name: 'Estonie' },
+  { code: 'LV', name: 'Lettonie' },
+  { code: 'LT', name: 'Lituanie' },
+  { code: 'MT', name: 'Malte' },
+  { code: 'CY', name: 'Chypre' },
+  
+  // Amériques
+  { code: 'CA', name: 'Canada' },
+  { code: 'US', name: 'États-Unis' },
+  { code: 'MX', name: 'Mexique' },
+  { code: 'BR', name: 'Brésil' },
+  { code: 'AR', name: 'Argentine' },
+  { code: 'CL', name: 'Chili' },
+  { code: 'CO', name: 'Colombie' },
+  { code: 'PE', name: 'Pérou' },
+  { code: 'VE', name: 'Venezuela' },
+  { code: 'EC', name: 'Équateur' },
+  { code: 'BO', name: 'Bolivie' },
+  { code: 'PY', name: 'Paraguay' },
+  { code: 'UY', name: 'Uruguay' },
+  { code: 'PA', name: 'Panama' },
+  { code: 'CR', name: 'Costa Rica' },
+  { code: 'GT', name: 'Guatemala' },
+  { code: 'HN', name: 'Honduras' },
+  { code: 'SV', name: 'Salvador' },
+  { code: 'NI', name: 'Nicaragua' },
+  { code: 'CU', name: 'Cuba' },
+  { code: 'DO', name: 'République dominicaine' },
+  { code: 'HT', name: 'Haïti' },
+  { code: 'JM', name: 'Jamaïque' },
+  { code: 'TT', name: 'Trinité-et-Tobago' },
+  { code: 'BS', name: 'Bahamas' },
+  { code: 'BB', name: 'Barbade' },
+  
+  // Asie
+  { code: 'CN', name: 'Chine' },
+  { code: 'JP', name: 'Japon' },
+  { code: 'KR', name: 'Corée du Sud' },
+  { code: 'IN', name: 'Inde' },
+  { code: 'ID', name: 'Indonésie' },
+  { code: 'MY', name: 'Malaisie' },
+  { code: 'PH', name: 'Philippines' },
+  { code: 'SG', name: 'Singapour' },
+  { code: 'TH', name: 'Thaïlande' },
+  { code: 'VN', name: 'Viêt Nam' },
+  { code: 'MM', name: 'Myanmar' },
+  { code: 'KH', name: 'Cambodge' },
+  { code: 'LA', name: 'Laos' },
+  { code: 'SA', name: 'Arabie saoudite' },
+  { code: 'AE', name: 'Émirats arabes unis' },
+  { code: 'QA', name: 'Qatar' },
+  { code: 'KW', name: 'Koweït' },
+  { code: 'BH', name: 'Bahreïn' },
+  { code: 'OM', name: 'Oman' },
+  { code: 'IL', name: 'Israël' },
+  { code: 'TR', name: 'Turquie' },
+  { code: 'LB', name: 'Liban' },
+  { code: 'JO', name: 'Jordanie' },
+  { code: 'IQ', name: 'Irak' },
+  { code: 'IR', name: 'Iran' },
+  { code: 'PK', name: 'Pakistan' },
+  { code: 'BD', name: 'Bangladesh' },
+  { code: 'LK', name: 'Sri Lanka' },
+  { code: 'NP', name: 'Népal' },
+  
+  // Océanie
+  { code: 'AU', name: 'Australie' },
+  { code: 'NZ', name: 'Nouvelle-Zélande' },
+  { code: 'FJ', name: 'Fidji' },
+  { code: 'PG', name: 'Papouasie-Nouvelle-Guinée' },
+  { code: 'SB', name: 'Îles Salomon' }
 ]
 
 // Liste des secteurs d'activité
@@ -77,6 +220,7 @@ interface Company {
   tax_id?: string
   notes?: string
   subscription_plan: string
+  subscription_plan_id?: number
   subscription_status: string
   subscription_start?: string
   subscription_end?: string
@@ -110,7 +254,7 @@ interface CompanyForm {
   website: string
   tax_id: string
   notes: string
-  subscription_plan: string
+  subscription_plan_id: number
   max_employees: number
   admin_email: string
   admin_prenom: string
@@ -125,9 +269,13 @@ export default function CompanyManagement() {
   const { permissions } = usePermissions()
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'suspended' | 'expired'>('all')
-  const [planFilter, setPlanFilter] = useState<'all' | 'basic' | 'premium' | 'enterprise'>('all')
+  const [planFilter, setPlanFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [editingCompany, setEditingCompany] = useState<Company | null>(null)
+  
+  // Chargement des plans d'abonnement disponibles
+  const { data: plansResp } = useApi(() => api.get('/subscription/plans'))
+  const subscriptionPlans = (plansResp as any)?.plans || []
   
   // Formulaire d'entreprise
   const [companyForm, setCompanyForm] = useState<CompanyForm>({
@@ -136,12 +284,12 @@ export default function CompanyManagement() {
     phone: '',
     address: '',
     city: '',
-    country: 'FR',
+    country: 'CI',
     industry: '',
     website: '',
     tax_id: '',
     notes: '',
-    subscription_plan: 'basic',
+    subscription_plan_id: subscriptionPlans.length > 0 ? subscriptionPlans[0].id : 1,
     max_employees: 10,
     admin_email: '',
     admin_prenom: '',
@@ -149,6 +297,17 @@ export default function CompanyManagement() {
     admin_phone: '',
     admin_password: ''
   })
+
+  // Utiliser useEffect pour mettre à jour l'ID du plan lorsque les plans sont chargés
+  useEffect(() => {
+    if (subscriptionPlans.length > 0) {
+      setCompanyForm(prev => ({
+        ...prev,
+        subscription_plan_id: subscriptionPlans[0].id,
+        max_employees: subscriptionPlans[0].max_employees || 10
+      }))
+    }
+  }, [subscriptionPlans])
 
   // Chargement des entreprises depuis l'API
   const { data: companyResp, loading, refetch } = useApi(() => superAdminService.getCompanies())
@@ -181,12 +340,12 @@ export default function CompanyManagement() {
       phone: '',
       address: '',
       city: '',
-      country: 'FR',
+      country: 'CI',
       industry: '',
       website: '',
       tax_id: '',
       notes: '',
-      subscription_plan: 'basic',
+      subscription_plan_id: 1,
       max_employees: 10,
       admin_email: '',
       admin_prenom: '',
@@ -202,6 +361,9 @@ export default function CompanyManagement() {
     
     await execute(async () => {
       // Simuler la création d'une entreprise
+      // Trouver le plan sélectionné
+      const selectedPlan = subscriptionPlans.find(p => p.id === companyForm.subscription_plan_id);
+      
       const newCompany: Company = {
         id: companies.length + 1,
         name: companyForm.name,
@@ -214,7 +376,8 @@ export default function CompanyManagement() {
         website: companyForm.website,
         tax_id: companyForm.tax_id,
         notes: companyForm.notes,
-        subscription_plan: companyForm.subscription_plan,
+        subscription_plan: selectedPlan ? selectedPlan.name : 'basic',
+        subscription_plan_id: companyForm.subscription_plan_id,
         subscription_status: 'active',
         max_employees: companyForm.max_employees,
         is_active: true,
@@ -280,16 +443,51 @@ export default function CompanyManagement() {
     }
   }
 
+  // États pour le modal de prolongement d'abonnement
+  const [showExtendModal, setShowExtendModal] = useState(false)
+  const [currentCompany, setCurrentCompany] = useState<Company | null>(null)
+  const [extensionForm, setExtensionForm] = useState({
+    months: 1,
+    subscription_plan_id: 0,
+    reason: '',
+  })
+
   // Prolonger l'abonnement
   const handleExtendSubscription = async (company: Company) => {
-    const months = parseInt(prompt(`Nombre de mois à ajouter à l'abonnement de "${company.name}" :`, '1') || '0')
-    
-    if (months > 0) {
+    // Initialiser le formulaire avec les valeurs actuelles de l'entreprise
+    setCurrentCompany(company)
+    setExtensionForm({
+      months: 1,
+      subscription_plan_id: company.subscription_plan_id || (subscriptionPlans.length > 0 ? subscriptionPlans[0].id : 1),
+      reason: '',
+    })
+    setShowExtendModal(true)
+  }
+  
+  // Soumettre le formulaire de prolongement
+  const submitExtendSubscription = async () => {
+    if (currentCompany && extensionForm.months > 0) {
       await execute(async () => {
-        await superAdminService.extendSubscription(company.id, { months })
-        toast.success(`Abonnement prolongé de ${months} mois.`)
-        refetch()
-      }, `Abonnement prolongé de ${months} mois`)
+        // Préparer les données à envoyer
+        const requestData: any = { 
+          months: extensionForm.months,
+        };
+        
+        // N'ajouter la raison que si elle est définie
+        if (extensionForm.reason) {
+          requestData.reason = extensionForm.reason;
+        }
+        
+        // N'ajouter le plan que s'il est différent du plan actuel
+        if (extensionForm.subscription_plan_id !== currentCompany.subscription_plan_id) {
+          requestData.subscription_plan_id = extensionForm.subscription_plan_id;
+        }
+        
+        await superAdminService.extendSubscription(currentCompany.id, requestData);
+        toast.success(`Abonnement prolongé de ${extensionForm.months} mois.`);
+        setShowExtendModal(false);
+        refetch();
+      }, `Prolongation de l'abonnement en cours...`);
     }
   }
 
@@ -323,7 +521,7 @@ export default function CompanyManagement() {
       website: company.website || '',
       tax_id: company.tax_id || '',
       notes: company.notes || '',
-      subscription_plan: company.subscription_plan,
+      subscription_plan_id: company.subscription_plan_id || 1,
       max_employees: company.max_employees,
       admin_email: company.admin_email || '',
       admin_prenom: adminPrenom,
@@ -793,8 +991,7 @@ export default function CompanyManagement() {
                         required
                         value={companyForm.email}
                         onChange={(e) => setCompanyForm(prev => ({ ...prev, email: e.target.value }))}
-                        className="input-field"
-                        placeholder="contact@entreprise.com"
+                        className="input-field"                          placeholder="contact@entreprise.ci"
                       />
                     </div>
 
@@ -808,7 +1005,7 @@ export default function CompanyManagement() {
                           value={companyForm.phone}
                           onChange={(e) => setCompanyForm(prev => ({ ...prev, phone: e.target.value }))}
                           className="input-field"
-                          placeholder="+33 1 23 45 67 89"
+                          placeholder="+225 27 20 30 40 50"
                         />
                       </div>
                       
@@ -838,7 +1035,7 @@ export default function CompanyManagement() {
                         value={companyForm.address}
                         onChange={(e) => setCompanyForm(prev => ({ ...prev, address: e.target.value }))}
                         className="input-field"
-                        placeholder="123 Rue de la Paix"
+                        placeholder="Rue des Jardins, Cocody"
                       />
                     </div>
 
@@ -852,7 +1049,7 @@ export default function CompanyManagement() {
                           value={companyForm.city}
                           onChange={(e) => setCompanyForm(prev => ({ ...prev, city: e.target.value }))}
                           className="input-field"
-                          placeholder="Paris"
+                          placeholder="Abidjan"
                         />
                       </div>
                       
@@ -866,9 +1063,50 @@ export default function CompanyManagement() {
                           className="input-field"
                         >
                           <option value="">Sélectionner un pays</option>
-                          {COUNTRIES.map(country => (
-                            <option key={country.code} value={country.code}>{country.name}</option>
-                          ))}
+                          
+                          <optgroup label="Afrique">
+                            {COUNTRIES.filter(c => [
+                              'CI', 'BJ', 'BF', 'CM', 'CF', 'TD', 'CG', 'CD', 'DJ', 'GQ', 'GA', 'GH', 'GN', 'GW', 'LR', 'ML', 
+                              'MR', 'NE', 'NG', 'SN', 'SL', 'TG', 'DZ', 'EG', 'LY', 'MA', 'TN', 'AO', 'BW', 'LS', 'MW', 'MZ', 
+                              'NA', 'ZA', 'SZ', 'ZM', 'ZW', 'BI', 'KM', 'ER', 'ET', 'KE', 'MG', 'MU', 'RW', 'SC', 'SO', 'SS', 
+                              'SD', 'TZ', 'UG', 'CV', 'GM', 'ST'
+                            ].includes(c.code)).map(country => (
+                              <option key={country.code} value={country.code}>{country.name}</option>
+                            ))}
+                          </optgroup>
+                          
+                          <optgroup label="Europe">
+                            {COUNTRIES.filter(c => [
+                              'FR', 'BE', 'CH', 'DE', 'ES', 'IT', 'PT', 'NL', 'LU', 'GB', 'IE', 'DK', 'NO', 'SE', 'FI', 'IS',
+                              'AT', 'GR', 'PL', 'CZ', 'SK', 'HU', 'RO', 'BG', 'HR', 'SI', 'EE', 'LV', 'LT', 'MT', 'CY'
+                            ].includes(c.code)).map(country => (
+                              <option key={country.code} value={country.code}>{country.name}</option>
+                            ))}
+                          </optgroup>
+                          
+                          <optgroup label="Amériques">
+                            {COUNTRIES.filter(c => [
+                              'CA', 'US', 'MX', 'BR', 'AR', 'CL', 'CO', 'PE', 'VE', 'EC', 'BO', 'PY', 'UY', 'PA', 'CR',
+                              'GT', 'HN', 'SV', 'NI', 'CU', 'DO', 'HT', 'JM', 'TT', 'BS', 'BB'
+                            ].includes(c.code)).map(country => (
+                              <option key={country.code} value={country.code}>{country.name}</option>
+                            ))}
+                          </optgroup>
+                          
+                          <optgroup label="Asie">
+                            {COUNTRIES.filter(c => [
+                              'CN', 'JP', 'KR', 'IN', 'ID', 'MY', 'PH', 'SG', 'TH', 'VN', 'MM', 'KH', 'LA', 'SA', 'AE',
+                              'QA', 'KW', 'BH', 'OM', 'IL', 'TR', 'LB', 'JO', 'IQ', 'IR', 'PK', 'BD', 'LK', 'NP'
+                            ].includes(c.code)).map(country => (
+                              <option key={country.code} value={country.code}>{country.name}</option>
+                            ))}
+                          </optgroup>
+                          
+                          <optgroup label="Océanie">
+                            {COUNTRIES.filter(c => ['AU', 'NZ', 'FJ', 'PG', 'SB'].includes(c.code)).map(country => (
+                              <option key={country.code} value={country.code}>{country.name}</option>
+                            ))}
+                          </optgroup>
                         </select>
                       </div>
                     </div>
@@ -883,7 +1121,7 @@ export default function CompanyManagement() {
                           value={companyForm.website}
                           onChange={(e) => setCompanyForm(prev => ({ ...prev, website: e.target.value }))}
                           className="input-field"
-                          placeholder="www.entreprise.com"
+                          placeholder="www.entreprise.ci"
                         />
                       </div>
                       
@@ -926,13 +1164,27 @@ export default function CompanyManagement() {
                         Plan d'abonnement
                       </label>
                       <select
-                        value={companyForm.subscription_plan}
-                        onChange={(e) => setCompanyForm(prev => ({ ...prev, subscription_plan: e.target.value }))}
+                        value={companyForm.subscription_plan_id}
+                        onChange={(e) => {
+                          const planId = Number(e.target.value);
+                          const selectedPlan = subscriptionPlans.find(plan => plan.id === planId);
+                          setCompanyForm(prev => ({ 
+                            ...prev, 
+                            subscription_plan_id: planId,
+                            max_employees: selectedPlan?.max_employees || prev.max_employees
+                          }));
+                        }}
                         className="input-field"
                       >
-                        <option value="basic">Basic (10 employés max)</option>
-                        <option value="premium">Premium (50 employés max)</option>
-                        <option value="enterprise">Enterprise (illimité)</option>
+                        {subscriptionPlans.map(plan => (
+                          <option key={plan.id} value={plan.id}>
+                            {plan.name} ({plan.max_employees > 999 ? 'Illimité' : `${plan.max_employees} employés max`}) 
+                            - {plan.duration_months} mois - {plan.price}€/mois
+                          </option>
+                        ))}
+                        {subscriptionPlans.length === 0 && (
+                          <option value="">Chargement des plans...</option>
+                        )}
                       </select>
                     </div>
 
@@ -964,7 +1216,7 @@ export default function CompanyManagement() {
                           value={companyForm.admin_email}
                           onChange={(e) => setCompanyForm(prev => ({ ...prev, admin_email: e.target.value }))}
                           className="input-field"
-                          placeholder="admin@entreprise.com"
+                          placeholder="admin@entreprise.ci"
                         />
                       </div>
                       
@@ -978,7 +1230,7 @@ export default function CompanyManagement() {
                             value={companyForm.admin_prenom}
                             onChange={(e) => setCompanyForm(prev => ({ ...prev, admin_prenom: e.target.value }))}
                             className="input-field"
-                            placeholder="Jean"
+                            placeholder="Kouamé"
                           />
                         </div>
                         
@@ -991,7 +1243,7 @@ export default function CompanyManagement() {
                             value={companyForm.admin_nom}
                             onChange={(e) => setCompanyForm(prev => ({ ...prev, admin_nom: e.target.value }))}
                             className="input-field"
-                            placeholder="Dupont"
+                            placeholder="Konan"
                           />
                         </div>
                       </div>
@@ -1005,7 +1257,7 @@ export default function CompanyManagement() {
                           value={companyForm.admin_phone}
                           onChange={(e) => setCompanyForm(prev => ({ ...prev, admin_phone: e.target.value }))}
                           className="input-field"
-                          placeholder="+33 6 12 34 56 78"
+                          placeholder="+225 05 45 67 89 10"
                         />
                       </div>
                       
@@ -1063,6 +1315,119 @@ export default function CompanyManagement() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de prolongement d'abonnement */}
+      {showExtendModal && currentCompany && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+            
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-blue-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <Calendar className="h-6 w-6 text-blue-600" />
+                  </div>
+                  
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      Prolonger l'abonnement
+                    </h3>
+                    
+                    <div className="mt-2">
+                      <p className="text-sm text-gray-500 mb-4">
+                        Entreprise : <strong>{currentCompany.name}</strong><br />
+                        Plan actuel : <strong>{currentCompany.subscription_plan}</strong><br />
+                        Statut : <strong>{currentCompany.is_subscription_expired ? 'Expiré' : `${currentCompany.subscription_days_remaining} jours restants`}</strong>
+                      </p>
+                      
+                      <div className="space-y-3">
+                        {/* Nombre de mois */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Nombre de mois à ajouter
+                          </label>
+                          <input
+                            type="number"
+                            min="1"
+                            max="24"
+                            className="input-field"
+                            value={extensionForm.months}
+                            onChange={(e) => setExtensionForm({
+                              ...extensionForm,
+                              months: parseInt(e.target.value) || 1
+                            })}
+                          />
+                        </div>
+                        
+                        {/* Changement de plan */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Plan d'abonnement (optionnel)
+                          </label>
+                          <select
+                            value={extensionForm.subscription_plan_id}
+                            onChange={(e) => setExtensionForm({
+                              ...extensionForm,
+                              subscription_plan_id: parseInt(e.target.value)
+                            })}
+                            className="input-field"
+                          >
+                            {subscriptionPlans.map(plan => (
+                              <option key={plan.id} value={plan.id}>
+                                {plan.name} ({plan.max_employees > 999 ? 'Illimité' : `${plan.max_employees} employés max`}) 
+                                - {plan.price}€/mois
+                              </option>
+                            ))}
+                          </select>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Laissez ce champ inchangé pour conserver le plan actuel.
+                          </p>
+                        </div>
+                        
+                        {/* Raison / Note */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">
+                            Raison de la prolongation (optionnel)
+                          </label>
+                          <textarea
+                            className="input-field min-h-[80px]"
+                            placeholder="Ajoutez une note ou raison pour cette prolongation..."
+                            value={extensionForm.reason}
+                            onChange={(e) => setExtensionForm({
+                              ...extensionForm,
+                              reason: e.target.value
+                            })}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={submitExtendSubscription}
+                  className="btn-primary w-full sm:w-auto"
+                >
+                  Prolonger l'abonnement
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExtendModal(false)}
+                  className="btn-secondary mt-3 sm:mt-0 sm:mr-3 w-full sm:w-auto"
+                >
+                  Annuler
+                </button>
+              </div>
             </div>
           </div>
         </div>

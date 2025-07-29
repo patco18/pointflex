@@ -35,7 +35,7 @@ def log_user_action(action, resource_type, resource_id=None, details=None,
                    old_values=None, new_values=None):
     """Fonction utilitaire pour logger une action utilisateur"""
     
-    from middleware.auth import get_current_user, get_request_info
+    from backend.middleware.auth import get_current_user, get_request_info
     
     try:
         current_user = get_current_user()

@@ -34,6 +34,16 @@ class Config:
     MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', 'on', '1']
     MAIL_USERNAME = os.environ.get('MAIL_USERNAME')
     MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD')
+    
+    # Configuration SMTP pour l'envoi d'emails
+    SMTP_SERVER = os.environ.get('SMTP_SERVER', 'smtp.gmail.com')
+    SMTP_PORT = int(os.environ.get('SMTP_PORT') or 587)
+    SMTP_USERNAME = os.environ.get('SMTP_USERNAME') or os.environ.get('MAIL_USERNAME')
+    SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD') or os.environ.get('MAIL_PASSWORD')
+    SENDER_EMAIL = os.environ.get('SENDER_EMAIL') or 'noreply@pointflex.com'
+    
+    # URL frontend pour les liens dans les emails
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173')
 
     # Push Notifications
     FCM_SERVER_KEY = os.environ.get('FCM_SERVER_KEY')
@@ -87,6 +97,23 @@ class ProductionConfig(Config):
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+
+class TestingConfig(Config):
+    """Configuration pour les tests"""
+    TESTING = True
+    DEBUG = True
+    # Utiliser une base de données en mémoire pour les tests
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    
+    # Configuration pour les tests d'email
+    MAIL_SERVER = 'localhost'
+    MAIL_PORT = 1025
+    MAIL_USERNAME = None
+    MAIL_PASSWORD = None
+    MAIL_DEFAULT_SENDER = 'test@pointflex.com'
+    MAIL_USE_TLS = False
+    MAIL_USE_SSL = False
+    MAIL_SUPPRESS_SEND = True  # Ne pas envoyer d'emails réels pendant les tests
 
 class TestingConfig(Config):
     """Configuration pour les tests"""

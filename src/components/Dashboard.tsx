@@ -285,7 +285,7 @@ export default function Dashboard() {
           <div>
             <h1 className="text-2xl font-bold">{getGreeting()}, {user?.prenom} !</h1>
             <p className="text-white/80 mt-1">
-              {format(new Date(), 'EEEE dd MMMM yyyy', { locale: fr })}
+              {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })} {/* Format ivoirien: jour-mois-année */}
             </p>
             <div className="flex items-center mt-3 space-x-4">
               <div className="flex items-center text-white/80">
@@ -439,7 +439,7 @@ export default function Dashboard() {
                         {record.type === 'office' ? 'Pointage Bureau' : 'Pointage Mission'}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {format(new Date(record.date_pointage), 'dd MMMM yyyy', { locale: fr })}
+                        {format(new Date(record.date_pointage), 'd MMMM yyyy', { locale: fr })}
                       </p>
                     </div>
                   </div>

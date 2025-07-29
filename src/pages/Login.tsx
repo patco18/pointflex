@@ -49,7 +49,25 @@ export default function Login() {
       } else if (response.data.token && response.data.user) {
         await contextLogin(data.email, data.password);
         toast.success('Connexion réussie!');
-        navigate('/');
+        
+        // Redirection basée sur le rôle de l'utilisateur
+        const user = response.data.user;
+        
+        if (user.role === 'admin_rh') {
+          navigate('/admin');
+        } else if (user.role === 'superadmin') {
+          navigate('/superadmin');
+        } else if (user.role === 'chef_service') {
+          navigate('/chef-service');
+        } else if (user.role === 'chef_projet') {
+          navigate('/chef-projet');
+        } else if (user.role === 'manager') {
+          navigate('/manager');
+        } else if (user.role === 'auditeur') {
+          navigate('/auditeur');
+        } else {
+          navigate('/');
+        }
       } else {
         toast.error("Réponse de connexion inattendue.");
       }
@@ -82,7 +100,25 @@ export default function Login() {
         await contextLogin(emailFor2FA, "useContextAfter2FA"); // Password not relevant here if contextLogin adapts
 
         toast.success('Connexion 2FA réussie!');
-        navigate('/');
+        
+        // Redirection basée sur le rôle de l'utilisateur
+        const user = response.data.user;
+        
+        if (user.role === 'admin_rh') {
+          navigate('/admin');
+        } else if (user.role === 'superadmin') {
+          navigate('/superadmin');
+        } else if (user.role === 'chef_service') {
+          navigate('/chef-service');
+        } else if (user.role === 'chef_projet') {
+          navigate('/chef-projet');
+        } else if (user.role === 'manager') {
+          navigate('/manager');
+        } else if (user.role === 'auditeur') {
+          navigate('/auditeur');
+        } else {
+          navigate('/');
+        }
         setIs2FARequired(false);
         setUserIdFor2FA(null);
         setOtpCode('');

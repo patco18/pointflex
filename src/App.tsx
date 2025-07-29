@@ -1,9 +1,25 @@
-import React from 'react'
+import React, { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import AdminDashboard from './pages/AdminDashboard'
+import AdminNotificationsHistory from './pages/admin/notifications/AdminNotificationsHistory'
+import NotificationsHistory from './pages/NotificationsHistory'
+
+// Composant temporaire pour le module de gestion des abonnements
+const SubscriptionManagementModule = () => {
+  return (
+    <div className="p-4">
+      <h1 className="text-xl font-bold mb-4">Module de gestion des abonnements</h1>
+      <p className="text-red-500">
+        Le module est temporairement indisponible en raison d'un problème technique.
+        Nous travaillons à sa résolution.
+      </p>
+    </div>
+  );
+}
+
 import ChefServiceDashboard from './pages/ChefServiceDashboard'
 import ChefProjetDashboard from './pages/ChefProjetDashboard'
 import ManagerDashboard from './pages/ManagerDashboard'
@@ -14,6 +30,8 @@ import PausePage from './pages/Pause'
 import AttendancePage from './pages/Attendance'
 import Profile from './pages/Profile'
 import History from './pages/History'
+import AttendanceHome from './pages/attendance/AttendanceHome'
+import CheckInPage from './pages/attendance/CheckInPage'
 import Settings from './pages/Settings'
 import SuperAdminDashboard from './pages/SuperAdminDashboard'
 import CompanyManagement from './pages/CompanyManagement'
@@ -29,9 +47,12 @@ import RoleManagementPage from './pages/RoleManagementPage'
 import BillingManagement from './pages/BillingManagement'
 import WebhookManagementPage from './pages/WebhookManagementPage'
 import ExtensionRequestsPage from './pages/ExtensionRequests'
+import SubscriptionPlanPage from './pages/SubscriptionPlanPage'
+import SuperAdminSubscriptionPage from './pages/SuperAdminSubscriptionPage'
 import Missions from './pages/Missions'
 import RequestLeavePage from './pages/RequestLeavePage';
 import MyLeaveHistoryPage from './pages/MyLeaveHistoryPage'; // Added MyLeaveHistoryPage
+import DebugPage from './pages/Debug'; // Page temporaire pour le débogage
 import Layout from './components/Layout'
 
 function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
@@ -58,13 +79,15 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode,
   
   return <>{children}</>
 }
-
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
           <Route path="/login" element={<Login />} />
+          
+          {/* Route de débogage (à supprimer en production) */}
+          <Route path="/debug" element={<DebugPage />} />
           
           {/* Routes SuperAdmin */}
           <Route path="/superadmin" element={
@@ -88,10 +111,33 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/superadmin/subscription" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <SuperAdminSubscriptionPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Route conservée pour la compatibilité */}
+          <Route path="/superadmin/subscription-plans" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <Navigate to="/superadmin/subscription" replace />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/superadmin/extension-requests" element={
             <ProtectedRoute requiredRole="superadmin">
               <Layout>
                 <ExtensionRequestsPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/notifications" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <AdminNotificationsHistory />
               </Layout>
             </ProtectedRoute>
           } />
@@ -139,10 +185,26 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
-          <Route path="/admin/webhooks" element={
-            <ProtectedRoute> {/* Assuming general admin access, refine with specific role if needed */}
+          <Route path="/admin/notifications-history" element={
+            <ProtectedRoute>
               <Layout>
-                <WebhookManagementPage />
+                <AdminNotificationsHistory />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/admin/notifications-history" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <AdminNotificationsHistory />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Admin Billing */}
+          <Route path="/admin/billing" element={
+            <ProtectedRoute>
+              <Layout>
+                <BillingManagement />
               </Layout>
             </ProtectedRoute>
           } />
@@ -185,6 +247,13 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/admin/reports" element={
+            <ProtectedRoute>
+              <Layout>
+                <Reports />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/team-calendar" element={
             <ProtectedRoute>
               <Layout>
@@ -192,7 +261,21 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/admin/team-calendar" element={
+            <ProtectedRoute>
+              <Layout>
+                <TeamCalendarPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/geofencing" element={
+            <ProtectedRoute>
+              <Layout>
+                <GeofencingPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/geofencing" element={
             <ProtectedRoute>
               <Layout>
                 <GeofencingPage />
@@ -220,47 +303,24 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
-          
-          {/* Routes communes */}
-          <Route path="/" element={
+          <Route path="/leave" element={
             <ProtectedRoute>
               <Layout>
-                <Dashboard />
+                <RequestLeavePage />
               </Layout>
             </ProtectedRoute>
           } />
-          <Route path="/attendance" element={
+          <Route path="/leave/history" element={
             <ProtectedRoute>
               <Layout>
-                <AttendancePage />
+                <MyLeaveHistoryPage />
               </Layout>
             </ProtectedRoute>
           } />
-          <Route path="/checkin" element={
+          <Route path="/subscription-plans" element={
             <ProtectedRoute>
               <Layout>
-                <CheckIn />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/checkout" element={
-            <ProtectedRoute>
-              <Layout>
-                <Checkout />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/pause" element={
-            <ProtectedRoute>
-              <Layout>
-                <PausePage />
-              </Layout>
-            </ProtectedRoute>
-          } />
-          <Route path="/history" element={
-            <ProtectedRoute>
-              <Layout>
-                <History />
+                <SubscriptionPlanPage />
               </Layout>
             </ProtectedRoute>
           } />
@@ -271,6 +331,22 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/admin/settings" element={
+            <ProtectedRoute>
+              <Layout>
+                <Settings />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/history" element={
+            <ProtectedRoute>
+              <Layout>
+                <History />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Routes d'authentification et de profil */}
           <Route path="/profile" element={
             <ProtectedRoute>
               <Layout>
@@ -278,20 +354,65 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
-          <Route path="/request-leave" element={
+          
+          {/* Route d'historique des notifications pour tous les utilisateurs */}
+          <Route path="/notifications/history" element={
             <ProtectedRoute>
               <Layout>
-                <RequestLeavePage />
+                <NotificationsHistory />
               </Layout>
             </ProtectedRoute>
           } />
-          <Route path="/my-leave-history" element={
+          
+          {/* Routes de présence */}
+          <Route path="/attendance" element={
             <ProtectedRoute>
               <Layout>
-                <MyLeaveHistoryPage />
+                <AttendancePage />
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/attendance/home" element={
+            <ProtectedRoute>
+              <Layout>
+                <AttendanceHome />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/attendance/checkin" element={
+            <ProtectedRoute>
+              <Layout>
+                <CheckInPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/checkin" element={
+            <ProtectedRoute>
+              <CheckIn />
+            </ProtectedRoute>
+          } />
+          <Route path="/checkout" element={
+            <ProtectedRoute>
+              <Checkout />
+            </ProtectedRoute>
+          } />
+          <Route path="/pause" element={
+            <ProtectedRoute>
+              <PausePage />
+            </ProtectedRoute>
+          } />
+          
+          {/* Route par défaut */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Layout>
+                <Dashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Redirection pour les routes inconnues */}
+          <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </Router>
     </AuthProvider>

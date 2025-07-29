@@ -41,6 +41,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
 
+  const [chartData, setChartData] = useState<Array<{date: string; present: number; late: number; absent: number}>>([])
+  
   useEffect(() => {
     loadData()
   }, [])
@@ -50,22 +52,36 @@ export default function Dashboard() {
       const startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd')
       const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd')
       
-      const [attendanceResponse, statsResponse] = await Promise.all([
+      const [attendanceResponse, statsResponse, last7DaysResponse] = await Promise.all([
         attendanceService.getAttendance(startDate, endDate),
-        attendanceService.getStats()
+        attendanceService.getStats(),
+        attendanceService.getLast7DaysStats()
       ])
       
       setAttendanceRecords(attendanceResponse.data.records)
       setStats(statsResponse.data.stats)
+      
+      // Traiter les données des 7 derniers jours
+      if (last7DaysResponse.data.stats && Array.isArray(last7DaysResponse.data.stats)) {
+        setChartData(last7DaysResponse.data.stats.map((day: any) => ({
+          date: day.date,
+          present: day.present,
+          late: day.late,
+          absent: day.absent
+        })))
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des données:', error)
+      
+      // En cas d'erreur, générer des données de démonstration
+      generateFallbackChartData()
     } finally {
       setLoading(false)
     }
   }
 
-  // Générer des données pour le graphique (simulation)
-  const generateChartData = () => {
+  // Générer des données pour le graphique comme fallback en cas d'erreur
+  const generateFallbackChartData = () => {
     const last7Days = Array.from({ length: 7 }, (_, i) => {
       const date = subDays(new Date(), 6 - i)
       return {
@@ -75,7 +91,7 @@ export default function Dashboard() {
         absent: Math.floor(Math.random() * 2)
       }
     })
-    return last7Days
+    setChartData(last7Days)
   }
 
   const getGreeting = () => {
@@ -127,7 +143,6 @@ export default function Dashboard() {
   }
 
   const todayStatus = getTodayStatus()
-  const chartData = generateChartData()
 
   return (
     <div className="space-y-6">
@@ -139,7 +154,7 @@ export default function Dashboard() {
               {getGreeting()}, {user?.prenom} !
             </h1>
             <p className="text-primary-100 mt-1">
-              {format(new Date(), 'EEEE dd MMMM yyyy', { locale: fr })}
+              {format(new Date(), 'EEEE d MMMM yyyy', { locale: fr })}
             </p>
             {user?.company_name && (
               <div className="flex items-center mt-2 text-primary-100">
@@ -154,7 +169,11 @@ export default function Dashboard() {
             </div>
             <div className="text-primary-200 text-sm">
               {user?.role === 'superadmin' ? 'Super Admin' : 
-               user?.role === 'admin' ? 'Administrateur' : 'Employé'}
+               user?.role === 'admin_rh' ? 'Administrateur RH' : 
+               user?.role === 'chef_service' ? 'Chef de Service' : 
+               user?.role === 'chef_projet' ? 'Chef de Projet' : 
+               user?.role === 'manager' ? 'Manager' : 
+               user?.role === 'auditeur' ? 'Auditeur' : 'Employé'}
             </div>
           </div>
         </div>

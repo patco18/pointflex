@@ -7,6 +7,7 @@ import io # For sending QR code image if generated on backend
 import json
 from flask import Blueprint, request, jsonify, current_app, send_file
 from flask_jwt_extended import jwt_required, create_access_token # For completing login
+from werkzeug.security import generate_password_hash, check_password_hash
 from backend.middleware.auth import get_current_user
 from backend.models.user import User
 from backend.database import db
@@ -33,11 +34,9 @@ def generate_backup_codes(count=10, length=8):
 
 # Helper to hash backup codes (using werkzeug for consistency with password hashing if desired, or simple SHA256)
 def hash_backup_code(code):
-    from werkzeug.security import generate_password_hash
     return generate_password_hash(code) # Store hashed codes
 
 def check_backup_code(hashed_code_list_json, provided_code):
-    from werkzeug.security import check_password_hash
     if not hashed_code_list_json:
         return False
     try:

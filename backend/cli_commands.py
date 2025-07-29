@@ -9,6 +9,48 @@ from backend.models.leave_balance import LeaveBalance
 from backend.models.audit_log import AuditLog # For logging the accrual action
 
 def register_cli_commands(app):
+    @app.cli.command('add-column-directly')
+    def add_column_directly_command():
+        """Ajoute directement la colonne subscription_plan_id à la table companies via SQLite."""
+        from backend.scripts.add_column_directly import add_column_directly
+        add_column_directly()
+        click.echo("Ajout direct de la colonne terminé.")
+    
+    @app.cli.command('migrate-subscription-plans')
+    def migrate_subscription_plans_command():
+        """Migre les données des plans d'abonnement existants vers le nouveau modèle."""
+        from backend.scripts.migrate_subscription_plans import migrate_subscription_plans
+        migrate_subscription_plans()
+        click.echo("Migration des plans d'abonnement terminée.")
+    
+    @app.cli.command('init-db')
+    def init_db_command():
+        """Initialise la base de données avec toutes les tables nécessaires."""
+        from backend.scripts.initialize_database import initialize_database
+        initialize_database()
+        click.echo("Initialisation de la base de données terminée.")
+        
+    @app.cli.command('db-diagnostic')
+    def db_diagnostic_command():
+        """Exécute des diagnostics sur la base de données."""
+        from backend.scripts.db_diagnostic import run_diagnostics
+        run_diagnostics()
+        click.echo("Diagnostic de la base de données terminé.")
+    
+    @app.cli.command('add-subscription-column')
+    def add_subscription_column_command():
+        """Ajoute la colonne subscription_plan_id à la table companies."""
+        from backend.scripts.add_subscription_plan_id_column import create_subscription_plan_id_column
+        create_subscription_plan_id_column()
+        click.echo("Ajout de la colonne subscription_plan_id terminé.")
+    
+    @app.cli.command('migrate-subscription-plans')
+    def migrate_subscription_plans_command():
+        """Migrer les entreprises vers les plans d'abonnement dynamiques."""
+        from backend.scripts.migrate_subscription_plans import migrate_subscription_plans
+        migrate_subscription_plans()
+        click.echo("Migration des plans d'abonnement terminée.")
+    
     @app.cli.command('accrue-leave')
     @click.option('--year', type=int, default=None, help="Accrue for a specific year. Defaults to current year if run on Jan 1st, else needs specified.")
     @click.option('--month', type=int, default=None, help="Accrue for a specific month (1-12). If provided with year, used for monthly accrual simulation (not standard annual).")
@@ -145,6 +187,18 @@ def register_cli_commands(app):
             print(f"Dry run complete. Would have processed {accrual_count} accruals.")
 
         print("Leave accrual process finished.")
+
+    @app.cli.command('check-expiring-subscriptions')
+    @click.option('--dry-run', is_flag=True, help="Simulation sans enregistrer de notifications")
+    def check_expiring_subscriptions_command(dry_run):
+        """Vérifie les abonnements sur le point d'expirer et envoie des notifications."""
+        with app.app_context():
+            from backend.tasks.subscription_tasks import check_expiring_subscriptions
+            success, message = check_expiring_subscriptions()
+            if success:
+                click.echo(f"Vérification des abonnements terminée: {message}")
+            else:
+                click.echo(f"Erreur lors de la vérification des abonnements: {message}", err=True)
 
     # If you have more CLI commands, you can group them:
     # leave_cli = AppGroup('leave', help='Leave management commands.')

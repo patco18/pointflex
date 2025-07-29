@@ -15,6 +15,7 @@ class Notification(db.Model):
     message = db.Column(db.String(255), nullable=False)
     is_read = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    read_at = db.Column(db.DateTime, nullable=True)
 
     user = db.relationship('User', backref='notifications', lazy=True)
 
@@ -24,7 +25,9 @@ class Notification(db.Model):
             'user_id': self.user_id,
             'message': self.message,
             'is_read': self.is_read,
-            'created_at': self.created_at.isoformat()
+            'read': self.is_read,  # Ajout de 'read' pour compatibilité frontend
+            'created_at': self.created_at.isoformat(),
+            'read_at': self.read_at.isoformat() if self.read_at else None
         }
 
     def __repr__(self):

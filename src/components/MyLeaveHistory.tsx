@@ -109,7 +109,7 @@ export default function MyLeaveHistory() {
 
     const columns = [
         { key: 'leave_type_name', label: 'Type de Congé' },
-        { key: 'dates', label: 'Dates', render: (lr: LeaveRequest) => `${new Date(lr.start_date+'T00:00:00').toLocaleDateString()} - ${new Date(lr.end_date+'T00:00:00').toLocaleDateString()}` },
+        { key: 'dates', label: 'Dates', render: (lr: LeaveRequest) => `${new Date(lr.start_date+'T00:00:00').toLocaleDateString('fr-CI', {day: 'numeric', month: 'numeric', year: 'numeric'}).replace(/\//g, '/')} - ${new Date(lr.end_date+'T00:00:00').toLocaleDateString('fr-CI', {day: 'numeric', month: 'numeric', year: 'numeric'}).replace(/\//g, '/')}` },
         { key: 'periods', label: 'Périodes', render: (lr: LeaveRequest) => `${formatPeriod(lr.start_day_period)} (Début) / ${formatPeriod(lr.end_day_period)} (Fin)`},
         { key: 'requested_days', label: 'Jours Dem.' },
         { key: 'status', label: 'Statut', render: (lr: LeaveRequest) => <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(lr.status)}`}>{lr.status}</span> },
@@ -161,16 +161,33 @@ export default function MyLeaveHistory() {
             </div>
 
             {isLoading ? <LoadingSpinner text="Chargement de l'historique..." /> : (
-                <DataTable
-                    columns={columns}
-                    data={leaveRequests}
-                    pagination={pagination}
-                    onPageChange={(newPage) => {
-                        setPagination(prev => ({ ...prev, page: newPage }));
-                        fetchLeaveRequests(newPage);
-                    }}
-                    emptyMessage="Aucune demande de congé trouvée."
-                />
+                <>
+                    <DataTable
+                        columns={columns}
+                        data={leaveRequests}
+                        searchTerm=""
+                        onSearchChange={() => {}}
+                        emptyMessage="Aucune demande de congé trouvée."
+                    />
+                    {pagination.total_pages > 1 && (
+                        <div className="flex justify-center mt-4">
+                            <nav className="pagination">
+                                {Array.from({ length: pagination.total_pages }, (_, i) => (
+                                    <button
+                                        key={i + 1}
+                                        onClick={() => {
+                                            setPagination(prev => ({ ...prev, page: i + 1 }));
+                                            fetchLeaveRequests(i + 1);
+                                        }}
+                                        className={`pagination-item ${pagination.page === i + 1 ? 'active' : ''}`}
+                                    >
+                                        {i + 1}
+                                    </button>
+                                ))}
+                            </nav>
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

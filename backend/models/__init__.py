@@ -27,6 +27,8 @@ from .webhook_delivery_log import WebhookDeliveryLog
 from .company_holiday import CompanyHoliday
 from .password_history import PasswordHistory # Added PasswordHistory
 from .subscription_extension_request import SubscriptionExtensionRequest
+from .notification_setting import NotificationSetting
+from .integration_setting import IntegrationSetting
 
 __all__ = [
     'User',
@@ -48,6 +50,8 @@ __all__ = [
     'LeaveBalance',
     'LeaveRequest',
     'WebhookSubscription',
+    'NotificationSetting',
+    'IntegrationSetting',
     'WebhookDeliveryLog',
     'CompanyHoliday',
     'PasswordHistory',

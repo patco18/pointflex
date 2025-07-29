@@ -549,7 +549,7 @@ export default function EnhancedOfficeManagement() {
                       value={officeForm.address || ''}
                       onChange={(e) => setOfficeForm(prev => ({ ...prev, address: e.target.value }))}
                       className="input-field"
-                      placeholder="123 Rue de la Paix, 75001 Paris"
+                      placeholder="Rue des Jardins, Cocody, Abidjan"
                     />
                   </div>
 
@@ -651,7 +651,7 @@ export default function EnhancedOfficeManagement() {
                         value={officeForm.manager_name || ''}
                         onChange={(e) => setOfficeForm(prev => ({ ...prev, manager_name: e.target.value }))}
                         className="input-field"
-                        placeholder="Marie Dubois"
+                        placeholder="Aminata Koné"
                       />
                     </div>
                     <div>
@@ -663,7 +663,7 @@ export default function EnhancedOfficeManagement() {
                         value={officeForm.phone || ''}
                         onChange={(e) => setOfficeForm(prev => ({ ...prev, phone: e.target.value }))}
                         className="input-field"
-                        placeholder="+33 1 23 45 67 89"
+                        placeholder="+225 07 12 34 56 78"
                       />
                     </div>
                   </div>
@@ -678,7 +678,7 @@ export default function EnhancedOfficeManagement() {
                         value={officeForm.wifi_ssid || ''}
                         onChange={(e) => setOfficeForm(prev => ({ ...prev, wifi_ssid: e.target.value }))}
                         className="input-field"
-                        placeholder="PointFlex-Office"
+                        placeholder="PointFlex-Abidjan"
                       />
                     </div>
                     <div>

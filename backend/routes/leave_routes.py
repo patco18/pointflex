@@ -7,6 +7,7 @@ from sqlalchemy import or_
 from datetime import datetime, date
 
 from backend.middleware.auth import get_current_user, require_admin, require_superadmin_or_admin # A new decorator might be needed
+from backend.middleware.audit import log_user_action
 from backend.models.user import User
 from backend.models.company import Company
 from backend.models.leave_type import LeaveType

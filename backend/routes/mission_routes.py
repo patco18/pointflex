@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
-from middleware.auth import get_current_user, require_admin
+from backend.middleware.auth import get_current_user, require_admin
 from backend.models.mission import Mission
 from backend.models.mission_user import MissionUser
 from backend.models.user import User
@@ -150,3 +150,55 @@ def update_mission(mission_id):
         current_app.logger.error(f"Erreur lors de la mise à jour de la mission {mission_id}: {e}", exc_info=True)
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
+@mission_bp.route('/active-legacy', methods=['GET'])
+@jwt_required()
+def get_active_missions_legacy():
+    """List active missions for the current user (legacy version)"""
+    try:
+        current_user = get_current_user()
+        
+        # Récupérer toutes les missions actives de l'utilisateur
+        active_missions = db.session.query(Mission).join(
+            MissionUser, Mission.id == MissionUser.mission_id
+        ).filter(
+            MissionUser.user_id == current_user.id,
+            Mission.status == 'active'
+        ).all()
+        
+        return jsonify({'missions': [m.to_dict() for m in active_missions]}), 200
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des missions actives: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur"), 500
+
+@mission_bp.route('/active', methods=['GET'])
+@jwt_required()
+def get_active_missions():
+    """Récupère les missions actives pour l'utilisateur connecté"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify(message="Utilisateur non trouvé"), 401
+
+        # Récupérer toutes les missions actives attribuées à l'utilisateur
+        # où la date de fin est supérieure ou égale à aujourd'hui
+        from datetime import date
+        today = date.today()
+        
+        # Requête pour trouver les missions où l'utilisateur est assigné et qui sont actives
+        user_missions = db.session.query(Mission).join(
+            MissionUser, Mission.id == MissionUser.mission_id
+        ).filter(
+            MissionUser.user_id == current_user.id,
+            Mission.status == 'active',
+            # Mission.end_date est facultatif ou supérieur à aujourd'hui
+            ((Mission.end_date == None) | (Mission.end_date >= today))
+        ).all()
+        
+        # Convertir en dictionnaire pour la réponse JSON
+        missions_data = [mission.to_dict() for mission in user_missions]
+        
+        return jsonify(missions_data), 200
+    
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des missions actives: {e}")
+        return jsonify(message="Erreur de base de données"), 500

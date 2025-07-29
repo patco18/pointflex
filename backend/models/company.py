@@ -24,10 +24,30 @@ class Company(db.Model):
     
     # Abonnement et limites
     subscription_plan = db.Column(db.String(50), default='basic', nullable=False)  # basic, premium, enterprise
+    # ATTENTION: Cette colonne n'existe pas dans la base de données
+    # La migration n'a pas fonctionné, nous la commentons complètement
+    # subscription_plan_id = db.Column(db.Integer, db.ForeignKey('subscription_plans.id'), nullable=True)
     subscription_status = db.Column(db.String(50), default='active', nullable=False)  # active, suspended, expired
     subscription_start = db.Column(db.Date, default=datetime.utcnow().date)
     subscription_end = db.Column(db.Date, nullable=True)
     max_employees = db.Column(db.Integer, default=10, nullable=False)
+    
+    # Relation avec le plan d'abonnement - Commentée car la colonne n'existe pas
+    # subscription_plan_rel = db.relationship('SubscriptionPlan', foreign_keys=[subscription_plan_id])
+    
+    @property
+    def get_subscription_plan(self):
+        """Récupère l'objet de plan d'abonnement associé à cette entreprise si disponible"""
+        try:
+            from backend.models.subscription_plan import SubscriptionPlan
+            if hasattr(self, 'subscription_plan_id') and self.subscription_plan_id:
+                return SubscriptionPlan.query.get(self.subscription_plan_id)
+            elif self.subscription_plan:
+                # Tenter de trouver par nom
+                return SubscriptionPlan.query.filter_by(name=self.subscription_plan).first()
+        except Exception:
+            pass
+        return None
     
     # Paramètres de pointage
     office_latitude = db.Column(db.Float, default=48.8566)  # Paris par défaut
@@ -67,6 +87,81 @@ class Company(db.Model):
         # Définir la date de fin d'abonnement si pas spécifiée
         if not self.subscription_end:
             self.subscription_end = (datetime.utcnow() + timedelta(days=30)).date()
+            
+    @property
+    def subscription_end_date(self):
+        """Alias pour subscription_end pour rétrocompatibilité"""
+        return self.subscription_end
+    
+    @property
+    def subscription_start_date(self):
+        """Alias pour subscription_start pour rétrocompatibilité"""
+        return self.subscription_start
+    
+    @property
+    def subscription_trial(self):
+        """Indique si l'abonnement est en période d'essai (moins de 30 jours depuis le début)"""
+        if not self.subscription_start:
+            return False
+        days_since_start = (datetime.utcnow().date() - self.subscription_start).days
+        return days_since_start <= 30 and self.subscription_status != 'expired'
+        
+    @property
+    def subscription_amount(self):
+        """Montant de l'abonnement"""
+        try:
+            # Essayer de récupérer le plan correspondant dans la base de données
+            from backend.models.subscription_plan import SubscriptionPlan
+            plan = SubscriptionPlan.query.filter_by(
+                name=self.subscription_plan.capitalize(),
+                duration_months=1
+            ).first()
+            
+            if plan:
+                return float(plan.price)
+            
+            # Fallback sur les noms de plan alternatifs
+            alternate_names = {
+                'basic': ['starter', 'basic'],
+                'premium': ['standard', 'premium'],
+                'enterprise': ['professional', 'enterprise']
+            }
+            
+            for category, names in alternate_names.items():
+                if self.subscription_plan.lower() in names:
+                    plan = SubscriptionPlan.query.filter(
+                        SubscriptionPlan.name.in_([name.capitalize() for name in names]),
+                        SubscriptionPlan.duration_months == 1
+                    ).first()
+                    if plan:
+                        return float(plan.price)
+            
+            # Tarifs par défaut si rien n'est trouvé dans la base de données
+            default_prices = {
+                'basic': 29.0,
+                'premium': 99.0,
+                'enterprise': 299.0,
+                'starter': 29.99,
+                'standard': 49.99
+            }
+            return default_prices.get(self.subscription_plan.lower(), 0)
+            
+        except Exception as e:
+            # En cas d'erreur, retourner les prix par défaut
+            default_prices = {
+                'basic': 29.0,
+                'premium': 99.0,
+                'enterprise': 299.0,
+                'starter': 29.99,
+                'standard': 49.99
+            }
+            return default_prices.get(self.subscription_plan.lower(), 0)
+    
+    @property
+    def subscription_auto_renew(self):
+        """Si l'abonnement se renouvelle automatiquement"""
+        # Par défaut, considérer que le renouvellement est automatique si un ID Stripe est défini
+        return bool(self.stripe_subscription_id)
     
     @property
     def current_employee_count(self):
@@ -133,6 +228,9 @@ class Company(db.Model):
     
     def get_plan_limits(self):
         """Retourne les limites selon le plan d'abonnement"""
+        # La colonne subscription_plan_id n'existe pas, nous utilisons uniquement les plans statiques définis ci-dessous
+        
+        # Fallback sur les plans statiques si pas de plan dynamique ou erreur
         plans = {
             'basic': {'max_employees': 10, 'features': ['pointage_basic']},
             'premium': {'max_employees': 50, 'features': ['pointage_basic', 'rapports', 'geofencing']},
@@ -142,6 +240,12 @@ class Company(db.Model):
     
     def to_dict(self, include_sensitive=False):
         """Convertit l'entreprise en dictionnaire"""
+        # Nous n'avons plus accès aux informations détaillées du plan d'abonnement
+        subscription_plan_info = None
+        
+        # Tenter de récupérer l'ID du plan d'abonnement si disponible
+        subscription_plan_id = getattr(self, 'subscription_plan_id', None)
+        
         data = {
             'id': self.id,
             'name': self.name,
@@ -156,6 +260,8 @@ class Company(db.Model):
             'logo_url': self.logo_url,
             'theme_color': self.theme_color,
             'subscription_plan': self.subscription_plan,
+            'subscription_plan_id': subscription_plan_id,  # Utiliser la valeur récupérée
+            'subscription_plan_info': subscription_plan_info,
             'subscription_status': self.subscription_status,
             'max_employees': self.max_employees,
             'current_employee_count': self.current_employee_count,

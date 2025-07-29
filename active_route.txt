@@ -1,0 +1,19 @@
+@mission_bp.route('/active', methods=['GET'])
+@jwt_required()
+def get_active_missions():
+    """List active missions for the current user"""
+    try:
+        current_user = get_current_user()
+        
+        # Récupérer toutes les missions actives de l'utilisateur
+        active_missions = db.session.query(Mission).join(
+            MissionUser, Mission.id == MissionUser.mission_id
+        ).filter(
+            MissionUser.user_id == current_user.id,
+            Mission.status == 'active'
+        ).all()
+        
+        return jsonify({'missions': [m.to_dict() for m in active_missions]}), 200
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des missions actives: {e}", exc_info=True)
+        return jsonify(message="Erreur interne du serveur"), 500

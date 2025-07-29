@@ -38,6 +38,17 @@ class Pointage(db.Model):
     # Indique si l'heure d'arrivée a été égalisée au début de journée
     is_equalized = db.Column(db.Boolean, default=False)
     
+    # Mode de pointage
+    is_qr_scan = db.Column(db.Boolean, default=False)
+    is_offline = db.Column(db.Boolean, default=False)
+    sync_status = db.Column(db.String(20), default='synced')  # 'synced', 'pending', 'failed'
+    offline_timestamp = db.Column(db.DateTime, nullable=True)
+    
+    # Justification des retards
+    delay_reason = db.Column(db.String(100), nullable=True)
+    delay_category = db.Column(db.String(50), nullable=True)  # 'transport', 'personnel', 'médical', etc.
+    is_justified = db.Column(db.Boolean, default=False)
+    
     # Métadonnées
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

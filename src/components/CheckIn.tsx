@@ -28,19 +28,39 @@ export default function CheckIn() {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude
         }
+        
+        // Validation des coordonnées
+        if (isNaN(newLocation.latitude) || isNaN(newLocation.longitude) ||
+            !isFinite(newLocation.latitude) || !isFinite(newLocation.longitude)) {
+          toast.error('Coordonnées GPS invalides. Veuillez réessayer.')
+          setLocationLoading(false)
+          return
+        }
+        
         setCurrentLocation(newLocation)
         toast.success('Position actuelle récupérée avec succès')
         setLocationLoading(false)
       },
       (error) => {
         console.error('Erreur de géolocalisation:', error)
-        toast.error('Impossible d\'obtenir votre position')
+        
+        // Messages d'erreur plus précis selon le type d'erreur
+        if (error.code === 1) {
+          toast.error('Accès à la géolocalisation refusé. Veuillez autoriser l\'accès dans les paramètres de votre navigateur.')
+        } else if (error.code === 2) {
+          toast.error('Position indisponible. Vérifiez vos paramètres GPS.')
+        } else if (error.code === 3) {
+          toast.error('Délai de récupération de la position dépassé. Veuillez réessayer.')
+        } else {
+          toast.error('Impossible d\'obtenir votre position')
+        }
+        
         setLocationLoading(false)
       },
       {
         enableHighAccuracy: true,
-        timeout: 15000,
-        maximumAge: 60000
+        timeout: 20000, // Augmenter le timeout pour les appareils lents
+        maximumAge: 30000 // Réduire pour plus de précision
       }
     )
   }
@@ -53,13 +73,26 @@ export default function CheckIn() {
 
     setLoading(true)
     try {
-      await attendanceService.checkInOffice(currentLocation)
-      toast.success('Pointage bureau enregistré avec succès!')
+      const response = await attendanceService.checkInOffice(currentLocation)
+      if (response && response.data) {
+        toast.success('Pointage bureau enregistré avec succès!')
+      } else {
+        toast.error('Réponse invalide du serveur')
+      }
     } catch (error: any) {
       if (error.message?.includes('Géolocalisation')) {
         toast.error('Veuillez autoriser l\'accès à votre position')
+      } else if (error.response?.status === 409) {
+        toast.error('Vous avez déjà pointé aujourd\'hui')
+      } else if (error.response?.status === 403) {
+        // Message spécifique pour les erreurs de distance
+        const errorMessage = error.response?.data?.message || 'Vous êtes trop loin du bureau';
+        toast.error(errorMessage);
+      } else if (error.response?.status === 400) {
+        toast.error('Coordonnées GPS non valides');
       } else {
         toast.error('Erreur lors du pointage bureau')
+        console.error('Détail de l\'erreur:', error)
       }
     } finally {
       setLoading(false)
@@ -74,16 +107,29 @@ export default function CheckIn() {
 
     setLoading(true)
     try {
+      let response;
       // Inclure les coordonnées GPS si disponibles
       if (currentLocation) {
-        await attendanceService.checkInMission(missionOrderNumber.trim(), currentLocation)
+        response = await attendanceService.checkInMission(missionOrderNumber.trim(), currentLocation)
       } else {
-        await attendanceService.checkInMission(missionOrderNumber.trim())
+        response = await attendanceService.checkInMission(missionOrderNumber.trim())
       }
-      toast.success('Pointage mission enregistré avec succès!')
-      setMissionOrderNumber('')
-    } catch (error) {
-      toast.error('Erreur lors du pointage mission')
+      
+      if (response && response.data) {
+        toast.success('Pointage mission enregistré avec succès!')
+        setMissionOrderNumber('')
+      } else {
+        toast.error('Réponse invalide du serveur')
+      }
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        toast.error('Mission non trouvée. Vérifiez le numéro d\'ordre.')
+      } else if (error.response?.status === 409) {
+        toast.error('Vous avez déjà pointé aujourd\'hui')
+      } else {
+        toast.error('Erreur lors du pointage mission')
+        console.error('Détail de l\'erreur:', error)
+      }
     } finally {
       setLoading(false)
     }
@@ -220,7 +266,7 @@ export default function CheckIn() {
                 value={missionOrderNumber}
                 onChange={(e) => setMissionOrderNumber(e.target.value)}
                 className="input-field"
-                placeholder="Ex: M2024-001"
+                placeholder="Ex: ABI2024-153"
               />
             </div>
             

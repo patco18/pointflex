@@ -858,7 +858,7 @@ export default function OrganizationManagement() {
                       value={deptForm.name}
                       onChange={(e) => setDeptForm(prev => ({ ...prev, name: e.target.value }))}
                       className="input-field"
-                      placeholder="Ex: Ressources Humaines"
+                      placeholder="Ex: Gestion Administrative"
                     />
                   </div>
                   
@@ -984,7 +984,7 @@ export default function OrganizationManagement() {
                       value={serviceForm.name}
                       onChange={(e) => setServiceForm(prev => ({ ...prev, name: e.target.value }))}
                       className="input-field"
-                      placeholder="Ex: Développement Web"
+                      placeholder="Ex: Service Commercial"
                     />
                   </div>
                   
@@ -1114,7 +1114,7 @@ export default function OrganizationManagement() {
                       value={positionForm.name}
                       onChange={(e) => setPositionForm(prev => ({ ...prev, name: e.target.value }))}
                       className="input-field"
-                      placeholder="Ex: Développeur Full Stack"
+                      placeholder="Ex: Chef Comptable"
                     />
                   </div>
                   

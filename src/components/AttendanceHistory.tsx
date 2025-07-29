@@ -304,7 +304,7 @@ export default function AttendanceHistory({ records: propRecords, hideFilters, f
                 {filteredRecords.map((record) => (
                   <tr key={record.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {format(new Date(record.date_pointage), 'dd MMM yyyy', { locale: fr })}
+                      {format(new Date(record.date_pointage), 'd MMM yyyy', { locale: fr })}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center space-x-2">

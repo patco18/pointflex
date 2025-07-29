@@ -6,11 +6,11 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from backend.models.user import User
 from backend.models.audit_log import AuditLog
-from middleware.auth import get_current_user
-from middleware.audit import log_user_action
+from backend.middleware.auth import get_current_user
+from backend.middleware.audit import log_user_action
 from backend.database import db
 from datetime import datetime
-from extensions import limiter
+from backend.extensions import limiter
 
 auth_bp = Blueprint('auth', __name__)
 

@@ -2,10 +2,10 @@
 Routes SuperAdmin - Gestion globale de la plateforme
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, make_response, current_app
 from flask_jwt_extended import jwt_required
-from middleware.auth import require_superadmin, get_current_user
-from middleware.audit import log_user_action
+from backend.middleware.auth import require_superadmin, get_current_user
+from backend.middleware.audit import log_user_action
 from backend.models.company import Company
 from backend.models.user import User
 from backend.models.pointage import Pointage
@@ -13,22 +13,83 @@ from backend.models.system_settings import SystemSettings
 from backend.models.audit_log import AuditLog
 from backend.models.invoice import Invoice
 from backend.models.payment import Payment
+from backend.models.notification import Notification
 from backend.models.subscription_extension_request import SubscriptionExtensionRequest
-from services.stripe_service import create_checkout_session, verify_webhook
+from backend.services.stripe_service import create_checkout_session, verify_webhook
+from backend.models.subscription_plan import SubscriptionPlan
 from backend.database import db
 from datetime import datetime, timedelta
 import json
 
 superadmin_bp = Blueprint('superadmin', __name__)
 
-# Tarifs mensuels par plan d'abonnement
-PLAN_PRICES = {
-    'basic': 10.0,
-    'premium': 20.0,
-    'enterprise': 50.0,
-}
+# Fonction pour obtenir les tarifs mensuels des plans d'abonnement depuis la base de données
+def get_plan_prices():
+    try:
+        # Récupérer tous les plans avec une durée d'1 mois (tarifs mensuels standard)
+        plans = SubscriptionPlan.query.filter_by(duration_months=1).all()
+        prices = {}
+        
+        # Créer un mapping nom de plan -> prix
+        for plan in plans:
+            plan_name = plan.name.lower()  # Normaliser les noms (basic, premium, etc.)
+            prices[plan_name] = float(plan.price)
+        
+        # Valeurs par défaut si aucun plan n'est trouvé dans la base de données
+        default_prices = {
+            'basic': 29.0,
+            'premium': 99.0,
+            'enterprise': 299.0,
+            'starter': 29.99,
+            'standard': 49.99
+        }
+        
+        # S'assurer que tous les plans de base ont un prix défini
+        for key, value in default_prices.items():
+            if key not in prices:
+                prices[key] = value
+                
+        return prices
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des prix des plans: {str(e)}")
+        # Retourner les prix par défaut en cas d'erreur
+        return {
+            'basic': 29.0,
+            'premium': 99.0,
+            'enterprise': 299.0,
+            'starter': 29.99,
+            'standard': 49.99
+        }
 
 # ===== GESTION DES ENTREPRISES =====
+
+@superadmin_bp.route('/companies/<int:company_id>', methods=['GET'])
+@require_superadmin
+def get_company(company_id):
+    """Récupère les détails d'une entreprise spécifique"""
+    try:
+        company = Company.query.get_or_404(company_id)
+        company_dict = company.to_dict(include_sensitive=True)
+        
+        # Trouver l'administrateur principal (premier admin_rh trouvé)
+        admin = User.query.filter_by(
+            company_id=company.id, 
+            role='admin_rh',
+            is_active=True
+        ).first()
+        
+        if admin:
+            company_dict['admin_id'] = admin.id
+            company_dict['admin_email'] = admin.email
+            company_dict['admin_name'] = f"{admin.prenom} {admin.nom}"
+            company_dict['admin_phone'] = admin.phone
+        
+        return jsonify({
+            'company': company_dict
+        }), 200
+    except Exception as e:
+        print(f"Erreur lors de la récupération de l'entreprise {company_id}: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
 
 @superadmin_bp.route('/companies', methods=['GET'])
 @require_superadmin
@@ -97,11 +158,28 @@ def create_company():
         # Extraire les champs supportés pour l'entreprise
         company_fields = [
             'name', 'email', 'phone', 'address', 'city', 'country',
-            'industry', 'website', 'tax_id', 'notes',
-            'subscription_plan', 'max_employees'
+            'industry', 'website', 'tax_id', 'notes', 'max_employees'
         ]
         
         company_data = {k: v for k, v in data.items() if k in company_fields}
+        
+        # Traiter le plan d'abonnement (version simplifiée sans subscription_plan_id)
+        if data.get('subscription_plan'):
+            company_data['subscription_plan'] = data['subscription_plan']
+            
+            # Définir max_employees en fonction du plan si non spécifié
+            if 'max_employees' not in company_data:
+                if data['subscription_plan'] == 'basic':
+                    company_data['max_employees'] = 10
+                elif data['subscription_plan'] == 'premium':
+                    company_data['max_employees'] = 50
+                elif data['subscription_plan'] == 'enterprise':
+                    company_data['max_employees'] = 999
+        else:
+            # Par défaut "basic"
+            company_data['subscription_plan'] = 'basic'
+            if 'max_employees' not in company_data:
+                company_data['max_employees'] = 10
         
         # Créer l'entreprise
         company = Company(**company_data)
@@ -340,6 +418,17 @@ def update_company(company_id):
             if field in data:
                 setattr(company, field, data[field])
         
+        # Traiter le plan d'abonnement
+        if data.get('subscription_plan_id'):
+            from backend.models.subscription_plan import SubscriptionPlan
+            plan = SubscriptionPlan.query.get(data['subscription_plan_id'])
+            if plan:
+                company.subscription_plan_id = plan.id
+                company.subscription_plan = plan.name
+                # Mettre à jour max_employees si non spécifié
+                if not data.get('max_employees') and plan.max_employees:
+                    company.max_employees = plan.max_employees
+        
         # Mettre à jour l'administrateur si fourni
         if 'admin_email' in data or 'admin_name' in data or 'admin_prenom' in data or 'admin_nom' in data:
             # Chercher l'administrateur existant
@@ -536,6 +625,27 @@ def delete_company(company_id):
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 
+@superadmin_bp.route('/companies/<int:company_id>/subscription/history', methods=['GET'])
+@jwt_required()
+@require_superadmin
+def get_company_subscription_history(company_id):
+    """Récupère l'historique des changements de plan d'abonnement d'une entreprise"""
+    try:
+        company = Company.query.get_or_404(company_id)
+        
+        from backend.models.subscription_plan_change_history import SubscriptionPlanChangeHistory
+        history = SubscriptionPlanChangeHistory.query.filter_by(company_id=company_id).order_by(SubscriptionPlanChangeHistory.created_at.desc()).all()
+        
+        return jsonify(
+            success=True,
+            company_name=company.name,
+            current_plan=company.subscription_plan,
+            history=[entry.to_dict() for entry in history]
+        )
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération de l'historique des abonnements: {str(e)}")
+        return jsonify(message=f"Une erreur est survenue: {str(e)}"), 500
+
 @superadmin_bp.route('/companies/<int:company_id>/extend-subscription', methods=['PUT'])
 @require_superadmin
 def extend_subscription(company_id):
@@ -551,11 +661,45 @@ def extend_subscription(company_id):
         # Sauvegarder l'ancien état
         old_values = company.to_dict()
         
+        # Vérifier si un changement de plan est demandé
+        new_plan_id = data.get('subscription_plan_id')
+        if new_plan_id:
+            try:
+                from backend.models.subscription_plan import SubscriptionPlan
+                # Convertir en entier si nécessaire (car peut arriver sous forme de string)
+                new_plan_id = int(new_plan_id)
+                new_plan = SubscriptionPlan.query.get(new_plan_id)
+                if new_plan:
+                    company.subscription_plan_id = new_plan.id
+                    company.subscription_plan = new_plan.name
+                    if not data.get('max_employees') and new_plan.max_employees:
+                        company.max_employees = new_plan.max_employees
+                else:
+                    print(f"Plan d'abonnement non trouvé pour l'ID {new_plan_id}")
+            except Exception as plan_error:
+                print(f"Erreur lors du changement de plan: {plan_error}")
+                # Ne pas échouer si le changement de plan échoue
+        
         # Prolonger l'abonnement
         company.extend_subscription(months)
 
-        # Créer la facture correspondante
-        amount = PLAN_PRICES.get(company.subscription_plan, 10.0) * months
+        # Déterminer le montant de la facture en fonction du plan
+        try:
+            # Utiliser la propriété get_subscription_plan pour récupérer le plan
+            subscription_plan = company.get_subscription_plan
+            if subscription_plan:
+                # Utiliser le prix du plan récupéré
+                amount = subscription_plan.price * months
+            else:
+                # Fallback sur les prix depuis la fonction
+                plan_prices = get_plan_prices()
+                amount = plan_prices.get(company.subscription_plan.lower(), 10.0) * months
+        except Exception as price_error:
+            print(f"Erreur lors du calcul du prix: {price_error}")
+            # En cas d'erreur, utiliser un prix par défaut basé sur le plan
+            plan_prices = get_plan_prices()
+            amount = plan_prices.get(company.subscription_plan.lower(), 10.0) * months
+        
         invoice = Invoice(
             company_id=company.id,
             amount=amount,
@@ -624,9 +768,13 @@ def extend_subscription(company_id):
         }), 200
         
     except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
         print(f"Erreur lors de la prolongation: {e}")
+        print(f"Détails: {error_trace}")
+        print(f"Données reçues: {data}")
         db.session.rollback()
-        return jsonify(message="Erreur interne du serveur"), 500
+        return jsonify(message=f"Erreur interne du serveur: {str(e)}"), 500
 
 
 @superadmin_bp.route('/subscription-extension-requests', methods=['GET'])
@@ -653,7 +801,8 @@ def approve_subscription_extension_request(req_id):
     old_values = company.to_dict()
     company.extend_subscription(req.months)
 
-    amount = PLAN_PRICES.get(company.subscription_plan, 10.0) * req.months
+    plan_prices = get_plan_prices()
+    amount = plan_prices.get(company.subscription_plan.lower(), 10.0) * req.months
     invoice = Invoice(
         company_id=company.id,
         amount=amount,
@@ -766,6 +915,71 @@ def get_company_invoices(company_id):
     except Exception as e:
         print(f"Erreur lors de la récupération des factures: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
+        
+@superadmin_bp.route('/companies/<int:company_id>/invoices', methods=['POST'])
+@require_superadmin
+def create_company_invoice(company_id):
+    """Crée une nouvelle facture pour une entreprise"""
+    try:
+        company = Company.query.get_or_404(company_id)
+        
+        data = request.get_json()
+        if not data:
+            return jsonify(message="Données JSON requises"), 400
+            
+        # Validation des données
+        amount = data.get('amount')
+        months = data.get('months', 1)
+        description = data.get('description', f"Abonnement {months} mois")
+        due_date_str = data.get('due_date')
+        
+        if not amount or amount <= 0:
+            return jsonify(message="Montant invalide"), 400
+            
+        if not months or months <= 0:
+            return jsonify(message="Nombre de mois invalide"), 400
+        
+        # Convertir la date d'échéance si fournie
+        due_date = None
+        if due_date_str:
+            try:
+                due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+            except ValueError:
+                return jsonify(message="Format de date invalide (YYYY-MM-DD)"), 400
+        else:
+            # Par défaut, échéance à 30 jours
+            due_date = datetime.utcnow().date() + timedelta(days=30)
+        
+        # Créer la facture
+        new_invoice = Invoice(
+            company_id=company_id,
+            amount=amount,
+            months=months,
+            description=description,
+            status='pending',
+            due_date=due_date
+        )
+        
+        db.session.add(new_invoice)
+        db.session.commit()
+        
+        # Log de l'action
+        log_user_action(
+            action='CREATE_INVOICE',
+            resource_type='Invoice',
+            resource_id=new_invoice.id,
+            details={'amount': amount, 'months': months}
+        )
+        
+        return jsonify({
+            'message': 'Facture créée avec succès',
+            'invoice': new_invoice.to_dict()
+        }), 201
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erreur lors de la création de la facture: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
 
 
 @superadmin_bp.route('/companies/<int:company_id>/payments', methods=['GET'])
@@ -822,6 +1036,158 @@ def pay_invoice(invoice_id):
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 
+
+@superadmin_bp.route('/invoices/<int:invoice_id>/remind', methods=['POST'])
+@require_superadmin
+def send_invoice_reminder(invoice_id):
+    """Envoie un rappel par email pour une facture impayée"""
+    try:
+        invoice = Invoice.query.get_or_404(invoice_id)
+        
+        if invoice.status == 'paid':
+            return jsonify(message="La facture est déjà payée"), 400
+            
+        if invoice.status == 'cancelled':
+            return jsonify(message="La facture est annulée"), 400
+        
+        company = Company.query.get(invoice.company_id)
+        if not company:
+            return jsonify(message="Entreprise non trouvée"), 404
+        
+        # Trouver les administrateurs de l'entreprise
+        admins = User.query.filter_by(company_id=company.id, role='admin').all()
+        if not admins:
+            return jsonify(message="Aucun administrateur trouvé pour cette entreprise"), 404
+            
+        # Envoyer un email à chaque administrateur (à implémenter avec un service d'email)
+        # Pour l'instant, nous simulons l'envoi d'email
+        
+        for admin in admins:
+            # Simuler l'envoi d'email
+            print(f"[Simulation] Envoi d'un rappel de facture à {admin.email} pour la facture #{invoice.id}")
+            
+            # Enregistrer une notification
+            notification = Notification(
+                user_id=admin.id,
+                title="Rappel de facture",
+                content=f"Rappel: La facture #{invoice.id} d'un montant de {invoice.amount}€ est en attente de paiement.",
+                category="billing",
+                is_read=False
+            )
+            db.session.add(notification)
+            
+            # Ici, vous pourriez appeler une fonction pour envoyer un véritable email
+            
+        # Log de l'action
+        log_user_action(
+            action='SEND_INVOICE_REMINDER',
+            resource_type='Invoice',
+            resource_id=invoice.id,
+            details={'recipient_count': len(admins)}
+        )
+        
+        db.session.commit()
+        
+        return jsonify({
+            'message': f"Rappel envoyé à {len(admins)} administrateur(s)",
+            'recipients': len(admins)
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        print(f"Erreur lors de l'envoi du rappel: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
+@superadmin_bp.route('/invoices/<int:invoice_id>/pdf', methods=['GET'])
+@require_superadmin
+def get_invoice_pdf(invoice_id):
+    """Génère un PDF pour une facture"""
+    try:
+        invoice = Invoice.query.get_or_404(invoice_id)
+        company = Company.query.get(invoice.company_id)
+        
+        if not company:
+            return jsonify(message="Entreprise non trouvée"), 404
+        
+        # Pour cette version, nous allons générer un PDF très simple avec ReportLab
+        # Dans une implémentation complète, vous utiliseriez un template de facture plus élaboré
+        
+        # Importer les modules nécessaires pour générer un PDF
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+        from reportlab.lib.styles import getSampleStyleSheet
+        from io import BytesIO
+        
+        # Créer un buffer pour stocker le PDF
+        buffer = BytesIO()
+        
+        # Créer le document PDF
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+        
+        # Préparer les données pour la facture
+        elements = []
+        
+        # En-tête
+        elements.append(Paragraph(f"Facture #{invoice.id}", styles['Heading1']))
+        elements.append(Spacer(1, 20))
+        
+        # Détails de la société
+        elements.append(Paragraph(f"Client: {company.name}", styles['Normal']))
+        elements.append(Paragraph(f"Date d'émission: {invoice.created_at.strftime('%d/%m/%Y')}", styles['Normal']))
+        elements.append(Paragraph(f"Date d'échéance: {invoice.due_date.strftime('%d/%m/%Y') if invoice.due_date else 'N/A'}", styles['Normal']))
+        elements.append(Paragraph(f"Statut: {invoice.status}", styles['Normal']))
+        elements.append(Spacer(1, 20))
+        
+        # Détails de la facture
+        data = [
+            ['Description', 'Période', 'Montant'],
+            [invoice.description or f"Abonnement {invoice.months} mois", f"{invoice.months} mois", f"{invoice.amount} €"]
+        ]
+        
+        # Créer le tableau
+        table = Table(data, colWidths=[300, 100, 100])
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, 0), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(table)
+        elements.append(Spacer(1, 20))
+        
+        # Total
+        elements.append(Paragraph(f"<b>Total:</b> {invoice.amount} €", styles['Normal']))
+        
+        # Construire le PDF
+        doc.build(elements)
+        
+        # Récupérer le contenu du buffer
+        pdf_data = buffer.getvalue()
+        buffer.close()
+        
+        # Log de l'action
+        log_user_action(
+            action='DOWNLOAD_INVOICE_PDF',
+            resource_type='Invoice',
+            resource_id=invoice.id
+        )
+        
+        # Retourner le PDF
+        response = make_response(pdf_data)
+        response.headers['Content-Type'] = 'application/pdf'
+        response.headers['Content-Disposition'] = f'attachment; filename=facture-{invoice.id}.pdf'
+        
+        return response
+        
+    except Exception as e:
+        print(f"Erreur lors de la génération du PDF: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
 
 @superadmin_bp.route('/invoices/<int:invoice_id>/stripe-session', methods=['POST'])
 @require_superadmin
@@ -895,10 +1261,10 @@ def get_global_stats():
             count = Company.query.filter_by(subscription_plan=plan).count()
             plans_distribution[plan] = count
         
-        # Revenus estimés (simulation)
-        plan_prices = {'basic': 29, 'premium': 99, 'enterprise': 299}
+        # Revenus calculés avec les tarifs actuels
+        plan_prices = get_plan_prices()
         monthly_revenue = sum(
-            plans_distribution[plan] * plan_prices[plan] 
+            plans_distribution[plan] * plan_prices.get(plan.lower(), 0) 
             for plan in plans_distribution
         )
         
@@ -1191,3 +1557,326 @@ def reset_system_settings():
         print(f"Erreur lors de la réinitialisation: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
+
+
+@superadmin_bp.route('/companies/<int:company_id>/subscription', methods=['PUT'])
+@jwt_required()
+@require_superadmin
+def update_company_subscription(company_id):
+    """Met à jour le plan d'abonnement d'une entreprise"""
+    try:
+        company = Company.query.get_or_404(company_id)
+        data = request.get_json()
+        
+        # Vérifier si un changement de plan est demandé
+        new_plan_id = data.get('subscription_plan_id')
+        if not new_plan_id:
+            return jsonify(message="L'ID du plan d'abonnement est requis"), 400
+        
+        # Sauvegarder l'ancien état
+        old_values = company.to_dict()
+        old_plan_id = company.subscription_plan_id
+        old_max_employees = company.max_employees
+        
+        # Récupérer le nouveau plan
+        from backend.models.subscription_plan import SubscriptionPlan
+        new_plan = SubscriptionPlan.query.get(new_plan_id)
+        if not new_plan:
+            return jsonify(message="Plan d'abonnement non trouvé"), 404
+        
+        # Récupérer l'ancien plan (s'il existe)
+        old_plan = None
+        if old_plan_id:
+            old_plan = SubscriptionPlan.query.get(old_plan_id)
+            
+        # Mettre à jour le plan d'abonnement
+        company.subscription_plan_id = new_plan.id
+        company.subscription_plan = new_plan.name
+        
+        # Déterminer le nouveau nombre max d'employés
+        new_max_employees = company.max_employees
+        if new_plan.max_employees and not data.get('keep_current_max_employees', False):
+            company.max_employees = new_plan.max_employees
+            new_max_employees = new_plan.max_employees
+        
+        # Enregistrer l'historique du changement
+        from backend.models.subscription_plan_change_history import SubscriptionPlanChangeHistory
+        from flask_jwt_extended import get_jwt_identity
+        current_user_id = get_jwt_identity()
+        
+        history_entry = SubscriptionPlanChangeHistory(
+            company_id=company.id,
+            user_id=current_user_id,
+            old_plan_id=old_plan_id,
+            new_plan_id=new_plan.id,
+            old_plan_name=old_plan.name if old_plan else company.subscription_plan,
+            new_plan_name=new_plan.name,
+            old_max_employees=old_max_employees,
+            new_max_employees=new_max_employees,
+            change_reason=data.get('reason')
+        )
+        db.session.add(history_entry)
+        
+        # Logger l'action
+        log_user_action(
+            action='UPDATE_SUBSCRIPTION_PLAN',
+            resource_type='Company',
+            resource_id=company.id,
+            details={
+                'new_plan_id': new_plan_id, 
+                'new_plan_name': new_plan.name,
+                'history_entry_id': history_entry.id
+            },
+            old_values=old_values,
+            new_values=company.to_dict()
+        )
+        
+        db.session.commit()
+        return jsonify(message="Plan d'abonnement mis à jour avec succès", company=company.to_dict()), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"Erreur lors de la mise à jour du plan d'abonnement: {str(e)}")
+        return jsonify(message=f"Une erreur est survenue: {str(e)}"), 500
+
+# ===== GESTION DES NOTIFICATIONS =====
+
+@superadmin_bp.route('/admin/notifications-history', methods=['GET'])
+@require_superadmin
+def get_notifications_history():
+    """Récupère l'historique complet des notifications pour les administrateurs"""
+    try:
+        current_user = get_current_user()
+        
+        # Paramètres de pagination
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('perPage', 10, type=int), 100)
+        
+        # Paramètres de filtrage
+        start_date = request.args.get('startDate')
+        end_date = request.args.get('endDate')
+        user_id = request.args.get('userId', type=int)
+        is_read = request.args.get('isRead')
+        search_query = request.args.get('searchQuery')
+        
+        # Base de la requête
+        query = Notification.query.join(User).join(Company)
+        
+        # Appliquer les filtres
+        if start_date:
+            query = query.filter(Notification.created_at >= datetime.fromisoformat(start_date))
+        
+        if end_date:
+            query = query.filter(Notification.created_at <= datetime.fromisoformat(end_date))
+            
+        if user_id:
+            query = query.filter(Notification.user_id == user_id)
+            
+        if is_read is not None:
+            is_read_bool = is_read.lower() == 'true'
+            query = query.filter(Notification.is_read == is_read_bool)
+            
+        if search_query:
+            query = query.filter(Notification.message.ilike(f'%{search_query}%'))
+        
+        # Tri par date (plus récentes d'abord)
+        query = query.order_by(Notification.created_at.desc())
+        
+        # Exécuter la requête paginée
+        paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Préparer les données de réponse
+        notifications = []
+        for notification in paginated.items:
+            user = notification.user
+            notification_data = notification.to_dict()
+            notification_data.update({
+                'user_email': user.email,
+                'user_name': f"{user.prenom} {user.nom}",
+                'company_name': user.company.name if user.company else "N/A",
+                'company_id': user.company_id
+            })
+            notifications.append(notification_data)
+        
+        # Journal d'audit
+        log_user_action(
+            action='VIEW_NOTIFICATIONS_HISTORY',
+            resource_type='Notification',
+            details=f"Consultation de l'historique des notifications - Page: {page}, Filtres: {request.args}"
+        )
+        
+        return jsonify({
+            'success': True,
+            'notifications': notifications,
+            'pagination': {
+                'total': paginated.total,
+                'pages': paginated.pages,
+                'page': page,
+                'per_page': per_page,
+                'has_next': paginated.has_next,
+                'has_prev': paginated.has_prev
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération de l'historique des notifications: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Une erreur est survenue: {str(e)}"
+        }), 500
+        
+# ===== ROUTES POUR LA GESTION DES ABONNEMENTS =====
+
+@superadmin_bp.route('/subscription/companies', methods=['GET'])
+@require_superadmin
+def get_company_subscriptions():
+    """Récupère les informations d'abonnement de toutes les entreprises"""
+    try:
+        # Récupération des entreprises avec leurs informations d'abonnement
+        companies = Company.query.all()
+        subscriptions = []
+        
+        for company in companies:
+            # Calcul des jours restants
+            days_remaining = 0
+            if company.subscription_end:
+                today = datetime.now().date()
+                days_remaining = (company.subscription_end - today).days
+                days_remaining = max(0, days_remaining)  # Pas de nombre négatif
+            
+            # Déterminer le statut
+            status = 'active'
+            
+            # Vérifier si on est en période d'essai (moins de 30 jours depuis le début)
+            is_trial = False
+            if company.subscription_start:
+                days_since_start = (today - company.subscription_start).days
+                is_trial = days_since_start <= 30 and company.subscription_status != 'expired'
+                
+            if is_trial:
+                status = 'trial'
+            elif not company.is_active:
+                status = 'cancelled'
+            elif days_remaining <= 0:
+                status = 'expired'
+            
+            subscriptions.append({
+                'id': company.id,
+                'company_id': company.id,
+                'company_name': company.name,
+                'plan': company.subscription_plan,
+                'status': status,
+                'start_date': company.subscription_start_date.isoformat() if company.subscription_start_date else '',
+                'end_date': company.subscription_end_date.isoformat() if company.subscription_end_date else '',
+                'amount_paid': company.subscription_amount or 0,
+                'days_remaining': days_remaining,
+                'auto_renew': company.subscription_auto_renew or False
+            })
+        
+        log_user_action(
+            action='VIEW_COMPANY_SUBSCRIPTIONS',
+            resource_type='Subscription',
+            details=f"Consultation des abonnements des entreprises"
+        )
+        
+        return jsonify({
+            'success': True,
+            'subscriptions': subscriptions
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des abonnements: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Une erreur est survenue: {str(e)}"
+        }), 500
+
+@superadmin_bp.route('/subscription/stats', methods=['GET'])
+@require_superadmin
+def get_subscription_stats():
+    """Récupère les statistiques globales des abonnements"""
+    try:
+        # Comptage des abonnements
+        companies = Company.query.all()
+        
+        total_subscriptions = len(companies)
+        active_subscriptions = 0
+        trial_subscriptions = 0
+        expired_subscriptions = 0
+        revenue_monthly = 0
+        
+        plan_distribution = {
+            'basic': 0,
+            'premium': 0,
+            'enterprise': 0
+        }
+        
+        renewal_upcoming_30_days = 0
+        
+        today = datetime.now().date()
+        thirty_days_future = today + timedelta(days=30)
+        
+        # Calculer les métriques
+        for company in companies:
+            # Distribution des plans
+            plan = company.subscription_plan
+            if plan in plan_distribution:
+                plan_distribution[plan] += 1
+            else:
+                plan_distribution[plan] = 1
+            
+            # Statut et revenus
+            if company.is_active:
+                # Vérifier si on est en période d'essai (moins de 30 jours depuis le début)
+                is_trial = False
+                if company.subscription_start:
+                    days_since_start = (today - company.subscription_start).days
+                    is_trial = days_since_start <= 30 and company.subscription_status != 'expired'
+                
+                if is_trial:
+                    trial_subscriptions += 1
+                else:
+                    active_subscriptions += 1
+                    
+                    # Tarifs mensuels pour calculer les revenus récurrents
+                    plan_prices = get_plan_prices()
+                    plan_price = plan_prices.get(plan.lower(), 0)
+                    revenue_monthly += plan_price
+            
+            # Vérifier si l'abonnement est expiré
+            if company.subscription_end and company.subscription_end < today:
+                expired_subscriptions += 1
+            
+            # Vérifier les renouvellements à venir
+            if (company.subscription_end and 
+                company.subscription_end > today and 
+                company.subscription_end <= thirty_days_future):
+                renewal_upcoming_30_days += 1
+        
+        stats = {
+            'total_subscriptions': total_subscriptions,
+            'active_subscriptions': active_subscriptions,
+            'trial_subscriptions': trial_subscriptions,
+            'expired_subscriptions': expired_subscriptions,
+            'revenue_monthly': revenue_monthly,
+            'plan_distribution': plan_distribution,
+            'renewal_upcoming_30_days': renewal_upcoming_30_days
+        }
+        
+        log_user_action(
+            action='VIEW_SUBSCRIPTION_STATS',
+            resource_type='SubscriptionStats',
+            details=f"Consultation des statistiques d'abonnement"
+        )
+        
+        return jsonify({
+            'success': True,
+            'stats': stats
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des statistiques d'abonnement: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Une erreur est survenue: {str(e)}"
+        }), 500

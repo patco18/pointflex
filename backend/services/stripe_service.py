@@ -1,6 +1,7 @@
 """Stripe API service utilities."""
 
 import os
+from typing import TYPE_CHECKING
 
 try:
     import stripe  # type: ignore
@@ -8,10 +9,10 @@ try:
 except Exception:  # pragma: no cover - Stripe may not be installed
     stripe = None
 
-# Forward declaration for type hinting
-if False:
-    from backend.models.company import Company # type: ignore
-    from backend.models.invoice import Invoice # type: ignore
+# Import for type checking only to avoid circular imports
+if TYPE_CHECKING:
+    from backend.models.company import Company
+    from backend.models.invoice import Invoice
 
 def get_or_create_stripe_customer(company: 'Company'):
     """Get existing Stripe customer or create a new one."""

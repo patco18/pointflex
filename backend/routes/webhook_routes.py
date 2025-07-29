@@ -7,6 +7,7 @@ import jsonschema  # For validating subscribed_events structure
 from datetime import datetime
 
 from backend.middleware.auth import get_current_user, require_admin
+from backend.middleware.audit import log_user_action
 from backend.models.company import Company
 from backend.models.webhook_subscription import WebhookSubscription
 from backend.models.webhook_delivery_log import WebhookDeliveryLog

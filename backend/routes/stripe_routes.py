@@ -14,32 +14,55 @@ from backend.models.invoice import Invoice
 from backend.models.payment import Payment
 from backend.models.company import Company  # Added Company model
 from backend.models.system_settings import SystemSettings
+from backend.middleware.audit import log_user_action
 
 stripe_bp = Blueprint('stripe_bp', __name__)
 
 
 def get_stripe_price_to_plan_mapping():
     """Return mapping of Stripe price IDs to internal plan details.
-
-    The function first checks the application configuration or environment
-    variable ``STRIPE_PRICE_MAP`` for a JSON mapping. If not found, it falls
-    back to the ``SystemSettings`` table under the ``billing`` category with
-    the key ``stripe_price_mapping``.
+    
+    This function now builds the mapping from the SubscriptionPlan model in the database.
+    It maintains backward compatibility with code that expects the older format.
     """
-    mapping_json = (
-        current_app.config.get('STRIPE_PRICE_MAP')
-        or os.getenv('STRIPE_PRICE_MAP')
-    )
-    if mapping_json:
-        try:
-            if isinstance(mapping_json, str):
-                return json.loads(mapping_json)
-            return mapping_json
-        except json.JSONDecodeError as e:
-            current_app.logger.error(f"Invalid STRIPE_PRICE_MAP JSON: {e}")
+    from backend.models.subscription_plan import SubscriptionPlan
+    
+    # Créer un mapping à partir des plans d'abonnement en base de données
+    mapping = {}
+    try:
+        subscription_plans = SubscriptionPlan.query.filter_by(is_active=True).all()
+        
+        for plan in subscription_plans:
+            if plan.stripe_price_id:
+                # Créer une entrée compatible avec l'ancien format
+                mapping[plan.stripe_price_id] = {
+                    "name": plan.name,
+                    "max_employees": plan.max_employees,
+                    "amount_eur": plan.price,
+                    "interval_months": plan.duration_months,
+                    "description": plan.description
+                }
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des plans d'abonnement: {e}")
+    
+    # Si aucun plan n'est trouvé, tenter d'utiliser la configuration ou les paramètres système
+    if not mapping:
+        mapping_json = (
+            current_app.config.get('STRIPE_PRICE_MAP')
+            or os.getenv('STRIPE_PRICE_MAP')
+        )
+        if mapping_json:
+            try:
+                if isinstance(mapping_json, str):
+                    return json.loads(mapping_json)
+                return mapping_json
+            except json.JSONDecodeError as e:
+                current_app.logger.error(f"Invalid STRIPE_PRICE_MAP JSON: {e}")
 
-    # Fallback to SystemSettings stored configuration
-    return SystemSettings.get_setting('billing', 'stripe_price_mapping', {})
+        # Fallback to SystemSettings stored configuration
+        return SystemSettings.get_setting('billing', 'stripe_price_mapping', {})
+    
+    return mapping
 
 
 @stripe_bp.route('/webhook', methods=['POST'])
@@ -89,9 +112,12 @@ def stripe_webhook():
         # --- Handle Subscription Payment ---
         if payment_type == 'subscription':
             stripe_price_id = metadata.get('stripe_price_id')
-            plan_details = get_stripe_price_to_plan_mapping().get(stripe_price_id)
+            
+            # Récupérer le plan d'abonnement depuis la base de données
+            from backend.models.subscription_plan import SubscriptionPlan
+            subscription_plan = SubscriptionPlan.query.filter_by(stripe_price_id=stripe_price_id).first()
 
-            if not stripe_price_id or not plan_details:
+            if not stripe_price_id or not subscription_plan:
                 current_app.logger.error(f"Stripe Webhook: Invalid or missing stripe_price_id ('{stripe_price_id}') for subscription.")
                 return jsonify({'error': "Invalid plan identifier"}), 400
 
@@ -99,20 +125,18 @@ def stripe_webhook():
             company.stripe_customer_id = session.customer
             company.stripe_subscription_id = session.subscription
             company.active_stripe_price_id = stripe_price_id # Store the active price ID
-            company.subscription_plan = plan_details["name"]
-            company.max_employees = plan_details["max_employees"]
+            company.subscription_plan = subscription_plan.name
+            company.max_employees = subscription_plan.max_employees
             company.subscription_status = 'active'
             company.subscription_start = datetime.utcnow().date()
-            # Calculate subscription_end based on interval (e.g., 1 month)
-            # This is a simplified calculation. Stripe webhooks for `invoice.paid` on renewals
-            # would be better for managing ongoing subscription periods.
-            company.subscription_end = datetime.utcnow().date() + timedelta(days=plan_details.get("interval_months", 1) * 30)
+            # Calculate subscription_end based on duration_months
+            company.subscription_end = datetime.utcnow().date() + timedelta(days=subscription_plan.duration_months * 30)
             company.is_suspended = False
             company.suspension_reason = None
 
             # Create an Invoice for this initial subscription payment
             # Description could be more dynamic, e.g., "Subscription to {plan_name} plan"
-            invoice_description = f"Abonnement Plan {plan_details['name'].capitalize()} ({plan_details.get('interval_months',1)} mois)"
+            invoice_description = f"Abonnement Plan {subscription_plan.name.capitalize()} ({subscription_plan.duration_months} mois)"
             new_invoice = Invoice(
                 company_id=company.id,
                 amount=session.amount_total / 100.0, # Amount from Stripe session
@@ -233,18 +257,19 @@ def stripe_webhook():
                                               stripe_subscription_id=stripe_subscription_id).first()
             if company:
                 # Create a new Invoice and Payment record for the renewal
-                plan_details = get_stripe_price_to_plan_mapping().get(
-                    company.active_stripe_price_id or ""
-                )  # Need to store active price_id on company
+                # Récupérer le plan d'abonnement depuis la base de données
+                from backend.models.subscription_plan import SubscriptionPlan
+                subscription_plan = SubscriptionPlan.query.filter_by(stripe_price_id=company.active_stripe_price_id).first()
+                
                 # For now, let's use a generic amount and description
                 renewal_amount = invoice_object.amount_paid / 100.0
-                renewal_months = 1 # This needs to be derived from the plan/subscription interval
+                renewal_months = 1 # Default value
 
-                # Ensure plan_details is not None before accessing its properties
-                if plan_details:
-                    renewal_months = plan_details.get("interval_months", 1)
-                    invoice_description = f"Renouvellement Abonnement Plan {plan_details['name'].capitalize()} ({renewal_months} mois)"
-                    payment_description = f"Paiement renouvellement abonnement {plan_details['name']}"
+                # Ensure subscription_plan is not None before accessing its properties
+                if subscription_plan:
+                    renewal_months = subscription_plan.duration_months
+                    invoice_description = f"Renouvellement Abonnement Plan {subscription_plan.name.capitalize()} ({renewal_months} mois)"
+                    payment_description = f"Paiement renouvellement abonnement {subscription_plan.name}"
                 else: # Fallback if plan_details not found (e.g. price_id changed or not in mapping)
                     current_app.logger.warning(f"Stripe Webhook: Plan details not found for price ID associated with company {company.id} during renewal.")
                     invoice_description = f"Renouvellement Abonnement (ID: {stripe_subscription_id})"

@@ -56,43 +56,51 @@ export default function LeaveRequestForm({ onSuccess }: LeaveRequestFormProps) {
   const startDayPeriod = watch('start_day_period');
   const endDayPeriod = watch('end_day_period');
 
-  // Debounce function
-  const debounce = <F extends (...args: any[]) => any>(func: F, waitFor: number) => {
+  // Debounce function pour async/await
+  const debounce = <F extends (...args: any[]) => Promise<any>>(func: F, waitFor: number) => {
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    return (...args: Parameters<F>): Promise<ReturnType<F>> =>
-      new Promise(resolve => {
+    return async (...args: Parameters<F>): Promise<ReturnType<F>> => {
+      return new Promise((resolve, reject) => {
         if (timeoutId) {
           clearTimeout(timeoutId);
         }
-        timeoutId = setTimeout(() => resolve(func(...args)), waitFor);
+        timeoutId = setTimeout(() => {
+          func(...args)
+            .then(resolve)
+            .catch(reject);
+        }, waitFor);
       });
+    };
   };
 
+  // Fonction debounced qui attend la résolution de la Promise
   const debouncedCalculateDuration = debounce(leaveService.calculateLeaveDuration, 500);
 
   useEffect(() => {
-    if (startDate && endDate && new Date(endDate) >= new Date(startDate)) {
-      setIsCalculatingDuration(true);
-      debouncedCalculateDuration({
-        start_date: startDate,
-        end_date: endDate,
-        start_day_period: startDayPeriod,
-        end_day_period: endDayPeriod,
-      })
-      .then(response => {
-        setCalculatedDuration(response.data.calculated_days);
-      })
-      .catch(error => {
-        console.error("Error calculating duration:", error);
-        setCalculatedDuration(null); // Clear on error
-        // Optionally show a small error to user if calculation fails
-      })
-      .finally(() => {
-        setIsCalculatingDuration(false);
-      });
-    } else {
-      setCalculatedDuration(null); // Clear if dates are invalid
-    }
+    const calculateDuration = async () => {
+      if (startDate && endDate && new Date(endDate) >= new Date(startDate)) {
+        setIsCalculatingDuration(true);
+        try {
+          const response = await debouncedCalculateDuration({
+            start_date: startDate,
+            end_date: endDate,
+            start_day_period: startDayPeriod,
+            end_day_period: endDayPeriod,
+          });
+          setCalculatedDuration(response.data.calculated_days);
+        } catch (error) {
+          console.error("Error calculating duration:", error);
+          setCalculatedDuration(null); // Clear on error
+          // Optionally show a small error to user if calculation fails
+        } finally {
+          setIsCalculatingDuration(false);
+        }
+      } else {
+        setCalculatedDuration(null); // Clear if dates are invalid
+      }
+    };
+    
+    calculateDuration();
   }, [startDate, endDate, startDayPeriod, endDayPeriod, debouncedCalculateDuration]); // Added debouncedCalculateDuration to dep array
 
   // Effect to manage interdependent period fields
@@ -288,7 +296,7 @@ export default function LeaveRequestForm({ onSuccess }: LeaveRequestFormProps) {
             <Controller
               name="reason"
               control={control}
-              render={({ field }) => <textarea {...field} id="reason" rows={3} className="input-field" placeholder="Ex: Vacances annuelles, Rendez-vous personnel..."></textarea>}
+              render={({ field }) => <textarea {...field} id="reason" rows={3} className="input-field" placeholder="Ex: Congé familial, Fête traditionnelle, Rendez-vous médical..."></textarea>}
             />
           </div>
 

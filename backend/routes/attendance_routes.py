@@ -2,11 +2,12 @@
 Routes de pointage
 """
 
-from flask import Blueprint, request, jsonify, Response
+from flask import Blueprint, request, jsonify, Response, current_app
 from flask_jwt_extended import jwt_required
-from middleware.auth import get_current_user
-from middleware.audit import log_user_action
-from utils.notification_utils import send_notification
+from backend.middleware.auth import get_current_user
+from backend.middleware.audit import log_user_action
+from backend.utils.notification_utils import send_notification
+from backend.utils.attendance_logger import log_attendance_event, log_attendance_error
 from backend.models.pointage import Pointage
 from backend.models.pause import Pause
 from backend.models.user import User
@@ -128,6 +129,18 @@ def office_checkin():
         
         db.session.commit()
 
+        # Journaliser l'événement de pointage
+        log_attendance_event(
+            event_type='office_checkin',
+            user_id=current_user.id,
+            details={
+                'pointage_id': pointage.id,
+                'office_id': getattr(pointage, 'office_id', None),
+                'status': pointage.statut,
+                'time': pointage.heure_arrivee.strftime('%H:%M:%S')
+            }
+        )
+
         # Dispatch webhook for pointage creation
         try:
             from backend.utils.webhook_utils import dispatch_webhook_event
@@ -138,6 +151,7 @@ def office_checkin():
             )
         except Exception as webhook_error:
             current_app.logger.error(f"Failed to dispatch pointage.created webhook for pointage {pointage.id}: {webhook_error}")
+            log_attendance_error('webhook_failure', current_user.id, str(webhook_error))
 
         send_notification(current_user.id, "Pointage bureau enregistré")
         if pointage.statut == 'retard':
@@ -149,9 +163,19 @@ def office_checkin():
         }), 201
         
     except Exception as e:
-        print(f"Erreur lors du pointage bureau: {e}")
+        error_details = str(e)
+        current_app.logger.error(f"Erreur lors du pointage bureau: {error_details}")
         db.session.rollback()
-        return jsonify(message="Erreur interne du serveur"), 500
+        
+        # Fournir des messages d'erreur plus détaillés selon le type d'exception
+        if "coordinates" in error_details.lower():
+            return jsonify(message="Erreur de coordonnées GPS"), 400
+        elif "office" in error_details.lower():
+            return jsonify(message="Bureau non trouvé ou inactif"), 404
+        elif "database" in error_details.lower() or "sql" in error_details.lower():
+            return jsonify(message="Erreur de base de données lors du pointage"), 500
+        else:
+            return jsonify(message="Erreur interne du serveur"), 500
 
 @attendance_bp.route('/checkin/mission', methods=['POST'])
 @jwt_required()
@@ -455,6 +479,61 @@ def get_attendance_stats():
         print(f"Erreur lors de la récupération des statistiques: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
 
+@attendance_bp.route('/last7days', methods=['GET'])
+@jwt_required()
+def get_last_7days_stats():
+    """Récupère les statistiques des 7 derniers jours"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify(message="Utilisateur non trouvé"), 401
+        
+        # Récupérer les 7 derniers jours
+        today = date.today()
+        last_7_days = [today - timedelta(days=i) for i in range(6, -1, -1)]  # Du plus ancien au plus récent
+        
+        daily_stats = []
+        for day in last_7_days:
+            # Obtenir les pointages de ce jour pour tous les utilisateurs de l'entreprise
+            if current_user.company_id:
+                daily_pointages = Pointage.query.join(User).filter(
+                    User.company_id == current_user.company_id,
+                    Pointage.date_pointage == day
+                ).all()
+                
+                # Calculer les présents, retards et absents
+                presents = len([p for p in daily_pointages if p.statut == 'present'])
+                retards = len([p for p in daily_pointages if p.statut == 'retard'])
+                # Pour les absents, une approche simple est de compter combien d'utilisateurs actifs n'ont pas pointé
+                total_active_users = User.query.filter_by(company_id=current_user.company_id, is_active=True).count()
+                absents = total_active_users - (presents + retards)
+                absents = max(0, absents)  # Éviter les nombres négatifs
+                
+                daily_stats.append({
+                    'date': day.strftime('%d/%m'),
+                    'present': presents,
+                    'late': retards,
+                    'absent': absents,
+                    'total': total_active_users
+                })
+            else:
+                # Utilisateur sans entreprise (cas rare)
+                daily_stats.append({
+                    'date': day.strftime('%d/%m'),
+                    'present': 0,
+                    'late': 0,
+                    'absent': 0,
+                    'total': 0
+                })
+        
+        return jsonify({
+            'stats': daily_stats
+        }), 200
+        
+    except Exception as e:
+        print(f"Erreur lors de la récupération des statistiques des 7 derniers jours: {e}")
+        return jsonify(message="Erreur interne du serveur"), 500
+
 @attendance_bp.route('/calendar', methods=['GET'])
 @jwt_required()
 def download_calendar():
@@ -511,27 +590,98 @@ def download_calendar():
 
 def calculate_distance(lat1, lon1, lat2, lon2):
     """Calcule la distance entre deux points GPS en mètres"""
-    # Rayon de la Terre en mètres
-    R = 6371000
+    try:
+        # Validation des entrées
+        if not all(isinstance(coord, (int, float)) for coord in [lat1, lon1, lat2, lon2]):
+            current_app.logger.error(f"Invalid coordinate types: {type(lat1)}, {type(lon1)}, {type(lat2)}, {type(lon2)}")
+            return float('inf')  # Distance infinie en cas d'erreur
+        
+        # Validation des valeurs
+        if not (-90 <= lat1 <= 90 and -90 <= lat2 <= 90 and -180 <= lon1 <= 180 and -180 <= lon2 <= 180):
+            current_app.logger.error(f"Coordinates out of range: {lat1}, {lon1}, {lat2}, {lon2}")
+            return float('inf')  # Distance infinie en cas d'erreur
+        
+        # Rayon de la Terre en mètres
+        R = 6371000
+        
+        # Convertir en radians
+        lat1_rad = math.radians(lat1)
+        lon1_rad = math.radians(lon1)
+        lat2_rad = math.radians(lat2)
+        lon2_rad = math.radians(lon2)
+        
+        # Différences
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+        
+        # Formule de Haversine
+        a = (math.sin(dlat/2) * math.sin(dlat/2) + 
+             math.cos(lat1_rad) * math.cos(lat2_rad) * 
+             math.sin(dlon/2) * math.sin(dlon/2))
+        
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        
+        # Distance en mètres
+        distance = R * c
+        
+        return distance
+    except Exception as e:
+        current_app.logger.error(f"Error calculating distance: {e}")
+        return float('inf')  # Distance infinie en cas d'erreur
+
+# Nouvelle route pour obtenir le pointage du jour de l'utilisateur connecté
+@attendance_bp.route('/today', methods=['GET'])
+@jwt_required()
+def get_today_attendance():
+    """Récupère le pointage du jour pour l'utilisateur connecté"""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify(message="Utilisateur non trouvé"), 401
+
+        today = date.today()
+        
+        # Récupérer le pointage du jour
+        pointage = Pointage.query.filter_by(
+            user_id=current_user.id,
+            date_pointage=today
+        ).first()
+        
+        if not pointage:
+            # Renvoyer un objet vide avec un statut 200 au lieu d'un 404
+            empty_data = {
+                'id': None,
+                'user_id': current_user.id,
+                'date_pointage': today.isoformat(),
+                'heure_arrivee': None,
+                'heure_depart': None,
+                'type': None,
+                'statut': 'absent',
+                'latitude': None,
+                'longitude': None,
+                'mission_order_number': None,
+                'office_id': None,
+                'message': 'Pas de pointage enregistré pour aujourd\'hui'
+            }
+            return jsonify(empty_data), 200
+        
+        # Convertir en dictionnaire pour la réponse JSON
+        pointage_data = {
+            'id': pointage.id,
+            'user_id': pointage.user_id,
+            'date_pointage': pointage.date_pointage.isoformat(),
+            'heure_arrivee': pointage.heure_arrivee.strftime('%H:%M:%S') if pointage.heure_arrivee else None,
+            'heure_depart': pointage.heure_depart.strftime('%H:%M:%S') if pointage.heure_depart else None,
+            'type': pointage.type,
+            'statut': pointage.statut,
+            'latitude': pointage.latitude,
+            'longitude': pointage.longitude,
+            'mission_order_number': pointage.mission_order_number,
+            'office_id': pointage.office_id
+        }
+        
+        return jsonify(pointage_data), 200
     
-    # Convertir en radians
-    lat1_rad = math.radians(lat1)
-    lon1_rad = math.radians(lon1)
-    lat2_rad = math.radians(lat2)
-    lon2_rad = math.radians(lon2)
-    
-    # Différences
-    dlat = lat2_rad - lat1_rad
-    dlon = lon2_rad - lon1_rad
-    
-    # Formule de Haversine
-    a = (math.sin(dlat/2) * math.sin(dlat/2) + 
-         math.cos(lat1_rad) * math.cos(lat2_rad) * 
-         math.sin(dlon/2) * math.sin(dlon/2))
-    
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
-    
-    # Distance en mètres
-    distance = R * c
-    
-    return distance
+    except Exception as e:
+        log_attendance_error(None, f"Erreur lors de la récupération du pointage du jour: {str(e)}")
+        return jsonify(message="Erreur de base de données"), 500

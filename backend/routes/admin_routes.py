@@ -4,10 +4,18 @@ Routes Admin - Gestion des entreprises
 
 from flask import Blueprint, request, jsonify, send_file, send_from_directory, current_app
 from flask_jwt_extended import jwt_required
-from middleware.auth import require_admin, require_manager_or_above, get_current_user
-from middleware.audit import log_user_action
+from backend.middleware.auth import require_admin, require_manager_or_above, get_current_user
+from backend.middleware.audit import log_user_action
 from backend.models.user import User
 from backend.models.company import Company
+from backend.models.notification import Notification
+import stripe
+from datetime import time, timedelta, datetime
+import json
+import os
+from reportlab.lib import colors
+# Import la fonction de cartographie des prix Stripe
+from backend.routes.stripe_routes import get_stripe_price_to_plan_mapping
 
 from backend.models.subscription_extension_request import SubscriptionExtensionRequest
 from backend.models.office import Office
@@ -46,23 +54,19 @@ def get_admin_company():
 
 
 @admin_bp.route('/subscription', methods=['GET'])
+@admin_bp.route('/company/subscription', methods=['GET'])  # Ajouter l'endpoint qui correspond au front
 @require_admin
 def get_company_subscription():
     """Récupère les informations d'abonnement de l'entreprise et les plans disponibles."""
+    from backend.models.subscription_plan import SubscriptionPlan
+    
     company, error_response = get_admin_company()
     if error_response:
         return error_response
 
-    available_plans = []
-    for price_id, details in get_stripe_price_to_plan_mapping().items():
-        available_plans.append({
-            "stripe_price_id": price_id,
-            "name": details["name"],
-            "max_employees": details["max_employees"],
-            "amount_eur": details["amount_eur"],
-            "interval_months": details["interval_months"],
-            "description": f"Plan {details['name'].capitalize()} - {details['amount_eur']}€ / {details['interval_months']} mois, jusqu'à {details['max_employees']} employés."
-        })
+    # Récupérer les plans actifs depuis le modèle SubscriptionPlan
+    subscription_plans = SubscriptionPlan.query.filter_by(is_active=True).all()
+    available_plans = [plan.to_dict() for plan in subscription_plans]
 
     # Get frontend URL for constructing success/cancel URLs
     frontend_url = current_app.config.get('FRONTEND_URL', 'http://localhost:5173') # Fallback
@@ -83,6 +87,7 @@ def get_company_subscription():
 
 
 @admin_bp.route('/subscription/checkout-session', methods=['POST'])
+@admin_bp.route('/company/subscription/checkout', methods=['POST'])  # Ajout du nouveau chemin
 @require_admin
 def create_company_subscription_checkout_session():
     """Crée une session de checkout Stripe pour un abonnement."""
@@ -142,6 +147,7 @@ def create_company_subscription_checkout_session():
 
 
 @admin_bp.route('/subscription/customer-portal', methods=['POST'])
+@admin_bp.route('/company/subscription/portal', methods=['POST'])  # Ajout du nouveau chemin
 @require_admin
 def create_company_customer_portal_session():
     """Crée une session de portail client Stripe."""
@@ -177,6 +183,7 @@ def create_company_customer_portal_session():
 
 
 @admin_bp.route('/subscription/extension-request', methods=['POST'])
+@admin_bp.route('/company/subscription/extension-request', methods=['POST'])  # Ajout du nouveau chemin
 @require_admin
 def request_subscription_extension():
     """Crée une demande de prolongation d'abonnement qui devra être validée par le superadmin."""
@@ -187,15 +194,46 @@ def request_subscription_extension():
     data = request.get_json() or {}
     months = data.get('months', 1)
     reason = data.get('reason', '')
+    plan_id = data.get('plan_id')  # ID du plan sélectionné (peut être None)
 
     if months < 1 or months > 24:
         return jsonify(message="Le nombre de mois doit être entre 1 et 24."), 400
-
+        
+    # Rechercher le plan d'abonnement sélectionné ou utiliser le plan actuel de l'entreprise
+    from backend.models.subscription_plan import SubscriptionPlan
+    
+    calculated_price = None
+    company = Company.query.get(current_admin.company_id)
+    plan = None
+    
+    if plan_id:
+        # Utiliser le plan sélectionné explicitement
+        plan = SubscriptionPlan.query.get(plan_id)
+        if plan:
+            calculated_price = plan.price * months
+            current_app.logger.info(f"Extension request using selected plan: {plan.name} (ID:{plan.id})")
+    
+    # Si aucun plan sélectionné ou plan invalide, utiliser le plan actuel de l'entreprise
+    if not plan and company.active_stripe_price_id:
+        plan = SubscriptionPlan.query.filter_by(stripe_price_id=company.active_stripe_price_id).first()
+        if plan:
+            plan_id = plan.id
+            calculated_price = plan.price * months
+            current_app.logger.info(f"Extension request using current plan: {plan.name} (ID:{plan.id})")
+    
+    # Si toujours pas de plan valide, journaliser l'erreur
+    if not plan:
+        current_app.logger.warning(f"No valid plan found for extension request from company {company.id}")
+        if company.active_stripe_price_id:
+            current_app.logger.warning(f"Company has stripe_price_id {company.active_stripe_price_id} but no matching plan in database")
+    
     extension_req = SubscriptionExtensionRequest(
         company_id=current_admin.company_id,
         months=months,
         reason=reason,
-        status='pending'
+        status='pending',
+        subscription_plan_id=plan_id,
+        calculated_price=calculated_price
     )
     db.session.add(extension_req)
     db.session.commit()
@@ -1080,7 +1118,14 @@ def update_company_settings():
                 value = data[field]
                 if field == 'work_start_time' and isinstance(value, str):
                     try:
-
+                        # Convert string to time format if needed
+                        # Assuming format like "09:00"
+                        hours, minutes = value.split(":")
+                        value = time(int(hours), int(minutes))
+                    except Exception as e:
+                        # Log the error but continue with original value
+                        current_app.logger.error(f"Error converting time: {e}")
+                        
                 setattr(company, field, value)
         
         # Logger l'action
@@ -1182,6 +1227,39 @@ def get_company_stats():
         total_employees = User.query.filter_by(company_id=company.id).count()
         active_employees = User.query.filter_by(company_id=company.id, is_active=True).count()
         
+        # Récupérer les statistiques des notifications
+        company_users = User.query.filter_by(company_id=company.id).all()
+        user_ids = [user.id for user in company_users]
+        
+        # Statistiques des notifications
+        total_notifications = Notification.query.filter(Notification.user_id.in_(user_ids)).count()
+        unread_notifications = Notification.query.filter(
+            Notification.user_id.in_(user_ids),
+            Notification.is_read == False
+        ).count()
+        
+        # Notifications des derniers 30 jours
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        recent_notifications = Notification.query.filter(
+            Notification.user_id.in_(user_ids),
+            Notification.created_at >= thirty_days_ago
+        ).count()
+        
+        # Statistiques des abonnements
+        from backend.models.subscription_plan import SubscriptionPlan
+        
+        days_remaining = company.subscription_days_remaining
+        subscription_expired = company.is_subscription_expired
+        
+        # Récupérer le plan d'abonnement actuel si disponible
+        plan_name = "Inconnu"
+        if hasattr(company, 'subscription_plan_id') and company.subscription_plan_id:
+            plan = SubscriptionPlan.query.get(company.subscription_plan_id)
+            if plan:
+                plan_name = plan.name
+        elif company.subscription_plan:
+            plan_name = company.subscription_plan
+        
         # Statistiques simulées pour la démo
         stats = {
             'total_employees': total_employees,
@@ -1191,7 +1269,17 @@ def get_company_stats():
             'offices': Office.query.filter_by(company_id=company.id).count(),
             'attendance_rate': 94.5,  # Simulé
             'retention_rate': 97.2,   # Simulé
-            'growth_rate': 12.5       # Simulé
+            'growth_rate': 12.5,      # Simulé
+            # Nouvelles statistiques de notifications
+            'total_notifications': total_notifications,
+            'unread_notifications': unread_notifications,
+            'recent_notifications': recent_notifications,
+            # Statistiques d'abonnement
+            'subscription_plan': plan_name,
+            'subscription_status': company.subscription_status,
+            'subscription_days_remaining': days_remaining,
+            'subscription_expired': subscription_expired,
+            'subscription_end_date': company.subscription_end.isoformat() if company.subscription_end else None
         }
         
         return jsonify({
@@ -1201,6 +1289,98 @@ def get_company_stats():
     except Exception as e:
         print(f"Erreur lors de la récupération des statistiques: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
+
+
+@admin_bp.route('/notifications-history', methods=['GET'])
+@require_admin
+def get_company_notifications_history():
+    """Récupère l'historique des notifications pour l'entreprise de l'administrateur"""
+    try:
+        current_user = get_current_user()
+        company_id = current_user.company_id
+        
+        if not company_id:
+            return jsonify({
+                'success': False,
+                'message': "Aucune entreprise associée à cet administrateur"
+            }), 400
+        
+        # Paramètres de pagination
+        page = request.args.get('page', 1, type=int)
+        per_page = min(request.args.get('perPage', 10, type=int), 100)
+        
+        # Paramètres de filtrage
+        start_date = request.args.get('startDate')
+        end_date = request.args.get('endDate')
+        user_id = request.args.get('userId', type=int)
+        is_read = request.args.get('isRead')
+        search_query = request.args.get('searchQuery')
+        
+        # Base de la requête - Notifications des utilisateurs de l'entreprise
+        query = Notification.query.join(User).filter(User.company_id == company_id)
+        
+        # Appliquer les filtres
+        if start_date:
+            query = query.filter(Notification.created_at >= datetime.fromisoformat(start_date))
+        
+        if end_date:
+            query = query.filter(Notification.created_at <= datetime.fromisoformat(end_date))
+            
+        if user_id:
+            query = query.filter(Notification.user_id == user_id)
+            
+        if is_read is not None:
+            is_read_bool = is_read.lower() == 'true'
+            query = query.filter(Notification.is_read == is_read_bool)
+            
+        if search_query:
+            query = query.filter(Notification.message.ilike(f'%{search_query}%'))
+        
+        # Tri par date (plus récentes d'abord)
+        query = query.order_by(Notification.created_at.desc())
+        
+        # Exécuter la requête paginée
+        paginated = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        # Préparer les données de réponse
+        notifications = []
+        for notification in paginated.items:
+            user = notification.user
+            notification_data = notification.to_dict()
+            notification_data.update({
+                'user_email': user.email,
+                'user_name': f"{user.prenom} {user.nom}",
+                'company_name': user.company.name if user.company else "N/A",
+                'company_id': user.company_id
+            })
+            notifications.append(notification_data)
+        
+        # Journal d'audit
+        log_user_action(
+            action='VIEW_COMPANY_NOTIFICATIONS_HISTORY',
+            resource_type='Notification',
+            details=f"Consultation de l'historique des notifications de l'entreprise - Page: {page}, Filtres: {request.args}"
+        )
+        
+        return jsonify({
+            'success': True,
+            'notifications': notifications,
+            'pagination': {
+                'total': paginated.total,
+                'pages': paginated.pages,
+                'page': page,
+                'per_page': per_page,
+                'has_next': paginated.has_next,
+                'has_prev': paginated.has_prev
+            }
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération de l'historique des notifications de l'entreprise: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f"Une erreur est survenue: {str(e)}"
+        }), 500
 
 
 @admin_bp.route('/attendance-report/pdf', methods=['GET'])
@@ -1867,3 +2047,147 @@ def delete_company_holiday(holiday_id):
         db.session.rollback()
         current_app.logger.error(f"Error deleting company holiday {holiday_id}: {e}", exc_info=True)
         return jsonify(message="Erreur interne du serveur."), 500
+
+
+# Endpoints pour les factures, les paramètres de notification et d'intégration
+
+@admin_bp.route('/company/invoices', methods=['GET'])
+@require_admin
+def get_company_invoices():
+    """Récupère les factures de l'entreprise"""
+    company, error_response = get_admin_company()
+    if error_response:
+        return error_response
+    
+    # Si l'entreprise n'a pas d'ID client Stripe, elle n'a pas de factures
+    if not company.stripe_customer_id:
+        return jsonify({
+            "invoices": [],
+            "message": "Aucune facture disponible pour cette entreprise"
+        }), 200
+    
+    try:
+        # Dans un cas réel, vous feriez une requête à l'API Stripe ici
+        # Pour l'instant, nous retournons des données factices
+        invoices = [
+            {
+                "id": "in_1234567890",
+                "date": datetime.now().strftime('%Y-%m-%d'),
+                "amount_total": 5990,
+                "amount_paid": 5990,
+                "status": "paid",
+                "pdf_url": "#",
+                "invoice_url": "#"
+            }
+        ]
+        
+        return jsonify({"invoices": invoices}), 200
+    except Exception as e:
+        current_app.logger.error(f"Error fetching invoices for company {company.id}: {e}")
+        return jsonify(message="Erreur lors de la récupération des factures."), 500
+
+
+@admin_bp.route('/company/notification-settings', methods=['GET'])
+@require_admin
+def get_notification_settings():
+    """Récupère les paramètres de notification de l'entreprise"""
+    company, error_response = get_admin_company()
+    if error_response:
+        return error_response
+    
+    # Paramètres de notification par défaut (à adapter selon vos besoins)
+    settings = {
+        "email_notifications": True,
+        "sms_notifications": False,
+        "push_notifications": True,
+        "daily_summary": True,
+        "attendance_alerts": True,
+        "leave_request_notifications": True,
+        "invoice_notifications": True,
+        "subscription_alerts": True
+    }
+    
+    return jsonify({"settings": settings}), 200
+
+
+@admin_bp.route('/company/notification-settings', methods=['PUT'])
+@require_admin
+def update_notification_settings():
+    """Met à jour les paramètres de notification de l'entreprise"""
+    company, error_response = get_admin_company()
+    if error_response:
+        return error_response
+    
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Données manquantes"), 400
+    
+    # Dans un cas réel, vous enregistreriez ces paramètres en base de données
+    # Pour l'instant, nous simulons simplement une mise à jour réussie
+    
+    log_user_action(
+        action='UPDATE_NOTIFICATION_SETTINGS',
+        resource_type='Company',
+        resource_id=company.id,
+        new_values=data,
+        details={'company_id': company.id}
+    )
+    
+    return jsonify({
+        "message": "Paramètres de notification mis à jour avec succès", 
+        "settings": data
+    }), 200
+
+
+@admin_bp.route('/company/integration-settings', methods=['GET'])
+@require_admin
+def get_integration_settings():
+    """Récupère les paramètres d'intégration de l'entreprise"""
+    company, error_response = get_admin_company()
+    if error_response:
+        return error_response
+    
+    # Paramètres d'intégration par défaut (à adapter selon vos besoins)
+    settings = {
+        "slack_enabled": False,
+        "slack_webhook_url": "",
+        "microsoft_teams_enabled": False,
+        "microsoft_teams_webhook_url": "",
+        "zapier_enabled": False,
+        "zapier_webhook_url": "",
+        "google_calendar_sync": False,
+        "outlook_calendar_sync": False,
+        "api_key_enabled": False,
+        "api_key": ""
+    }
+    
+    return jsonify({"settings": settings}), 200
+
+
+@admin_bp.route('/company/integration-settings', methods=['PUT'])
+@require_admin
+def update_integration_settings():
+    """Met à jour les paramètres d'intégration de l'entreprise"""
+    company, error_response = get_admin_company()
+    if error_response:
+        return error_response
+    
+    data = request.get_json()
+    if not data:
+        return jsonify(message="Données manquantes"), 400
+    
+    # Dans un cas réel, vous enregistreriez ces paramètres en base de données
+    # Pour l'instant, nous simulons simplement une mise à jour réussie
+    
+    log_user_action(
+        action='UPDATE_INTEGRATION_SETTINGS',
+        resource_type='Company',
+        resource_id=company.id,
+        new_values=data,
+        details={'company_id': company.id}
+    )
+    
+    return jsonify({
+        "message": "Paramètres d'intégration mis à jour avec succès", 
+        "settings": data
+    }), 200

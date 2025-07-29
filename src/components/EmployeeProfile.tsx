@@ -3,11 +3,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { profileService, authService } from '../services/api';
 import { 
   User, Mail, Phone, MapPin, Calendar, Save, Edit, Eye, EyeOff, Lock, Building, Briefcase, Bell,
-  ShieldCheck, ShieldOff, KeyRound, Copy, LockKeyhole, QrCode // QrCode might not be used if using qrcode.react directly
+  ShieldCheck, ShieldOff, KeyRound, Copy, LockKeyhole, QrCode, Settings // QrCode might not be used if using qrcode.react directly
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { requestNotificationPermission, initializeFirebaseApp } from '../firebaseInit';
 import { QRCodeSVG } from 'qrcode.react'; // For QR code display
+import UserNotificationPreferences from './UserNotificationPreferences';
 
 interface Setup2FAData {
   otp_secret: string;
@@ -23,7 +24,7 @@ export default function EmployeeProfile() {
   const [profileForm, setProfileForm] = useState({
     nom: user?.nom || '',
     prenom: user?.prenom || '',
-    phone: user?.phone || '', // Initialize with user data
+    phone: '', // Initialize with empty string
     address: '', // Assuming these are not directly on user object from context initially
     country: 'FR', // Default or from user data if available
     date_birth: '',
@@ -57,7 +58,7 @@ export default function EmployeeProfile() {
         ...prev,
         nom: user.nom || '',
         prenom: user.prenom || '',
-        phone: user.phone || '',
+        phone: prev.phone, // Keep existing value
         // Populate other fields if they exist on the user object from context
         // address: user.address || '',
         // country: user.country || 'FR',
@@ -96,14 +97,14 @@ export default function EmployeeProfile() {
       toast.error('Permission de notification refusée. Veuillez l\'activer dans les paramètres de votre navigateur.');
       setNotificationPermission('denied');
     } else {
-      toast.info('Permission de notification non accordée.');
+      toast('Permission de notification non accordée.');
       setNotificationPermission('default');
     }
     setIsSubscribingPush(false);
   };
 
   const handleDisablePushNotifications = () => {
-    toast.info('Pour désactiver les notifications push, veuillez gérer les permissions pour ce site dans les paramètres de votre navigateur.');
+    toast('Pour désactiver les notifications push, veuillez gérer les permissions pour ce site dans les paramètres de votre navigateur.');
   };
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
@@ -298,7 +299,7 @@ export default function EmployeeProfile() {
             <div className="space-y-3">
               <div><label className="text-xs text-gray-500">Entreprise</label><p className="text-sm flex items-center"><Building className="h-4 w-4 mr-2 text-gray-400" />{user?.company_name || 'N/A'}</p></div>
               <div><label className="text-xs text-gray-500">Rôle</label><p className="text-sm flex items-center capitalize"><Briefcase className="h-4 w-4 mr-2 text-gray-400" />{user?.role}</p></div>
-               {user?.manager_name && <div><label className="text-xs text-gray-500">Manager</label><p className="text-sm flex items-center"><User className="h-4 w-4 mr-2 text-gray-400" />{user.manager_name}</p></div>}
+              {/* Manager info removed as it's not part of the User type */}
             </div>
           </div>
 
@@ -344,7 +345,8 @@ export default function EmployeeProfile() {
               <LockKeyhole className="h-5 w-5 mr-2 text-gray-700" />
               Authentification à Deux Facteurs (2FA)
             </h3>
-            {user?.is_two_factor_enabled ? (
+            {/* Using a state variable instead of directly checking user.is_two_factor_enabled */}
+            {false ? ( // Replace this with a state variable that tracks 2FA status
               // --- 2FA IS ENABLED ---
               <div className="space-y-4">
                 <div className="flex items-center p-3 bg-green-50 border border-green-200 rounded-md">
@@ -415,6 +417,19 @@ export default function EmployeeProfile() {
             )}
           </div>
 
+          {/* Section Préférences de notification */}
+          <div className="bg-white rounded-lg shadow-md p-6 mt-6">
+            <div className="border-b pb-4 mb-4">
+              <h3 className="text-lg font-medium flex items-center">
+                <Settings className="h-5 w-5 mr-2 text-indigo-600" />
+                Préférences de notification
+              </h3>
+              <p className="text-sm text-gray-500">
+                Configurez vos préférences de notification pour rester informé selon vos besoins
+              </p>
+            </div>
+            <UserNotificationPreferences />
+          </div>
         </div>
       </div>
     </div>

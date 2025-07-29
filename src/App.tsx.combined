@@ -1,0 +1,359 @@
+import React, { lazy, Suspense } from 'react'
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import Login from './pages/Login'
+import Dashboard from './pages/Dashboard'
+import AdminDashboard from './pages/AdminDashboard'
+
+// Composant temporaire pour le module de gestion des abonnements
+const SubscriptionManagementModule = () => {
+  return (
+    <div className="p-4">
+      <h1 className="text-xl font-bold mb-4">Module de gestion des abonnements</h1>
+      <p className="text-red-500">
+        Le module est temporairement indisponible en raison d'un problème technique.
+        Nous travaillons à sa résolution.
+      </p>
+    </div>
+  );
+}
+
+import ChefServiceDashboard from './pages/ChefServiceDashboard'
+import ChefProjetDashboard from './pages/ChefProjetDashboard'
+import ManagerDashboard from './pages/ManagerDashboard'
+import AuditeurDashboard from './pages/AuditeurDashboard'
+import CheckIn from './pages/CheckIn'
+import Checkout from './pages/Checkout'
+import PausePage from './pages/Pause'
+import AttendancePage from './pages/Attendance'
+import Profile from './pages/Profile'
+import History from './pages/History'
+import AttendanceHome from './pages/attendance/AttendanceHome'
+import CheckInPage from './pages/attendance/CheckInPage'
+import Settings from './pages/Settings'
+import SuperAdminDashboard from './pages/SuperAdminDashboard'
+import CompanyManagement from './pages/CompanyManagement'
+import EmployeeManagement from './pages/EmployeeManagement'
+import EmployeeDetailsPage from './pages/EmployeeDetailsPage'
+import Reports from './pages/Reports'
+import TeamCalendarPage from './pages/TeamCalendarPage'
+import GeofencingPage from './pages/GeofencingPage'
+import OfficeManagementPage from './pages/OfficeManagementPage'
+import OrganizationManagement from './pages/OrganizationManagement'
+import AdvancedFeatures from './pages/AdvancedFeatures'
+import RoleManagementPage from './pages/RoleManagementPage'
+import BillingManagement from './pages/BillingManagement'
+import WebhookManagementPage from './pages/WebhookManagementPage'
+import ExtensionRequestsPage from './pages/ExtensionRequests'
+import SubscriptionPlanPage from './pages/SubscriptionPlanPage'
+import Missions from './pages/Missions'
+import RequestLeavePage from './pages/RequestLeavePage';
+import MyLeaveHistoryPage from './pages/MyLeaveHistoryPage'; // Added MyLeaveHistoryPage
+import DebugPage from './pages/Debug'; // Page temporaire pour le débogage
+import Layout from './components/Layout'
+
+function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
+  const { user, loading } = useAuth()
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Chargement...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" />
+  }
+  
+  if (requiredRole && user.role !== requiredRole) {
+    return <Navigate to="/" />
+  }
+  
+  return <>{children}</>
+}
+function App() {
+  return (
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          
+          {/* Route de débogage (à supprimer en production) */}
+          <Route path="/debug" element={<DebugPage />} />
+          
+          {/* Routes SuperAdmin */}
+          <Route path="/superadmin" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <SuperAdminDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/companies" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <CompanyManagement />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/billing" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <BillingManagement />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/subscription/*" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <SubscriptionManagementModule />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Route conservée pour la compatibilité */}
+          <Route path="/superadmin/subscription-plans" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <Navigate to="/superadmin/subscription" replace />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/superadmin/extension-requests" element={
+            <ProtectedRoute requiredRole="superadmin">
+              <Layout>
+                <ExtensionRequestsPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Routes Admin */}
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <Layout>
+                <AdminDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/employees" element={
+            <ProtectedRoute>
+              <Layout>
+                <EmployeeManagement />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/employees/:id" element={
+            <ProtectedRoute>
+              <Layout>
+                <EmployeeDetailsPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/offices" element={
+            <ProtectedRoute>
+              <Layout>
+                <OfficeManagementPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/organization" element={
+            <ProtectedRoute>
+              <Layout>
+                <OrganizationManagement />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/webhooks" element={
+            <ProtectedRoute> {/* Assuming general admin access, refine with specific role if needed */}
+              <Layout>
+                <WebhookManagementPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/webhooks" element={
+            <ProtectedRoute> {/* Assuming general admin access, refine with specific role if needed */}
+              <Layout>
+                <WebhookManagementPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Dashboards par rôle */}
+          <Route path="/chef-service" element={
+            <ProtectedRoute requiredRole="chef_service">
+              <Layout>
+                <ChefServiceDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/chef-projet" element={
+            <ProtectedRoute requiredRole="chef_projet">
+              <Layout>
+                <ChefProjetDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/manager" element={
+            <ProtectedRoute requiredRole="manager">
+              <Layout>
+                <ManagerDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/auditeur" element={
+            <ProtectedRoute requiredRole="auditeur">
+              <Layout>
+                <AuditeurDashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Nouvelles routes */}
+          <Route path="/reports" element={
+            <ProtectedRoute>
+              <Layout>
+                <Reports />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/team-calendar" element={
+            <ProtectedRoute>
+              <Layout>
+                <TeamCalendarPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/geofencing" element={
+            <ProtectedRoute>
+              <Layout>
+                <GeofencingPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/missions" element={
+            <ProtectedRoute>
+              <Layout>
+                <Missions />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/advanced" element={
+            <ProtectedRoute>
+              <Layout>
+                <AdvancedFeatures />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/roles" element={
+            <ProtectedRoute>
+              <Layout>
+                <RoleManagementPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/leave" element={
+            <ProtectedRoute>
+              <Layout>
+                <RequestLeavePage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/leave/history" element={
+            <ProtectedRoute>
+              <Layout>
+                <MyLeaveHistoryPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/subscription-plans" element={
+            <ProtectedRoute>
+              <Layout>
+                <SubscriptionPlanPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/settings" element={
+            <ProtectedRoute>
+              <Layout>
+                <Settings />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/history" element={
+            <ProtectedRoute>
+              <Layout>
+                <History />
+              </Layout>
+            </ProtectedRoute>
+          } />
+
+          {/* Routes d'authentification et de profil */}
+          <Route path="/profile" element={
+            <ProtectedRoute>
+              <Layout>
+                <Profile />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Routes de présence */}
+          <Route path="/attendance" element={
+            <ProtectedRoute>
+              <Layout>
+                <AttendancePage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/attendance/home" element={
+            <ProtectedRoute>
+              <Layout>
+                <AttendanceHome />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/attendance/checkin" element={
+            <ProtectedRoute>
+              <Layout>
+                <CheckInPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/checkin" element={
+            <ProtectedRoute>
+              <CheckIn />
+            </ProtectedRoute>
+          } />
+          <Route path="/checkout" element={
+            <ProtectedRoute>
+              <Checkout />
+            </ProtectedRoute>
+          } />
+          <Route path="/pause" element={
+            <ProtectedRoute>
+              <PausePage />
+            </ProtectedRoute>
+          } />
+          
+          {/* Route par défaut */}
+          <Route path="/" element={
+            <ProtectedRoute>
+              <Layout>
+                <Dashboard />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          
+          {/* Redirection pour les routes inconnues */}
+          <Route path="*" element={<Navigate to="/" />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
+  )
+}
+
+export default App

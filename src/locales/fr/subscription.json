@@ -1,0 +1,63 @@
+{
+  "subscription_history": {
+    "title": "Historique des abonnements",
+    "view_history": "Voir l'historique des abonnements",
+    "history": "Historique",
+    "current_plan": "Plan actuel",
+    "changes_history": "Historique des modifications",
+    "no_history": "Aucun historique de changement d'abonnement disponible",
+    "date": "Date",
+    "user": "Utilisateur",
+    "old_plan": "Ancien plan",
+    "new_plan": "Nouveau plan",
+    "max_employees_change": "Changement d'effectif max",
+    "reason": "Raison",
+    "no_change": "Pas de changement",
+    "no_reason": "Pas de raison spécifiée",
+    "no_previous_plan": "Premier abonnement",
+    "load_error": "Erreur lors du chargement de l'historique des abonnements"
+  },
+  "notification": {
+    "subscription_expiration": "Expiration de l'abonnement",
+    "subscription_expiration_soon": "Votre abonnement expire bientôt",
+    "subscription_expired": "Votre abonnement a expiré",
+    "days_remaining": "{{days}} jours restants"
+  },
+  "notifications": {
+    "title": "Notifications",
+    "mark_all_read": "Tout marquer comme lu",
+    "no_notifications": "Aucune notification",
+    "view_all": "Voir toutes",
+    "subscription_expiring": "Votre abonnement expire bientôt",
+    "subscription_expired": "Votre abonnement a expiré",
+    "subscription_info": "Informations sur l'abonnement",
+    "new_notification": "Nouvelle notification",
+    "expired": "Expiré",
+    "expiring_soon": "Expiration proche",
+    "days_remaining": "{days} jours restants",
+    "renewal_info": "Veuillez renouveler votre abonnement pour continuer à utiliser toutes les fonctionnalités",
+    "contact_admin": "Contactez votre administrateur pour plus d'informations",
+    "manage_subscription": "Gérer l'abonnement"
+  },
+  "common": {
+    "back": "Retour",
+    "system": "Système",
+    "loading": "Chargement...",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "unknown": "Inconnu"
+  },
+  "subscription_management": {
+    "company_subscriptions": "Abonnements des entreprises",
+    "subscription_plan": "Plan d'abonnement",
+    "change_plan": "Changer de plan",
+    "change_subscription_plan": "Changer le plan d'abonnement",
+    "change_plan_for": "Changer le plan d'abonnement pour {{company}}",
+    "employees": "employés",
+    "expiration_date": "Date d'expiration",
+    "max_employees": "Employés max",
+    "actions": "Actions",
+    "no_companies": "Aucune entreprise disponible",
+    "no_plan": "Pas de plan"
+  }
+}
