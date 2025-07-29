@@ -12,7 +12,8 @@ export const api = axios.create({
 // Intercepteur pour gérer les erreurs
 api.interceptors.response.use(
   (response) => {
-    console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`)
+    // Ne pas logger les réponses réussies en production
+    // console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`)
     return response
   },
   (error) => {
@@ -58,8 +59,10 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
-      console.log(`🔑 Token ajouté à la requête ${config.method?.toUpperCase()} ${config.url}`)
+      // En production, nous ne loggons pas les informations sensibles d'authentification
+      // console.log(`🔑 Token ajouté à la requête ${config.method?.toUpperCase()} ${config.url}`)
     } else {
+      // Uniquement logger les erreurs d'authentification
       console.log(`⚠️ Aucun token pour la requête ${config.method?.toUpperCase()} ${config.url}`)
     }
     return config
@@ -149,9 +152,10 @@ export const authService = {
 }
 
 export const attendanceService = {
-  checkInOffice: async (coordinates: { latitude: number; longitude: number }) => {
+  checkInOffice: async (coordinates: { latitude: number; longitude: number; qrCode?: string }) => {
     try {
-      console.log('🏢 Pointage bureau avec coordonnées:', coordinates)
+      // Ne pas logger les coordonnées en production pour des raisons de confidentialité
+      // console.log('🏢 Pointage bureau avec coordonnées:', coordinates)
       return await api.post('/attendance/checkin/office', { coordinates })
     } catch (error: any) {
       if (error.response?.data?.message) {
@@ -165,7 +169,8 @@ export const attendanceService = {
   
   checkInMission: async (missionOrderNumber: string, coordinates?: { latitude: number; longitude: number }) => {
     try {
-      console.log('🚀 Pointage mission:', missionOrderNumber, coordinates ? 'avec coordonnées' : 'sans coordonnées')
+      // Ne pas logger les informations de mission et coordonnées en production
+      // console.log('🚀 Pointage mission:', missionOrderNumber, coordinates ? 'avec coordonnées' : 'sans coordonnées')
       const data: any = { mission_order_number: missionOrderNumber }
       
       // Ajouter les coordonnées si disponibles
@@ -184,13 +189,38 @@ export const attendanceService = {
     }
   },
   
+  // Méthode de pointage QR code
+  checkInQr: async (qrData: string) => {
+    try {
+      return await api.post('/attendance/checkin/qr', { qr_data: qrData })
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        console.error('QR checkin service error:', error.response.data.message)
+      } else {
+        console.error('QR checkin service error:', error)
+      }
+      throw error
+    }
+  },
+  
+  // Méthode de pointage hors ligne
+  checkInOffline: async (timestamp: string) => {
+    try {
+      return await api.post('/attendance/checkin/offline', { timestamp })
+    } catch (error: any) {
+      console.error('Offline checkin service error:', error)
+      throw error
+    }
+  },
+  
   getAttendance: async (startDate?: string, endDate?: string) => {
     try {
       const params: any = {}
       if (startDate) params.start_date = startDate
       if (endDate) params.end_date = endDate
 
-      console.log('📊 Récupération des pointages...')
+      // Pas besoin de logger chaque récupération de pointages
+      // console.log('📊 Récupération des pointages...')
       return await api.get('/attendance', { params })
     } catch (error) {
       console.error('Get attendance service error:', error)
@@ -200,10 +230,20 @@ export const attendanceService = {
   
   getStats: async () => {
     try {
-      console.log('📈 Récupération des statistiques...')
+      // Pas besoin de logger chaque récupération de statistiques
+      // console.log('📈 Récupération des statistiques...')
       return await api.get('/attendance/stats')
     } catch (error) {
       console.error('Get stats service error:', error)
+      throw error
+    }
+  },
+  
+  getLast7DaysStats: async () => {
+    try {
+      return await api.get('/attendance/last7days')
+    } catch (error) {
+      console.error('Get last 7 days stats service error:', error)
       throw error
     }
   },
@@ -220,26 +260,75 @@ export const attendanceService = {
 
   checkout: async () => {
     try {
-
       return await api.post('/attendance/checkout')
     } catch (error) {
       console.error('Checkout service error:', error)
       throw error
     }
   },
-
-  startPause: async () => {
+  
+  // Récupérer le pointage du jour pour l'utilisateur courant
+  getTodayAttendance: async () => {
     try {
-      return await api.post('/attendance/pause/start')
+      return await api.get('/attendance/today')
+    } catch (error) {
+      console.error('Get today attendance service error:', error)
+      throw error
+    }
+  },
+  
+  // Récupérer les statistiques hebdomadaires
+  getWeeklyStats: async () => {
+    try {
+      return await api.get('/attendance/stats/weekly')
+    } catch (error) {
+      console.error('Get weekly stats service error:', error)
+      throw error
+    }
+  },
+  
+  // Récupérer les missions actives
+  getActiveMissions: async () => {
+    try {
+      return await api.get('/missions/active')
+    } catch (error) {
+      console.error('Get active missions service error:', error)
+      throw error
+    }
+  },
+  
+  // Récupérer les pauses du jour
+  getPauses: async () => {
+    try {
+      return await api.get('/attendance/pauses')
+    } catch (error) {
+      console.error('Get pauses service error:', error)
+      throw error
+    }
+  },
+  
+  // Justifier un retard
+  justifyDelay: async (pointageId: number, reason: string, category: string) => {
+    try {
+      return await api.post(`/attendance/justify/${pointageId}`, { reason, category })
+    } catch (error) {
+      console.error('Justify delay service error:', error)
+      throw error
+    }
+  },
+
+  startPause: async (pauseType: string) => {
+    try {
+      return await api.post('/attendance/pause/start', { type: pauseType })
     } catch (error) {
       console.error('Start pause service error:', error)
       throw error
     }
   },
 
-  endPause: async () => {
+  endPause: async (pauseId: number) => {
     try {
-      return await api.post('/attendance/pause/end')
+      return await api.post('/attendance/pause/end', { pause_id: pauseId })
     } catch (error) {
       console.error('End pause service error:', error)
       throw error
@@ -295,6 +384,26 @@ export const superAdminService = {
       throw error
     }
   },
+  
+  // Services pour la gestion des plans et abonnements
+  
+  getCompanySubscriptions: async () => {
+    try {
+      return await api.get('/superadmin/subscription/companies')
+    } catch (error) {
+      console.error('Get company subscriptions service error:', error)
+      throw error
+    }
+  },
+  
+  getSubscriptionStats: async () => {
+    try {
+      return await api.get('/superadmin/subscription/stats')
+    } catch (error) {
+      console.error('Get subscription stats service error:', error)
+      throw error
+    }
+  },
 
   // Services pour la gestion des abonnements - CORRIGÉS
   toggleCompanyStatus: async (companyId: number, data: { suspend: boolean, reason: string, notify_admin: boolean }) => {
@@ -307,12 +416,26 @@ export const superAdminService = {
     }
   },
 
-  extendSubscription: async (companyId: number, data: { months: number, reason?: string }) => {
+  extendSubscription: async (companyId: number, data: { 
+    months: number, 
+    reason?: string,
+    subscription_plan_id?: number
+  }) => {
     try {
       console.log(`📅 Prolongation abonnement entreprise ${companyId} de ${data.months} mois...`)
       return await api.put(`/superadmin/companies/${companyId}/extend-subscription`, data)
     } catch (error) {
       console.error('Extend subscription service error:', error)
+      throw error
+    }
+  },
+
+  getCompany: async (companyId: number) => {
+    try {
+      console.log(`🔍 Récupération des détails de l'entreprise ${companyId}...`)
+      return await api.get(`/superadmin/companies/${companyId}`)
+    } catch (error) {
+      console.error('Get company details service error:', error)
       throw error
     }
   },
@@ -346,6 +469,26 @@ export const superAdminService = {
       throw error
     }
   },
+  
+  updateCompanySubscription: async (companyId: number, planId: number) => {
+    try {
+      return await api.put(`/superadmin/companies/${companyId}/subscription`, {
+        subscription_plan_id: planId
+      })
+    } catch (error) {
+      console.error('Update company subscription service error:', error)
+      throw error
+    }
+  },
+  
+  getCompanySubscriptionHistory: async (companyId: number) => {
+    try {
+      return await api.get(`/superadmin/companies/${companyId}/subscription/history`)
+    } catch (error) {
+      console.error('Get company subscription history service error:', error)
+      throw error
+    }
+  },
 
   // ===== FACTURATION =====
   getCompanyInvoices: async (companyId: number) => {
@@ -371,6 +514,73 @@ export const superAdminService = {
       return await api.post(`/superadmin/invoices/${invoiceId}/pay`, data)
     } catch (error) {
       console.error('Pay invoice service error:', error)
+      throw error
+    }
+  },
+  
+  createInvoice: async (companyId: number, data: { amount: number, months: number, description: string, due_date: string }) => {
+    try {
+      return await api.post(`/superadmin/companies/${companyId}/invoices`, data)
+    } catch (error) {
+      console.error('Create invoice service error:', error)
+      throw error
+    }
+  },
+  
+  sendInvoiceReminder: async (invoiceId: number) => {
+    try {
+      return await api.post(`/superadmin/invoices/${invoiceId}/remind`)
+    } catch (error) {
+      console.error('Send invoice reminder service error:', error)
+      throw error
+    }
+  },
+  
+  downloadInvoicePdf: async (invoiceId: number) => {
+    try {
+      return await api.get(`/superadmin/invoices/${invoiceId}/pdf`, { 
+        responseType: 'blob' 
+      })
+    } catch (error) {
+      console.error('Download invoice PDF service error:', error)
+      throw error
+    }
+  },
+
+  // ===== SERVICES POUR LES PLANS D'ABONNEMENT =====
+  
+  getSubscriptionPlans: async () => {
+    try {
+      return await api.get('/subscription/plans')
+    } catch (error) {
+      console.error('Get subscription plans service error:', error)
+      throw error
+    }
+  },
+  
+  createSubscriptionPlan: async (planData: any) => {
+    try {
+      return await api.post('/subscription/plans', planData)
+    } catch (error) {
+      console.error('Create subscription plan service error:', error)
+      throw error
+    }
+  },
+  
+  updateSubscriptionPlan: async (planId: number, planData: any) => {
+    try {
+      return await api.put(`/subscription/plans/${planId}`, planData)
+    } catch (error) {
+      console.error('Update subscription plan service error:', error)
+      throw error
+    }
+  },
+  
+  deleteSubscriptionPlan: async (planId: number) => {
+    try {
+      return await api.delete(`/subscription/plans/${planId}`)
+    } catch (error) {
+      console.error('Delete subscription plan service error:', error)
       throw error
     }
   },
@@ -624,6 +834,37 @@ export const missionService = {
 
 // Services Admin
 export const adminService = {
+  getNotificationsHistory: async (params?: { 
+    page?: number; 
+    perPage?: number; 
+    startDate?: string; 
+    endDate?: string;
+    userId?: number;
+    isRead?: boolean;
+    type?: string;
+    searchQuery?: string;
+    isSuperAdmin?: boolean;
+  }) => {
+    try {
+      console.log('📋 Récupération de l\'historique des notifications...')
+      // Détermine l'URL en fonction du rôle (superadmin ou admin)
+      const endpoint = params?.isSuperAdmin 
+        ? '/superadmin/admin/notifications-history'
+        : '/admin/notifications-history';
+        
+      // Supprime isSuperAdmin des paramètres pour ne pas l'envoyer à l'API
+      if (params?.isSuperAdmin !== undefined) {
+        const { isSuperAdmin, ...restParams } = params;
+        return await api.get(endpoint, { params: restParams });
+      } else {
+        return await api.get(endpoint, { params });
+      }
+    } catch (error) {
+      console.error('Get notifications history service error:', error)
+      throw error
+    }
+  },
+  
   getEmployees: async () => {
     try {
       return await api.get('/admin/employees')
@@ -672,6 +913,38 @@ export const adminService = {
       return await api.get('/admin/attendance', { params: query })
     } catch (error) {
       console.error('Get company attendance service error:', error)
+      throw error
+    }
+  },
+  
+  getRecentActivities: async (limit: number = 5) => {
+    try {
+      // Utilisation de la route attendance existante au lieu de recent-activities
+      const response = await api.get('/admin/attendance', {
+        params: {
+          limit: limit
+        }
+      })
+      
+      // Transformer les données pour correspondre au format attendu
+      const activities = response.data.records?.slice(0, limit).map((record: any) => ({
+        id: record.id,
+        user_name: record.user_name,
+        action_type: record.type === 'mission' ? 'Pointage Mission' : 'Pointage Bureau',
+        date: record.date_pointage,
+        formatted_date: new Date(record.date_pointage + 'T' + record.heure_arrivee).toLocaleString('fr-FR', {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        }),
+        status: record.statut
+      })) || [];
+      
+      return { activities };
+    } catch (error) {
+      console.error('Get recent activities service error:', error)
       throw error
     }
   },
@@ -870,74 +1143,11 @@ export const adminService = {
     }
   },
 
-  getCompanySettings: async () => {
-    try {
-      return await api.get('/admin/company/settings')
-    } catch (error) {
-      console.error('Get company settings service error:', error)
-      throw error
-    }
-  },
+  // Les méthodes suivantes sont définies plus loin dans le code
+  // Voir les définitions complètes ci-dessous
   
-  // Service pour mettre à jour les paramètres de l'entreprise
-  updateCompanySettings: async (settings: any) => {
-    try {
-      console.log('⚙️ Mise à jour des paramètres de l\'entreprise...', settings)
-
-      // Filter only the allowed fields expected by the backend
-      const allowedFields = [
-        'office_latitude',
-        'office_longitude',
-        'office_radius',
-        'work_start_time',
-        'late_threshold',
-        'logo_url',
-        'theme_color'
-      ] as const
-
-      const payload: any = {}
-      for (const key of allowedFields) {
-        if (key in settings) {
-
-        }
-      }
-
-      return await api.put('/admin/company/settings', payload)
-    } catch (error) {
-      console.error('Update company settings service error:', error)
-      throw error
-    }
-  },
-
-
-
-  // Subscription management for company admins
-  getCompanySubscription: async () => {
-    try {
-      return await api.get('/admin/subscription')
-    } catch (error) {
-      console.error('Get company subscription service error:', error)
-      throw error
-    }
-  },
-
-  createSubscriptionCheckoutSession: async (stripePriceId: string) => {
-    try {
-      return await api.post('/admin/subscription/checkout-session', { stripe_price_id: stripePriceId })
-    } catch (error) {
-      console.error('Create subscription checkout session service error:', error)
-      throw error
-    }
-  },
-
-  createCustomerPortalSession: async () => {
-    try {
-      return await api.post('/admin/subscription/customer-portal')
-    } catch (error) {
-      console.error('Create customer portal session service error:', error)
-      throw error
-    }
-  },
+  // Note: les méthodes pour la gestion des paramètres de l'entreprise et des abonnements
+  // ont été déplacées pour éviter les duplications de code
 
 
   // Leave policy management
@@ -976,6 +1186,8 @@ export const adminService = {
       throw error
     }
   },
+  
+
 
   downloadAttendancePdf: async (params?: { startDate?: string; endDate?: string }) => {
     try {
@@ -1000,6 +1212,169 @@ export const adminService = {
     } catch (error) {
       console.error(`Download employee ${employeeId} leave report error:`, error);
       throw error;
+    }
+  },
+  
+  // Méthodes pour les paramètres de l'entreprise
+  getCompanySettings: async () => {
+    try {
+      return await api.get('/admin/company/settings')
+    } catch (error) {
+      console.error('Get company settings service error:', error)
+      throw error
+    }
+  },
+  
+  updateCompanySettings: async (settings: any) => {
+    try {
+      return await api.put('/admin/company/settings', settings)
+    } catch (error) {
+      console.error('Update company settings service error:', error)
+      throw error
+    }
+  },
+  
+  uploadCompanyLogo: async (file: File) => {
+    try {
+      const formData = new FormData()
+      formData.append('logo', file)
+      return await api.post('/admin/company/logo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+    } catch (error) {
+      console.error('Upload company logo service error:', error)
+      throw error
+    }
+  },
+  
+  // Méthodes pour l'abonnement et la facturation
+  getCompanySubscription: async () => {
+    try {
+      return await api.get('/admin/company/subscription')
+    } catch (error) {
+      console.error('Get company subscription service error:', error)
+      throw error
+    }
+  },
+  
+  createSubscriptionCheckoutSession: async (stripePriceId: string) => {
+    try {
+      return await api.post('/admin/company/subscription/checkout', { stripe_price_id: stripePriceId })
+    } catch (error) {
+      console.error('Create checkout session service error:', error)
+      throw error
+    }
+  },
+  
+  createCustomerPortalSession: async () => {
+    try {
+      return await api.post('/admin/company/subscription/portal')
+    } catch (error) {
+      console.error('Create customer portal service error:', error)
+      throw error
+    }
+  },
+  
+  requestSubscriptionExtension: async (months: number, reason: string, planId?: number) => {
+    try {
+      return await api.post('/admin/company/subscription/extension-request', { 
+        months, 
+        reason, 
+        plan_id: planId // Envoyer l'ID du plan si disponible
+      })
+    } catch (error) {
+      console.error('Request subscription extension service error:', error)
+      throw error
+    }
+  },
+  
+  getCompanyInvoices: async () => {
+    try {
+      return await api.get('/admin/company/invoices')
+    } catch (error) {
+      console.error('Get company invoices service error:', error)
+      throw error
+    }
+  },
+  
+  // Méthodes pour les notifications et alertes
+  getNotificationSettings: async () => {
+    try {
+      return await api.get('/admin/company/notification-settings')
+    } catch (error) {
+      console.error('Get notification settings service error:', error)
+      throw error
+    }
+  },
+  
+  updateNotificationSettings: async (settings: any) => {
+    try {
+      return await api.put('/admin/company/notification-settings', settings)
+    } catch (error) {
+      console.error('Update notification settings service error:', error)
+      throw error
+    }
+  },
+  
+  // Méthodes pour les préférences de notification utilisateur
+  getUserNotificationPreferences: async () => {
+    try {
+      return await api.get('/user/notifications/preferences')
+    } catch (error) {
+      console.error('Get user notification preferences service error:', error)
+      throw error
+    }
+  },
+  
+  updateUserNotificationPreferences: async (preferences: any) => {
+    try {
+      return await api.put('/user/notifications/preferences', preferences)
+    } catch (error) {
+      console.error('Update user notification preferences service error:', error)
+      throw error
+    }
+  },
+  
+  // Méthodes pour les intégrations et webhooks
+  getIntegrationSettings: async () => {
+    try {
+      return await api.get('/admin/company/integration-settings')
+    } catch (error) {
+      console.error('Get integration settings service error:', error)
+      throw error
+    }
+  },
+  
+  updateIntegrationSettings: async (settings: any) => {
+    try {
+      return await api.put('/admin/company/integration-settings', settings)
+    } catch (error) {
+      console.error('Update integration settings service error:', error)
+      throw error
+    }
+  },
+  
+  generateApiKey: async () => {
+    try {
+      return await api.post('/admin/company/generate-api-key')
+    } catch (error) {
+      console.error('Generate API key service error:', error)
+      throw error
+    }
+  },
+  
+  // Méthodes pour l'exportation de données
+  exportCompanyData: async (format: string, dataType: string) => {
+    try {
+      return await api.get(`/admin/company/export/${dataType}`, {
+        params: { format },
+        responseType: 'blob'
+      })
+    } catch (error) {
+      console.error('Export company data service error:', error)
+      throw error
     }
   }
 }
@@ -1035,6 +1410,25 @@ export const profileService = {
       throw error
     }
   },
+  
+  // Méthodes pour les préférences de notification utilisateur
+  getUserNotificationPreferences: async () => {
+    try {
+      return await api.get('/user/notifications/preferences')
+    } catch (error) {
+      console.error('Get user notification preferences service error:', error)
+      throw error
+    }
+  },
+  
+  updateUserNotificationPreferences: async (preferences: any) => {
+    try {
+      return await api.put('/user/notifications/preferences', preferences)
+    } catch (error) {
+      console.error('Update user notification preferences service error:', error)
+      throw error
+    }
+  },
 }
 
 // Service pour les notifications utilisateur
@@ -1044,6 +1438,39 @@ export const notificationService = {
       return await api.get('/notifications')
     } catch (error) {
       console.error('List notifications service error:', error)
+      throw error
+    }
+  },
+  
+  markAsRead: async (notificationId: number) => {
+    try {
+      return await api.post(`/notifications/${notificationId}/read`)
+    } catch (error) {
+      console.error('Mark notification as read service error:', error)
+      throw error
+    }
+  },
+  
+  markAllAsRead: async () => {
+    try {
+      return await api.post('/notifications/mark-all-read')
+    } catch (error) {
+      console.error('Mark all notifications as read service error:', error)
+      throw error
+    }
+  },
+  
+  getHistory: async (params?: { 
+    page?: number; 
+    perPage?: number;
+    search?: string;
+    read?: boolean;
+  }) => {
+    try {
+      console.log('📋 Récupération de l\'historique des notifications utilisateur...')
+      return await api.get('/notifications/history', { params })
+    } catch (error) {
+      console.error('Get user notifications history service error:', error)
       throw error
     }
   }
