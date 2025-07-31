@@ -38,7 +38,9 @@ from backend.routes.export_routes import export_bp # Added Export blueprint
 from backend.routes.attendance_extras import attendance_extras_bp # Added Attendance Extras blueprint
 from backend.routes.pause_routes import pause_bp # Added Pause blueprint
 from backend.routes.stats_routes import stats_bp # Added Stats blueprint
+from backend.routes.qr_attendance_routes import qr_code_bp # Added QR Attendance routes
 from backend.routes.user_notification_routes import user_notifications_bp # Added User Notifications blueprint
+from backend.routes.admin_attendance_routes import admin_attendance_bp # Added Admin Attendance blueprint
 
 # Import middleware
 from backend.middleware.auth import init_auth_middleware
@@ -117,6 +119,8 @@ def create_app():
     app.register_blueprint(stats_bp, url_prefix='/api') # Registered Stats blueprint
     app.register_blueprint(subscription_plan_bp, url_prefix='/api/subscription') # Registered Subscription Plan blueprint
     app.register_blueprint(user_notifications_bp, url_prefix='/api/user/notifications') # Registered User Notifications blueprint
+    app.register_blueprint(admin_attendance_bp, url_prefix='/api/admin') # Registered Admin Attendance blueprint
+    app.register_blueprint(qr_code_bp, url_prefix='/api/attendance') # Registered QR Attendance routes
 
     # Ensure upload folder exists and expose uploads route
     upload_folder = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', app.config['UPLOAD_FOLDER']))

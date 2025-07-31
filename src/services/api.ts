@@ -203,6 +203,20 @@ export const attendanceService = {
     }
   },
   
+  // Méthode de pointage avec QR code et géolocalisation
+  qrCheckin: async (token: string, location?: { latitude: number; longitude: number; accuracy?: number }) => {
+    try {
+      return await api.post('/attendance/qr-checkin', { token, location })
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        console.error('QR checkin service error:', error.response.data.message)
+      } else {
+        console.error('QR checkin service error:', error)
+      }
+      throw error
+    }
+  },
+  
   // Méthode de pointage hors ligne
   checkInOffline: async (timestamp: string) => {
     try {
@@ -739,6 +753,73 @@ export const leaveService = {
       });
     } catch (error) {
       console.error('Download my leave report error:', error);
+      throw error;
+    }
+  },
+  // Nouvelles méthodes pour le système d'approbation
+  getLeaveRequestsToApprove: async (params: {
+    page?: number;
+    per_page?: number;
+    status?: string;
+    start_date?: string;
+    end_date?: string;
+    department_id?: string | number;
+    leave_type_id?: string | number;
+    user_id?: string | number;
+  }) => {
+    try {
+      return await api.get('/admin/leave/requests', { params });
+    } catch (error) {
+      console.error('Get leave requests to approve error:', error);
+      throw error;
+    }
+  },
+  approveLeaveRequest: async (id: number, data: { comment?: string }) => {
+    try {
+      return await api.post(`/admin/leave/requests/${id}/approve`, data);
+    } catch (error) {
+      console.error('Approve leave request error:', error);
+      throw error;
+    }
+  },
+  rejectLeaveRequest: async (id: number, data: { comment: string }) => {
+    try {
+      return await api.post(`/admin/leave/requests/${id}/reject`, data);
+    } catch (error) {
+      console.error('Reject leave request error:', error);
+      throw error;
+    }
+  },
+  getTeamLeaveEvents: async (params: {
+    start_date?: string;
+    end_date?: string;
+    department_id?: string | number;
+    include_pending?: boolean;
+  }) => {
+    try {
+      return await api.get('/admin/leave/calendar', { params });
+    } catch (error) {
+      console.error('Get team leave calendar error:', error);
+      throw error;
+    }
+  },
+  getEmployeeSubstitutes: async (departmentId?: number) => {
+    try {
+      const params: any = {};
+      if (departmentId) params.department_id = departmentId;
+      return await api.get('/leave/substitutes', { params });
+    } catch (error) {
+      console.error('Get employee substitutes error:', error);
+      throw error;
+    }
+  },
+  getTeamMembers: async (departmentId?: number) => {
+    try {
+      const params: any = {};
+      if (departmentId) params.department_id = departmentId;
+      return await api.get('/team/members', { params });
+    } catch (error) {
+      console.error('Get team members error:', error);
       throw error;
     }
   }

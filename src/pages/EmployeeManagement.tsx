@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { adminService } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { canCreateUserWithRole, UserRole } from '../types/roles'
 import { Link } from 'react-router-dom'
 import { 
   Users, 
@@ -273,7 +274,7 @@ const COUNTRIES = [
 ]
 
 export default function EmployeeManagement() {
-  const { isSuperAdmin } = useAuth()
+  const { isSuperAdmin, user } = useAuth()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -393,6 +394,12 @@ export default function EmployeeManagement() {
       return
     }
 
+    // Vérifier si l'utilisateur courant peut créer un utilisateur avec ce rôle
+    if (user && !canCreateUserWithRole(user.role, employeeForm.role as UserRole)) {
+      toast.error(`Vous n'avez pas la permission de créer un utilisateur avec le rôle ${employeeForm.role}`)
+      return
+    }
+
     setCreating(true)
     try {
       const employeeData = {
@@ -423,6 +430,12 @@ export default function EmployeeManagement() {
   const handleUpdateEmployee = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingEmployee) return
+    
+    // Vérifier si l'utilisateur courant peut modifier un utilisateur avec ce rôle
+    if (user && !canCreateUserWithRole(user.role, employeeForm.role as UserRole)) {
+      toast.error(`Vous n'avez pas la permission de modifier un utilisateur avec le rôle ${employeeForm.role}`)
+      return
+    }
 
     setUpdating(true)
     try {
@@ -1026,13 +1039,19 @@ export default function EmployeeManagement() {
                         onChange={(e) => handleInputChange('role', e.target.value)}
                         className="input-field"
                       >
-                        <option value="superadmin">SuperAdmin</option>
-                        <option value="admin_rh">Administrateur</option>
-                        <option value="chef_service">Chef de Service</option>
-                        <option value="chef_projet">Chef de Projet</option>
-                        <option value="manager">Manager</option>
-                        <option value="employee">Employé</option>
-                        <option value="auditeur">Auditeur</option>
+                        {user?.role && [
+                          {role: 'superadmin', label: 'SuperAdmin'},
+                          {role: 'admin_rh', label: 'Administrateur'},
+                          {role: 'chef_service', label: 'Chef de Service'},
+                          {role: 'chef_projet', label: 'Chef de Projet'},
+                          {role: 'manager', label: 'Manager'},
+                          {role: 'employee', label: 'Employé'},
+                          {role: 'auditeur', label: 'Auditeur'}
+                        ]
+                        .filter(option => canCreateUserWithRole(user.role, option.role as UserRole))
+                        .map(option => (
+                          <option key={option.role} value={option.role}>{option.label}</option>
+                        ))}
                       </select>
                     </div>
 

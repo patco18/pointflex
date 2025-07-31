@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { adminService } from '../services/api'
 import { useAuth } from '../contexts/AuthContext'
+import { canCreateUserWithRole, UserRole } from '../types/roles'
 import { useApi, useAsyncAction } from '../hooks/useApi'
 import toast from 'react-hot-toast'
 import Modal from './shared/Modal'
@@ -56,7 +57,7 @@ const COUNTRIES = [
 ]
 
 export default function EmployeeManagement() {
-  const { isAdmin, isSuperAdmin } = useAuth()
+  const { isAdmin, isSuperAdmin, user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
@@ -159,6 +160,12 @@ export default function EmployeeManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Vérifier si l'utilisateur courant peut créer un utilisateur avec ce rôle
+    if (user && !canCreateUserWithRole(user.role, form.role as UserRole)) {
+      toast.error(`Vous n'avez pas la permission de ${editingEmployee ? 'modifier' : 'créer'} un utilisateur avec le rôle ${form.role}`)
+      return
+    }
 
     // Prepare form data, ensuring manager_id is number or null
     const dataToSubmit: any = { ...form };
@@ -373,9 +380,18 @@ export default function EmployeeManagement() {
                 onChange={(e) => setForm(prev => ({ ...prev, role: e.target.value }))}
                 className="input-field"
               >
-                <option value="employee">Employé</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Administrateur</option>
+                {user?.role && [
+                  { role: 'employee', label: 'Employé' },
+                  { role: 'manager', label: 'Manager' },
+                  { role: 'admin_rh', label: 'Administrateur' },
+                  { role: 'chef_service', label: 'Chef de Service' },
+                  { role: 'chef_projet', label: 'Chef de Projet' },
+                  { role: 'auditeur', label: 'Auditeur' }
+                ]
+                .filter(option => canCreateUserWithRole(user.role, option.role as UserRole))
+                .map(option => (
+                  <option key={option.role} value={option.role}>{option.label}</option>
+                ))}
               </select>
             </div>
             <div>

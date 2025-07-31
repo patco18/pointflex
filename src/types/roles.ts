@@ -1,3 +1,7 @@
+// Import des permissions de congés et d'analytique
+import { LEAVE_PERMISSIONS, LEAVE_ROLE_PERMISSIONS } from './leavePermissions';
+import { ANALYTICS_PERMISSIONS, ANALYTICS_ROLE_PERMISSIONS } from './analyticsPermissions';
+
 // Types pour le système de rôles étendu
 export type UserRole = 
   | 'superadmin' 
@@ -12,7 +16,7 @@ export interface Permission {
   id: string
   name: string
   description: string
-  category: 'pointage' | 'gestion_equipe' | 'rapports' | 'administration' | 'missions' | 'audit'
+  category: 'pointage' | 'gestion_equipe' | 'rapports' | 'administration' | 'missions' | 'audit' | 'analytics'
 }
 
 export interface RoleDefinition {
@@ -27,6 +31,9 @@ export interface RoleDefinition {
 
 // Définition des permissions
 export const PERMISSIONS: Record<string, Permission> = {
+  // On ajoute également toutes les permissions de congés et d'analytique
+  ...LEAVE_PERMISSIONS,
+  ...ANALYTICS_PERMISSIONS,
   // Pointage
   'pointage.self': {
     id: 'pointage.self',
@@ -69,13 +76,19 @@ export const PERMISSIONS: Record<string, Permission> = {
   'team.create_users': {
     id: 'team.create_users',
     name: 'Créer utilisateurs',
-    description: 'Créer de nouveaux utilisateurs',
+    description: 'Créer de nouveaux utilisateurs dans l\'entreprise',
     category: 'gestion_equipe'
   },
   'team.assign_roles': {
     id: 'team.assign_roles',
     name: 'Assigner rôles',
-    description: 'Assigner des rôles aux utilisateurs',
+    description: 'Assigner des rôles aux utilisateurs (niveau inférieur ou égal uniquement)',
+    category: 'gestion_equipe'
+  },
+  'team.create_company_users': {
+    id: 'team.create_company_users',
+    name: 'Créer utilisateurs entreprise',
+    description: 'Créer des utilisateurs dans sa propre entreprise uniquement',
     category: 'gestion_equipe'
   },
 
@@ -185,13 +198,15 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
       'admin.global_management',
       'admin.system_config',
       'admin.company_settings',
-      'team.create_users',
-      'team.assign_roles',
+      ...ANALYTICS_ROLE_PERMISSIONS.superadmin,
+      'team.create_users', // Peut créer des utilisateurs globalement
+      'team.assign_roles', // Peut assigner n'importe quel rôle
       'team.manage',
       'reports.advanced',
       'reports.company',
       'audit.read_all',
       'audit.generate_reports'
+      // Pas de 'team.create_company_users' car le superadmin n'appartient pas à une entreprise spécifique
     ]
   },
   
@@ -203,11 +218,14 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
     color: 'bg-purple-100 text-purple-800',
     icon: 'Users',
     permissions: [
+      ...ANALYTICS_ROLE_PERMISSIONS.admin_rh,
       'pointage.self',
       'pointage.view_team',
       'pointage.validate',
       'pointage.edit_team',
       'team.create_users',
+      ...ANALYTICS_ROLE_PERMISSIONS.admin_rh,
+      'team.create_company_users', // Peut créer des utilisateurs dans sa propre entreprise
       'team.assign_roles',
       'team.manage',
       'missions.validate',
@@ -226,11 +244,13 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
     color: 'bg-blue-100 text-blue-800',
     icon: 'Building',
     permissions: [
+      ...ANALYTICS_ROLE_PERMISSIONS.chef_service,
       'pointage.self',
       'pointage.view_team',
       'pointage.validate',
       'team.view',
       'team.manage',
+      'team.create_company_users', // Peut créer des utilisateurs dans sa propre entreprise
       'missions.create',
       'missions.assign',
       'missions.track',
@@ -247,6 +267,7 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
     color: 'bg-green-100 text-green-800',
     icon: 'Target',
     permissions: [
+      ...ANALYTICS_ROLE_PERMISSIONS.chef_projet,
       'pointage.self',
       'pointage.view_team',
       'pointage.validate',
@@ -266,6 +287,7 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
     color: 'bg-yellow-100 text-yellow-800',
     icon: 'UserCheck',
     permissions: [
+      ...ANALYTICS_ROLE_PERMISSIONS.manager,
       'pointage.self',
       'pointage.view_team',
       'team.view',
@@ -282,6 +304,7 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
     color: 'bg-gray-100 text-gray-800',
     icon: 'User',
     permissions: [
+      ...ANALYTICS_ROLE_PERMISSIONS.employee,
       'pointage.self',
       'reports.personal'
     ]
@@ -295,6 +318,7 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
     color: 'bg-orange-100 text-orange-800',
     icon: 'Search',
     permissions: [
+      ...ANALYTICS_ROLE_PERMISSIONS.auditeur,
       'audit.read_all',
       'audit.generate_reports',
       'reports.company',
@@ -306,7 +330,17 @@ export const ROLES: Record<UserRole, RoleDefinition> = {
 // Fonction utilitaire pour vérifier les permissions
 export function hasPermission(userRole: UserRole, permission: string): boolean {
   const role = ROLES[userRole]
-  return role?.permissions.includes(permission) || false
+  // Vérifier les permissions de base
+  if (role?.permissions.includes(permission)) {
+    return true
+  }
+  
+  // Vérifier les permissions de congés
+  if (LEAVE_ROLE_PERMISSIONS[userRole]?.includes(permission)) {
+    return true
+  }
+  
+  return false
 }
 
 // Fonction pour obtenir toutes les permissions d'un rôle
@@ -314,7 +348,14 @@ export function getRolePermissions(userRole: UserRole): Permission[] {
   const role = ROLES[userRole]
   if (!role) return []
   
-  return role.permissions.map(permId => PERMISSIONS[permId]).filter(Boolean)
+  // Combiner les permissions standards et les permissions de congés
+  const standardPermissions = role.permissions.map(permId => PERMISSIONS[permId]).filter(Boolean)
+  
+  // Ajouter les permissions de congés
+  const leavePerms = LEAVE_ROLE_PERMISSIONS[userRole] || []
+  const leavePermissions = leavePerms.map(permId => LEAVE_PERMISSIONS[permId]).filter(Boolean)
+  
+  return [...standardPermissions, ...leavePermissions]
 }
 
 // Fonction pour vérifier si un rôle peut gérer un autre rôle
@@ -324,6 +365,37 @@ export function canManageRole(managerRole: UserRole, targetRole: UserRole): bool
   
   if (!manager || !target) return false
   
-  // Un rôle peut gérer les rôles de niveau inférieur
-  return manager.level < target.level
+  // Le superadmin peut gérer tous les rôles
+  if (managerRole === 'superadmin') return true;
+  
+  // Un rôle peut gérer uniquement les rôles de niveau inférieur au sien
+  // Plus le niveau est élevé, moins le rôle est privilégié (inversé par rapport à l'intuition)
+  return manager.level < target.level;
+}
+
+// Fonction pour vérifier si un utilisateur peut créer/modifier un utilisateur avec un certain rôle
+export function canCreateUserWithRole(creatorRole: UserRole, targetRole: UserRole, sameCompany: boolean = true): boolean {
+  const creator = ROLES[creatorRole]
+  const target = ROLES[targetRole]
+  
+  if (!creator || !target) return false
+  
+  // Règle 1: Un utilisateur ne peut pas créer d'utilisateur avec un rôle supérieur au sien
+  // Plus le niveau est bas, plus le rôle est privilégié
+  if (creator.level >= target.level && creatorRole !== targetRole) return false;
+  
+  // Règle 2: Seuls le superadmin, l'admin RH et le chef de service peuvent créer des utilisateurs
+  if (!['superadmin', 'admin_rh', 'chef_service'].includes(creatorRole)) return false;
+  
+  // Règle 3: Le superadmin n'appartient pas à une entreprise spécifique et peut tout faire
+  if (creatorRole === 'superadmin') return true;
+  
+  // Règle 4: Les admins RH et chefs de service ne peuvent créer que des utilisateurs dans leur propre entreprise
+  if (['admin_rh', 'chef_service'].includes(creatorRole)) {
+    // Ils doivent avoir la permission de créer des utilisateurs dans leur entreprise
+    const hasCreateCompanyUsersPerm = hasPermission(creatorRole, 'team.create_company_users');
+    return sameCompany && hasCreateCompanyUsersPerm;
+  }
+  
+  return false;
 }

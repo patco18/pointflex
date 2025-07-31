@@ -12,6 +12,7 @@ interface TabsProps {
   defaultValue: string
   children: React.ReactNode
   className?: string
+  onValueChange?: (value: string) => void
 }
 
 interface TabsTriggerProps {
@@ -26,11 +27,19 @@ interface TabsContentProps {
   className?: string
 }
 
-export function Tabs({ defaultValue, children, className = '' }: TabsProps) {
+export function Tabs({ defaultValue, children, className = '', onValueChange }: TabsProps) {
   const [selectedTab, setSelectedTab] = useState(defaultValue)
   
+  // Handler pour mettre à jour l'état et appeler le callback externe si fourni
+  const handleTabChange = (value: string) => {
+    setSelectedTab(value);
+    if (onValueChange) {
+      onValueChange(value);
+    }
+  };
+  
   return (
-    <TabsContext.Provider value={{ selectedTab, setSelectedTab }}>
+    <TabsContext.Provider value={{ selectedTab, setSelectedTab: handleTabChange }}>
       <div className={className}>
         {children}
       </div>

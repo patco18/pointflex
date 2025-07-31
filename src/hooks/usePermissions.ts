@@ -33,6 +33,16 @@ export function usePermissions() {
     canCreateUsers: checkPermission('team.create_users'),
     canAssignRoles: checkPermission('team.assign_roles'),
     
+    // Permissions de congés
+    canRequestLeave: checkPermission('leave.request'),
+    canViewPersonalLeave: checkPermission('leave.view_personal'),
+    canViewTeamLeave: checkPermission('leave.view_team'),
+    canViewDepartmentLeave: checkPermission('leave.view_department'),
+    canViewAllLeave: checkPermission('leave.view_all'),
+    canApproveTeamLeave: checkPermission('leave.approve_team'),
+    canApproveDepartmentLeave: checkPermission('leave.approve_department'),
+    canApproveAllLeave: checkPermission('leave.approve_all'),
+    
     // Missions
     canCreateMissions: checkPermission('missions.create'),
     canValidateMissions: checkPermission('missions.validate'),

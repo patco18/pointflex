@@ -38,7 +38,7 @@ interface LayoutProps {
 
 export default function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth()
-  const { permissions } = usePermissions()
+  const { permissions, checkPermission } = usePermissions()
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
@@ -83,8 +83,10 @@ export default function Layout({ children }: LayoutProps) {
       // Section Infrastructure
       nav.push({ name: 'Gestion Bureaux', href: '/admin/offices', icon: Building, priority: false, permission: null })
       nav.push({ name: 'Géofencing', href: '/admin/geofencing', icon: MapPin, priority: false, permission: null })
+      nav.push({ name: 'Pointage QR Code', href: '/admin/qr-code', icon: Target, priority: false, permission: null })
       
       // Section Analyses et Paramètres
+      nav.push({ name: 'Historique Pointages', href: '/admin/attendance-history', icon: History, priority: false, permission: null })
       nav.push({ name: 'Rapports Entreprise', href: '/admin/reports', icon: FileText, priority: false, permission: null })
       nav.push({ name: 'Webhooks', href: '/admin/webhooks', icon: Globe, priority: false, permission: null })
       nav.push({ name: 'Paramètres Entreprise', href: '/admin/settings', icon: Cog, priority: false, permission: null })
@@ -115,12 +117,21 @@ export default function Layout({ children }: LayoutProps) {
 
     // Pointage regroupé pour tous (sauf auditeur)
     if (permissions.canSelfCheckIn) {
-      nav.push({ name: 'Nouveau Pointage', href: '/attendance/home', icon: Clock, priority: true, permission: null })
-      nav.push({ name: 'Pointage', href: '/checkin', icon: MapPin, priority: false, permission: null })
+      nav.push({ name: 'Pointage', href: '/attendance/home', icon: Clock, priority: true, permission: null })
     }
 
     // Historique personnel pour tous
     nav.push({ name: 'Historique', href: '/history', icon: History, priority: false, permission: null })
+    
+    // Menu Gestion des congés
+    if (checkPermission('leave.view_personal')) {
+      nav.push({ name: 'Congés', href: '/leave', icon: Calendar, priority: true, permission: null })
+    }
+    
+    // Tableau de bord analytique pour les rôles qui ont les permissions nécessaires
+    if (checkPermission('analytics.access_basic')) {
+      nav.push({ name: 'Tableau de Bord', href: '/analytics', icon: BarChart3, priority: true, permission: null })
+    }
 
     // Fonctionnalités avancées pour tous
     nav.push({ name: 'Fonctionnalités Avancées', href: '/advanced', icon: Zap, priority: false, permission: null })

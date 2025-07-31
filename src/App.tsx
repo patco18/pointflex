@@ -1,10 +1,13 @@
 import React, { lazy, Suspense } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { usePermissions } from './hooks/usePermissions'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import AdminDashboard from './pages/AdminDashboard'
 import AdminNotificationsHistory from './pages/admin/notifications/AdminNotificationsHistory'
+import AttendanceHistoryAdmin from './pages/admin/AttendanceHistoryAdmin'
+import AttendanceReport from './pages/admin/reports/AttendanceReport'
 import NotificationsHistory from './pages/NotificationsHistory'
 
 // Composant temporaire pour le module de gestion des abonnements
@@ -46,17 +49,36 @@ import AdvancedFeatures from './pages/AdvancedFeatures'
 import RoleManagementPage from './pages/RoleManagementPage'
 import BillingManagement from './pages/BillingManagement'
 import WebhookManagementPage from './pages/WebhookManagementPage'
+import AnalyticsPage from './pages/AnalyticsPage'
+import QRCodeAdmin from './pages/admin/QRCodeAdmin'
+import LeaveApprovalPage from './pages/admin/LeaveApprovalPage'
+import QRScanner from './components/qrcode/QRScanner'
+import AttendanceSuccess from './pages/attendance/AttendanceSuccess'
 import ExtensionRequestsPage from './pages/ExtensionRequests'
 import SubscriptionPlanPage from './pages/SubscriptionPlanPage'
 import SuperAdminSubscriptionPage from './pages/SuperAdminSubscriptionPage'
 import Missions from './pages/Missions'
-import RequestLeavePage from './pages/RequestLeavePage';
-import MyLeaveHistoryPage from './pages/MyLeaveHistoryPage'; // Added MyLeaveHistoryPage
 import DebugPage from './pages/Debug'; // Page temporaire pour le débogage
+import LeaveManagement from './pages/LeaveManagement';
+import LeaveRequestPage from './pages/leave/LeaveRequestPage';
+import MyLeaveHistoryPage from './pages/leave/MyLeaveHistoryPage';
+import TeamLeaveCalendar from './pages/leave/TeamLeaveCalendar';
+import LeaveApprovalManager from './pages/leave/LeaveApprovalPage';
+import LeaveBalancesPage from './pages/leave/LeaveBalancesPage';
+import RoleTestPage from './pages/RoleTestPage';
 import Layout from './components/Layout'
 
-function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode, requiredRole?: string }) {
+function ProtectedRoute({ 
+  children, 
+  requiredRole, 
+  requiredPermission 
+}: { 
+  children: React.ReactNode, 
+  requiredRole?: string,
+  requiredPermission?: string
+}) {
   const { user, loading } = useAuth()
+  const { checkPermission } = usePermissions()
   
   if (loading) {
     return (
@@ -74,6 +96,10 @@ function ProtectedRoute({ children, requiredRole }: { children: React.ReactNode,
   }
   
   if (requiredRole && user.role !== requiredRole) {
+    return <Navigate to="/" />
+  }
+  
+  if (requiredPermission && !checkPermission(requiredPermission)) {
     return <Navigate to="/" />
   }
   
@@ -192,6 +218,20 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/admin/attendance-history" element={
+            <ProtectedRoute>
+              <Layout>
+                <AttendanceHistoryAdmin />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/attendance-report" element={
+            <ProtectedRoute>
+              <Layout>
+                <AttendanceReport />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/superadmin/admin/notifications-history" element={
             <ProtectedRoute requiredRole="superadmin">
               <Layout>
@@ -282,6 +322,39 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/admin/qr-code" element={
+            <ProtectedRoute>
+              <Layout>
+                <QRCodeAdmin />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/leave-approval" element={
+            <ProtectedRoute>
+              <LeaveApprovalPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/attendance/qr-scanner" element={
+            <ProtectedRoute>
+              <Layout>
+                <QRScanner />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/attendance/qr-checkin/:token" element={
+            <ProtectedRoute>
+              <Layout>
+                <QRScanner />
+              </Layout>
+            </ProtectedRoute>
+          } />
+          <Route path="/attendance/success" element={
+            <ProtectedRoute>
+              <Layout>
+                <AttendanceSuccess />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/missions" element={
             <ProtectedRoute>
               <Layout>
@@ -303,20 +376,28 @@ function App() {
               </Layout>
             </ProtectedRoute>
           } />
+          <Route path="/roles/test" element={
+            <ProtectedRoute>
+              <Layout>
+                <RoleTestPage />
+              </Layout>
+            </ProtectedRoute>
+          } />
           <Route path="/leave" element={
             <ProtectedRoute>
               <Layout>
-                <RequestLeavePage />
+                <LeaveManagement />
               </Layout>
             </ProtectedRoute>
-          } />
-          <Route path="/leave/history" element={
-            <ProtectedRoute>
-              <Layout>
-                <MyLeaveHistoryPage />
-              </Layout>
-            </ProtectedRoute>
-          } />
+          }>
+            {/* Sous-routes pour la gestion des congés */}
+            <Route path="request" element={<LeaveRequestPage />} />
+            <Route path="my-history" element={<MyLeaveHistoryPage />} />
+            <Route path="team-calendar" element={<TeamLeaveCalendar />} />
+            <Route path="approvals" element={<LeaveApprovalManager />} />
+            <Route path="balances" element={<LeaveBalancesPage />} />
+            <Route index element={<Navigate to="/leave/my-history" replace />} />
+          </Route>
           <Route path="/subscription-plans" element={
             <ProtectedRoute>
               <Layout>
@@ -399,6 +480,15 @@ function App() {
           <Route path="/pause" element={
             <ProtectedRoute>
               <PausePage />
+            </ProtectedRoute>
+          } />
+          
+          {/* Tableau de bord analytique */}
+          <Route path="/analytics" element={
+            <ProtectedRoute requiredPermission="analytics.access_basic">
+              <Layout>
+                <AnalyticsPage />
+              </Layout>
             </ProtectedRoute>
           } />
           

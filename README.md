@@ -406,12 +406,20 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:pass@host:port/db'
 - [X] **Rapports PDF**: Génération de rapports de présence (entreprise, individuel) et logs d'audit. *(Backend implémenté; nécessite intégration UI Frontend pour téléchargement/filtrage)*
 - [X] **Application mobile**: Conception initiale et bases pour une application React Native. *(Structure de base, Auth et API client conceptuels; développement complet requis)*
 - [X] **Intégration calendrier**: Affichage des pointages et missions sur un calendrier d'équipe. *(Backend API et composant calendrier Frontend de base implémentés; améliorations UI/filtres possibles)*
-- [X] **Gestion des congés**: Système de demande et d'approbation des congés avec gestion des soldes. *(Backend pour modèles, soumission par employé, approbation admin et gestion des soldes implémenté; nécessite UI Frontend complète et logique d'accumulation annuelle)*
+- [X] **Gestion des congés**: Système de demande et d'approbation des congés avec gestion des soldes. Interface utilisateur complète avec formulaire de demande amélioré, calendrier des absences d'équipe et système d'approbation par les responsables.
 - [X] **API webhooks**: Système permettant aux applications externes de souscrire à des événements système. *(Backend pour modèles, création/liste de souscriptions, et distribution d'événements clés implémenté; nécessite UI Frontend et intégration de plus d'événements)*
 - [X] **Audit logs**: Journalisation complète des actions critiques. *(Modèle et utilitaires existants améliorés et intégrés plus largement; vue SuperAdmin existe; vue Admin Société est une amélioration possible)*
 
+### 🔄 Améliorations récentes et à venir
+
+**Système de gestion des congés amélioré:**
+- ✅ Formulaire de demande de congé enrichi avec sélection de remplaçant et téléchargement de justificatifs
+- ✅ Calendrier des absences d'équipe avec filtres par département et type de congé
+- ✅ Interface d'approbation pour les responsables avec notifications et commentaires
+- ✅ Intégration complète avec le système de soldes de congés
+
 **Autres améliorations possibles / Prochaines étapes de développement:**
-- Finalisation de l'interface utilisateur (Frontend) pour la Gestion des Congés.
+- Amélioration de la logique d'accumulation annuelle des congés.
 - Finalisation de l'interface utilisateur (Frontend) pour la gestion des Webhooks par les administrateurs d'entreprise.
 - Implémentation complète de l'application mobile React Native.
 - Intégration de la logique d'accumulation annuelle automatique pour les soldes de congés.

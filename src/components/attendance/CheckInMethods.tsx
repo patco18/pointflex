@@ -24,25 +24,9 @@ export default function CheckInMethods() {
     }
   }
   
-  const handleQrCheckIn = async (qrData: string) => {
-    setLoading(true)
-    try {
-      // Cette méthode sera implémentée dans le service API
-      const { data } = await attendanceService.checkInOffice({
-        latitude: 0,
-        longitude: 0,
-        qrCode: qrData
-      })
-      toast.success(data.message || 'Pointage par QR code réussi')
-      window.location.reload()
-    } catch (error: any) {
-      if (error.response?.data?.message) {
-        toast.error(error.response.data.message)
-      }
-    } finally {
-      setLoading(false)
-      setActiveMethod(null)
-    }
+  const handleQrCheckIn = () => {
+    // Redirection vers la page de scan QR dédiée
+    window.location.href = '/attendance/qr-scanner';
   }
   
   const handleOfflineCheckIn = () => {
@@ -112,7 +96,27 @@ export default function CheckInMethods() {
       ) : activeMethod === 'geo' ? (
         <GeoCheck onCheckIn={handleGeoCheckIn} onCancel={() => setActiveMethod(null)} loading={loading} />
       ) : activeMethod === 'qr' ? (
-        <QrScanner onScan={handleQrCheckIn} onCancel={() => setActiveMethod(null)} loading={loading} />
+        <div className="text-center py-6">
+          <p className="mb-4 text-gray-600">
+            Vous allez être redirigé vers la page de scan du QR code.
+          </p>
+          <div className="space-x-4">
+            <button 
+              onClick={handleQrCheckIn}
+              className="btn-primary"
+              disabled={loading}
+            >
+              Aller au scanner QR
+            </button>
+            <button 
+              onClick={() => setActiveMethod(null)}
+              className="btn-secondary"
+              disabled={loading}
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
       ) : activeMethod === 'offline' ? (
         <div className="text-center py-6">
           <p className="mb-4 text-gray-600">

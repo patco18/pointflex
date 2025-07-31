@@ -9,6 +9,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import toast from 'react-hot-toast'
+import { MapPin } from 'lucide-react'
 
 // Types temporaires - à remplacer par les types réels du service API
 interface Attendance {
@@ -252,14 +253,23 @@ export default function AttendanceHome() {
           </p>
         </div>
         
-        {todayAttendance?.heure_arrivee && (
-          <div className="text-right">
-            <span className="text-sm text-gray-500">Arrivée aujourd'hui</span>
-            <p className="text-lg font-semibold">
-              {format(new Date(`2000-01-01T${todayAttendance.heure_arrivee}`), 'HH:mm')}
-            </p>
-          </div>
-        )}
+        <div className="flex items-center space-x-4">
+          {!todayAttendance?.heure_arrivee && (
+            <a href="/checkin" className="inline-flex items-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg">
+              <MapPin className="h-5 w-5 mr-2" />
+              Enregistrer un pointage
+            </a>
+          )}
+          
+          {todayAttendance?.heure_arrivee && (
+            <div className="text-right">
+              <span className="text-sm text-gray-500">Arrivée aujourd'hui</span>
+              <p className="text-lg font-semibold">
+                {format(new Date(`2000-01-01T${todayAttendance.heure_arrivee}`), 'HH:mm')}
+              </p>
+            </div>
+          )}
+        </div>
       </div>
       
       {/* Statut du pointage du jour */}
