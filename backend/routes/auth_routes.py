@@ -26,29 +26,29 @@ def login():
         if not email or not password:
             return jsonify(message="Email et mot de passe requis"), 400
         
-        print(f"Tentative de connexion pour: {email}")
+        current_app.logger.info(f"Tentative de connexion pour: {email}")
         
         # Rechercher l'utilisateur
         user = User.query.filter_by(email=email).first()
         
         if not user:
-            print(f"Utilisateur non trouvé: {email}")
+            current_app.logger.info(f"Utilisateur non trouvé: {email}")
             return jsonify(message="Email ou mot de passe incorrect"), 401
         
         # Vérifier si le compte est verrouillé
         if user.is_locked():
-            print(f"Compte verrouillé: {email}")
+            current_app.logger.info(f"Compte verrouillé: {email}")
             return jsonify(message="Compte temporairement verrouillé"), 423
         
         # Vérifier le mot de passe
         if not user.check_password(password):
-            print(f"Mot de passe incorrect pour: {email}")
+            current_app.logger.info(f"Mot de passe incorrect pour: {email}")
             user.increment_failed_attempts()
             
             # Verrouiller le compte après 5 tentatives
             if user.failed_login_attempts >= 5:
                 user.lock_account()
-                print(f"Compte verrouillé après 5 tentatives: {email}")
+                current_app.logger.info(f"Compte verrouillé après 5 tentatives: {email}")
             
             db.session.commit()
             
@@ -65,7 +65,7 @@ def login():
         
         # Vérifier si l'utilisateur est actif
         if not user.is_active:
-            print(f"Utilisateur inactif: {email}")
+            current_app.logger.info(f"Utilisateur inactif: {email}")
             return jsonify(message="Compte désactivé"), 403
         
         # Connexion réussie
@@ -77,7 +77,7 @@ def login():
         
         db.session.commit()
         
-        print(f"Connexion réussie pour {email}, token généré")
+        current_app.logger.info(f"Connexion réussie pour {email}, token généré")
         
         # Logger la connexion réussie
         AuditLog.log_login(
@@ -111,7 +111,7 @@ def login():
         # 2FA not enabled, proceed with normal token generation
         access_token = create_access_token(identity=user)
         
-        print(f"Connexion réussie pour {email}, token généré")
+        current_app.logger.info(f"Connexion réussie pour {email}, token généré")
 
         # Logger la connexion réussie (already done by user.update_last_login() if AuditLog.log_login is called there)
         # AuditLog.log_login was already called after password check, which is fine.
@@ -134,7 +134,7 @@ def login():
         }), 200
         
     except Exception as e:
-        print(f"Erreur lors de la connexion: {e}")
+        current_app.logger.error(f"Erreur lors de la connexion: {e}")
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
 
@@ -153,7 +153,7 @@ def get_current_user_info():
         }), 200
         
     except Exception as e:
-        print(f"Erreur lors de la récupération de l'utilisateur: {e}")
+        current_app.logger.error(f"Erreur lors de la récupération de l'utilisateur: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
 
 @auth_bp.route('/refresh', methods=['POST'])
@@ -174,7 +174,7 @@ def refresh_token():
         }), 200
         
     except Exception as e:
-        print(f"Erreur lors du renouvellement du token: {e}")
+        current_app.logger.error(f"Erreur lors du renouvellement du token: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
 
 @auth_bp.route('/logout', methods=['POST'])
@@ -200,5 +200,5 @@ def logout():
         return jsonify(message="Déconnexion réussie"), 200
         
     except Exception as e:
-        print(f"Erreur lors de la déconnexion: {e}")
+        current_app.logger.error(f"Erreur lors de la déconnexion: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
