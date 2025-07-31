@@ -5,6 +5,7 @@ Configuration et initialisation de la base de données
 from flask_sqlalchemy import SQLAlchemy
 from datetime import datetime
 import json
+from flask import current_app
 
 db = SQLAlchemy()
 
@@ -35,10 +36,10 @@ def init_db():
         
         # Vérifier si les données de test existent déjà
         if User.query.first():
-            print("✅ Base de données déjà initialisée")
+            current_app.logger.info("✅ Base de données déjà initialisée")
             return
-        
-        print("🔧 Initialisation de la base de données...")
+
+        current_app.logger.info("🔧 Initialisation de la base de données...")
         
         # Créer les entreprises de test
         companies_data = [
@@ -265,25 +266,33 @@ def init_db():
         
         # Sauvegarder toutes les données
         db.session.commit()
-        print("✅ Base de données initialisée avec succès!")
-        print(f"   - {len(companies)} entreprises créées")
-        print(f"   - {len(offices_data)} bureaux créés")
-        print(f"   - {len(missions_data)} missions créées")
-        print(f"   - {len(users_data)} utilisateurs créés")
-        print(f"   - {len(default_settings)} paramètres système créés")
+        current_app.logger.info("✅ Base de données initialisée avec succès!")
+        current_app.logger.info(f"   - {len(companies)} entreprises créées")
+        current_app.logger.info(f"   - {len(offices_data)} bureaux créés")
+        current_app.logger.info(f"   - {len(missions_data)} missions créées")
+        current_app.logger.info(f"   - {len(users_data)} utilisateurs créés")
+        current_app.logger.info(f"   - {len(default_settings)} paramètres système créés")
         
     except Exception as e:
-        print(f"❌ Erreur lors de l'initialisation de la base de données: {str(e)}")
-        print(f"   Type d'erreur: {type(e).__name__}")
+        current_app.logger.error(
+            f"❌ Erreur lors de l'initialisation de la base de données: {str(e)}"
+        )
+        current_app.logger.error(f"   Type d'erreur: {type(e).__name__}")
         
         # Rollback de la session en cas d'erreur
         try:
             db.session.rollback()
-            print("   Session de base de données annulée")
+            current_app.logger.info("   Session de base de données annulée")
         except Exception as rollback_error:
-            print(f"   Erreur lors du rollback: {str(rollback_error)}")
+            current_app.logger.error(
+                f"   Erreur lors du rollback: {str(rollback_error)}"
+            )
         
         # Ne pas lever l'exception pour permettre au serveur de démarrer
         # L'application peut fonctionner sans données de test
-        print("   L'application va continuer sans les données de test")
-        print("   Vous pouvez créer manuellement les données nécessaires")
+        current_app.logger.info(
+            "   L'application va continuer sans les données de test"
+        )
+        current_app.logger.info(
+            "   Vous pouvez créer manuellement les données nécessaires"
+        )
