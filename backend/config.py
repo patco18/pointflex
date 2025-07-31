@@ -114,13 +114,7 @@ class TestingConfig(Config):
     MAIL_USE_TLS = False
     MAIL_USE_SSL = False
     MAIL_SUPPRESS_SEND = True  # Ne pas envoyer d'emails réels pendant les tests
-
-class TestingConfig(Config):
-    """Configuration pour les tests"""
-    TESTING = True
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     WTF_CSRF_ENABLED = False
-
 # Configuration par défaut
 config = {
     'development': DevelopmentConfig,
