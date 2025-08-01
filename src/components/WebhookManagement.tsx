@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { webhookService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import Modal from './shared/Modal';
-import DataTable from './shared/DataTable'; // Assuming you have a generic DataTable
+import DataTable from './shared/DataTable';
 import LoadingSpinner from './shared/LoadingSpinner';
 import { PlusCircle, Edit3, Trash2, Eye, Send, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -67,6 +67,7 @@ export default function WebhookManagement() {
     const [deliveryLogs, setDeliveryLogs] = useState<DeliveryLog[]>([]);
     const [logsLoading, setLogsLoading] = useState(false);
     const [logPagination, setLogPagination] = useState({ page: 1, per_page: 10, total_pages: 1, total_items: 0 });
+    const [searchTerm, setSearchTerm] = useState('');
 
     const fetchSubscriptions = async () => {
         setIsLoading(true);
@@ -196,6 +197,12 @@ export default function WebhookManagement() {
         { key: 'created_at', label: 'Créé le', render: (sub: WebhookSubscription) => new Date(sub.created_at).toLocaleDateString() },
     ];
 
+    const filteredSubscriptions = subscriptions.filter(sub => {
+        if (!searchTerm) return true;
+        const term = searchTerm.toLowerCase();
+        return sub.target_url.toLowerCase().includes(term) || sub.subscribed_events.join(',').toLowerCase().includes(term);
+    });
+
     const logColumns = [
         { key: 'attempted_at', label: 'Date & Heure', render: (log: DeliveryLog) => new Date(log.attempted_at).toLocaleString() },
         { key: 'event_type', label: 'Événement' },
@@ -216,7 +223,9 @@ export default function WebhookManagement() {
 
             <DataTable
                 columns={subscriptionColumns}
-                data={subscriptions}
+                data={filteredSubscriptions}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
                 emptyMessage="Aucun abonnement webhook configuré."
                 actions={(sub: WebhookSubscription) => (
                     <div className="space-x-2 flex">
@@ -274,7 +283,7 @@ export default function WebhookManagement() {
                     {logsLoading ? <LoadingSpinner text="Chargement des logs..."/> : (
                         deliveryLogs.length > 0 ? (
                             <>
-                                <DataTable columns={logColumns} data={deliveryLogs} emptyMessage="Aucun log de livraison." itemsPerPage={logPagination.per_page}/>
+                                <DataTable columns={logColumns} data={deliveryLogs} searchTerm="" onSearchChange={() => {}} emptyMessage="Aucun log de livraison." />
                                 {/* Basic Pagination (can be improved) */}
                                 <div className="flex justify-between items-center mt-4 text-sm">
                                     <button
