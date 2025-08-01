@@ -4,24 +4,63 @@ Application SaaS complète de gestion des pointages avec architecture multi-tena
 
 ## 🚀 Fonctionnalités
 
-### 🔐 Système de Rôles
-- **SuperAdmin** : Contrôle total de la plateforme
-  - Gestion des entreprises (création, modification, suppression)
-  - Vue d'ensemble globale avec statistiques
-  - Gestion de tous les utilisateurs
-  - Contrôle des abonnements et limites
+### 🔐 Système de Rôles & Privilèges
 
-- **Admin Entreprise** : Gestion de son entreprise
-  - Gestion des employés de son entreprise
-  - Configuration des paramètres de pointage
-  - Rapports et statistiques d'entreprise
-  - Pointage personnel
+L'application dispose d'une interface dédiée pour la gestion des rôles et privilèges accessible à l'adresse : [http://localhost:5173/roles](http://localhost:5173/roles)
 
-- **Employé** : Utilisation du système
-  - Pointage bureau avec géolocalisation
-  - Pointage mission avec numéro d'ordre
-  - Consultation de son historique
-  - Dashboard personnel
+#### Hiérarchie des Rôles
+
+- **Super-administrateur** (Niveau 1) : Contrôle total de la plateforme SaaS
+  - Gestion globale de toutes les entreprises et utilisateurs
+  - Configuration système et analytique avancée
+  - Accès complet aux rapports et audit logs
+
+- **Administrateur RH** (Niveau 2) : Gestion complète des ressources humaines
+  - Création et gestion des utilisateurs de l'entreprise
+  - Configuration des paramètres d'entreprise
+  - Gestion des congés et politique RH
+  - Rapports avancés et analytique
+
+- **Chef de service** (Niveau 3) : Gestion d'un service ou département
+  - Gestion d'équipes et validation des pointages
+  - Création de missions et suivi d'activité
+  - Rapports départementaux et approbation des congés
+
+- **Chef de projet** (Niveau 4) : Supervision d'équipes projet
+  - Création et assignation de missions
+  - Suivi des pointages d'équipe
+  - Validation des congés d'équipe
+
+- **Manager** (Niveau 5) : Supervision d'équipe restreinte
+  - Suivi des pointages d'équipe
+  - Approbation des congés d'équipe
+  - Accès aux rapports d'équipe
+
+- **Employé** (Niveau 6) : Utilisateur standard
+  - Pointage personnel (bureau/mission)
+  - Demandes de congés personnelles
+  - Consultation de l'historique personnel
+
+- **Auditeur** (Niveau 7) : Accès en lecture pour audit
+  - Lecture de toutes les données pour audit
+  - Génération de rapports d'audit
+  - Accès aux statistiques et analyses
+
+#### Catégories de Permissions
+
+L'interface de gestion des rôles affiche les permissions regroupées par catégories :
+
+- **Pointage** : Permissions liées à la gestion des présences
+- **Gestion d'équipe** : Gestion des utilisateurs et équipes
+- **Missions** : Création et suivi des ordres de mission
+- **Rapports** : Génération et consultation des statistiques
+- **Administration** : Configuration système et entreprise
+- **Audit** : Permissions spécifiques pour les auditeurs
+- **Analytique** : Accès aux tableaux de bord et KPIs
+
+#### Matrice des Permissions
+
+Les super-administrateurs ont accès à une matrice complète des permissions permettant de visualiser les droits accordés à chaque rôle et de comprendre la structure hiérarchique du système.
 
 ### 🏢 Multi-Tenant
 - Isolation complète des données par entreprise
