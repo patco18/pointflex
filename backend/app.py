@@ -32,6 +32,7 @@ from backend.routes.calendar_routes import calendar_bp # Added Calendar blueprin
 from backend.routes.subscription_plan_routes import subscription_plan_bp # Added Subscription Plan blueprint
 from backend.routes.leave_routes import leave_bp # Added Leave blueprint
 from backend.routes.webhook_routes import webhook_bp # Added Webhook blueprint
+from backend.routes.mobile_money_routes import mobile_money_bp
 from backend.routes.two_factor_routes import two_factor_bp # Added 2FA blueprint
 from backend.routes.admin_settings_routes import admin_settings_bp # Added Admin Settings blueprint
 from backend.routes.export_routes import export_bp # Added Export blueprint
@@ -113,6 +114,7 @@ def create_app():
     app.register_blueprint(calendar_bp, url_prefix='/api/calendar') # Registered Calendar blueprint
     app.register_blueprint(leave_bp, url_prefix='/api/leave') # Registered Leave blueprint
     app.register_blueprint(webhook_bp, url_prefix='/api/webhooks') # Registered Webhook blueprint
+    app.register_blueprint(mobile_money_bp, url_prefix='/api/mobile-money')
     app.register_blueprint(two_factor_bp, url_prefix='/api/auth/2fa') # Registered 2FA blueprint under /auth path
     # Le pause_bp est préféré car il retourne déjà des résultats vides avec 200
     app.register_blueprint(pause_bp, url_prefix='/api/pause') # Registered Pause blueprint avec un nouveau préfixe

@@ -166,6 +166,7 @@ def get_billing_data(company_id):
     data = []
     
     for invoice in invoices:
+        last_payment = invoice.payments[-1] if invoice.payments else None
         data.append({
             'id': invoice.id,
             'numero': invoice.invoice_number,
@@ -175,7 +176,8 @@ def get_billing_data(company_id):
             'date_echeance': invoice.due_date.strftime('%Y-%m-%d') if invoice.due_date else None,
             'statut': invoice.status,
             'date_paiement': invoice.paid_date.strftime('%Y-%m-%d') if invoice.paid_date else None,
-            'methode_paiement': invoice.payment_method or 'Non spécifié'
+            'methode_paiement': last_payment.payment_method if last_payment else 'Non spécifié',
+            'operateur': last_payment.mobile_money_operator if last_payment else ''
         })
     
     return data
