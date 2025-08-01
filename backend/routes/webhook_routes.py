@@ -29,6 +29,13 @@ VALID_EVENT_TYPES = [
     # Add more as your system evolves
 ]
 
+
+@webhook_bp.route('/event-types', methods=['GET'])
+@require_admin
+def get_webhook_event_types():
+    """Return the list of valid webhook event types."""
+    return jsonify(event_types=VALID_EVENT_TYPES), 200
+
 subscribed_events_schema = {
     "type": "array",
     "items": {"type": "string", "enum": VALID_EVENT_TYPES},

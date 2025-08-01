@@ -889,6 +889,14 @@ export const webhookService = {
       console.error('Ping webhook subscription error:', error);
       throw error;
     }
+  },
+  getEventTypes: async () => {
+    try {
+      return await api.get('/webhooks/event-types');
+    } catch (error) {
+      console.error('Get webhook event types error:', error);
+      throw error;
+    }
   }
 };
 

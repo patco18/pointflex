@@ -7,19 +7,6 @@ import LoadingSpinner from './shared/LoadingSpinner';
 import { PlusCircle, Edit3, Trash2, Eye, Send, AlertTriangle, CheckCircle, XCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-// TODO: Fetch this from backend or define centrally
-const VALID_EVENT_TYPES = [
-    "user.created", "user.updated", "user.deleted",
-    "company.created", "company.updated", // company.deleted is also valid
-    "pointage.created", "pointage.updated",
-    "invoice.created", "invoice.paid", "invoice.payment_failed",
-    "subscription.created", "subscription.updated", "subscription.cancelled",
-    "leave_request.created", "leave_request.approved", "leave_request.rejected",
-    "leave_balance.updated", // Added this based on recent work
-    "mission.created", "mission.updated", "mission.deleted",
-    "ping.test" // For test pings
-];
-
 interface WebhookSubscription {
     id: number;
     target_url: string;
@@ -55,6 +42,7 @@ const initialFormState: WebhookFormState = {
 export default function WebhookManagement() {
     const { isAdmin } = useAuth();
     const [subscriptions, setSubscriptions] = useState<WebhookSubscription[]>([]);
+    const [eventTypes, setEventTypes] = useState<string[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
     const [editingSubscription, setEditingSubscription] = useState<WebhookSubscription | null>(null);
@@ -81,9 +69,19 @@ export default function WebhookManagement() {
         }
     };
 
+    const fetchEventTypes = async () => {
+        try {
+            const resp = await webhookService.getEventTypes();
+            setEventTypes(resp.data.event_types || []);
+        } catch (error) {
+            toast.error("Erreur lors de la récupération des types d'événements.");
+        }
+    };
+
     useEffect(() => {
         if (isAdmin) {
             fetchSubscriptions();
+            fetchEventTypes();
         }
     }, [isAdmin]);
 
@@ -247,7 +245,7 @@ export default function WebhookManagement() {
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Événements à Souscrire *</label>
                         <div className="max-h-60 overflow-y-auto border rounded-md p-2 grid grid-cols-2 md:grid-cols-3 gap-2">
-                            {VALID_EVENT_TYPES.map(eventType => (
+                            {eventTypes.map(eventType => (
                                 <label key={eventType} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded cursor-pointer">
                                     <input type="checkbox" checked={formState.subscribed_events.includes(eventType)} onChange={() => handleEventToggle(eventType)} className="form-checkbox h-4 w-4 text-primary-600"/>
                                     <span className="text-xs">{eventType}</span>

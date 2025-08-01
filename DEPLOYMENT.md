@@ -97,6 +97,10 @@ SECRET_KEY=your-secret-key-change-in-production
 JWT_SECRET_KEY=your-jwt-secret-change-in-production
 DATABASE_URL=sqlite:///instance/pointflex.db
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+REDIS_URL=redis://localhost:6379/0
+FCM_SERVER_KEY=your_fcm_server_key
+TWO_FACTOR_ENCRYPTION_KEY=base64_32_bytes_key
+RATELIMIT_STORAGE_URL=redis://localhost:6379/2
 ```
 
 ## 🚀 Déploiement Serveur
