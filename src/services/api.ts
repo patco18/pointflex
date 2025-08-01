@@ -822,6 +822,14 @@ export const leaveService = {
       console.error('Get team members error:', error);
       throw error;
     }
+  },
+  getLeaveStatistics: async () => {
+    try {
+      return await api.get('/leave/statistics');
+    } catch (error) {
+      console.error('Get leave statistics error:', error);
+      throw error;
+    }
   }
 };
 
@@ -879,6 +887,14 @@ export const webhookService = {
       return await api.post(`/webhooks/subscriptions/${subId}/ping`);
     } catch (error) {
       console.error('Ping webhook subscription error:', error);
+      throw error;
+    }
+  },
+  getEventTypes: async () => {
+    try {
+      return await api.get('/webhooks/event-types');
+    } catch (error) {
+      console.error('Get webhook event types error:', error);
       throw error;
     }
   }

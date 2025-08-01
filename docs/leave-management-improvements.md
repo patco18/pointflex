@@ -75,9 +75,12 @@ Ajout d'une nouvelle route pour la page d'approbation des congés :
 } />
 ```
 
+## Fonctionnalités supplémentaires
+
+- **Accumulation annuelle des congés** : une commande CLI `flask accrue-leave` met à jour automatiquement les soldes de congés en début d'année.
+- **Statistiques d'utilisation** : `leaveService.getLeaveStatistics()` fournit un résumé des jours pris et restants par type de congé.
+
 ## Prochaines étapes possibles
 
-1. Implémenter la logique d'accumulation annuelle des congés
-2. Ajouter des rapports et statistiques sur l'utilisation des congés
-3. Intégrer le système avec le calendrier d'équipe existant
-4. Développer des notifications automatiques pour les approbations/refus
+1. Intégrer le système avec le calendrier d'équipe existant
+2. Développer des notifications automatiques pour les approbations/refus
