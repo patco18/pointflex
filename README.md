@@ -65,6 +65,9 @@ Application SaaS complète de gestion des pointages avec architecture multi-tena
 
 ## 📦 Installation
 
+Un guide détaillé d'installation et d'utilisation est disponible dans
+[docs/installation-guide.md](docs/installation-guide.md).
+
 ### Prérequis
 - Node.js 16+
 - Python 3.8+
