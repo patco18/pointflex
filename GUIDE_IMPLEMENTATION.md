@@ -180,7 +180,7 @@ class NotificationSettings(db.Model):
 
 ### 3.2 Modèle pour les paramètres d'intégration
 
-Dans `backend/models/integration_settings.py` :
+Dans `backend/models/integration_setting.py` :
 
 ```python
 from backend.database import db
