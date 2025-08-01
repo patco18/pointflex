@@ -163,8 +163,28 @@ def submit_leave_request():
     db.session.add(leave_request)
     db.session.commit()
 
-    # Notify manager/admin (TODO: determine who to notify)
-    # send_notification(manager_id, f"New leave request from {current_user.prenom} {current_user.nom}")
+    # Notify the employee's manager and/or company admins
+    recipients: list[int] = []
+    if current_user.manager_id:
+        recipients.append(current_user.manager_id)
+
+    admins = (
+        User.query.filter_by(company_id=current_user.company_id, role="admin_rh")
+        .with_entities(User.id)
+        .all()
+    )
+    recipients.extend([admin.id for admin in admins if admin.id not in recipients])
+
+    for uid in recipients:
+        try:
+            send_notification(
+                uid,
+                f"New leave request from {current_user.prenom} {current_user.nom}",
+            )
+        except Exception as notify_error:
+            current_app.logger.error(
+                f"Failed to notify user {uid} for leave request {leave_request.id}: {notify_error}"
+            )
 
     log_user_action(
         action='SUBMIT_LEAVE_REQUEST',

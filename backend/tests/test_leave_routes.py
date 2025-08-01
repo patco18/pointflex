@@ -43,7 +43,10 @@ def test_submit_leave_request_dispatch_event(client, monkeypatch):
         "backend.utils.webhook_utils.dispatch_webhook_event",
         lambda event_type, payload_data, company_id: events.append(event_type),
     )
-    monkeypatch.setattr("backend.utils.notification_utils.send_notification", lambda *a, **k: None)
+    monkeypatch.setattr(
+        "backend.routes.leave_routes.send_notification",
+        lambda *a, **k: None,
+    )
 
     # Create leave type
     resp = client.post("/api/leave/types", json={"name": "Vacation"}, headers=admin_headers)
@@ -64,8 +67,54 @@ def test_submit_leave_request_dispatch_event(client, monkeypatch):
 
     resp = client.post(
         "/api/leave/requests",
-        json={"leave_type_id": leave_type_id, "start_date": "2024-01-01", "end_date": "2024-01-01"},
+        json={"leave_type_id": leave_type_id, "start_date": "2024-01-02", "end_date": "2024-01-02"},
         headers=employee_headers,
     )
     assert resp.status_code == 201
     assert "leave_request.created" in events
+
+
+def test_submit_leave_request_triggers_notification(client, monkeypatch):
+    admin_token = login_admin(client)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    monkeypatch.setattr(
+        "backend.utils.webhook_utils.dispatch_webhook_event",
+        lambda *a, **k: None,
+    )
+
+    notified = []
+
+    def fake_notify(user_id, message, **kwargs):
+        notified.append(user_id)
+
+    monkeypatch.setattr(
+        "backend.routes.leave_routes.send_notification",
+        fake_notify,
+    )
+
+    resp = client.post("/api/leave/types", json={"name": "Vacation"}, headers=admin_headers)
+    leave_type_id = resp.get_json()["id"]
+
+    with client.application.app_context():
+        employee = User.query.filter_by(email="employee@pointflex.com").first()
+        admin_user = User.query.filter_by(email="admin@pointflex.com").first()
+        employee_id = employee.id
+        admin_id = admin_user.id
+
+    client.post(
+        f"/api/leave/admin/users/{employee_id}/balances",
+        json={"leave_type_id": leave_type_id, "balance_days": 5},
+        headers=admin_headers,
+    )
+
+    employee_token = login_employee(client)
+    employee_headers = {"Authorization": f"Bearer {employee_token}"}
+
+    resp = client.post(
+        "/api/leave/requests",
+        json={"leave_type_id": leave_type_id, "start_date": "2024-01-02", "end_date": "2024-01-02"},
+        headers=employee_headers,
+    )
+    assert resp.status_code == 201
+    assert admin_id in notified
