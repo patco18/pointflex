@@ -426,12 +426,6 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:pass@host:port/db'
 - ✅ Intégration complète avec le système de soldes de congés
 - ✅ Logique d'accumulation annuelle automatique et statistiques d'utilisation
 
-**Nouvelles fonctionnalités terminées :**
-- ✅ Interface de gestion des Webhooks pour les administrateurs
-- ✅ Première version de l'application mobile avec pointage géolocalisé
-- ✅ Localisation Côte d'Ivoire : jours fériés intégrés, paiements Mobile Money et rapports compatibles FCFA
-
-**Autres améliorations possibles / Prochaines étapes de développement:**
 - Tests unitaires et d'intégration exhaustifs pour toutes les nouvelles fonctionnalités.
 - Documentation utilisateur et administrateur pour les nouvelles fonctionnalités.
 - Optimisations de performance et de sécurité continues.
