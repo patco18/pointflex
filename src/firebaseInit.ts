@@ -1,22 +1,22 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, FirebaseApp } from "firebase/app";
-import { getMessaging, getToken, onMessage, MessagePayload } from "firebase/messaging";
+import { getMessaging, getToken, onMessage, onTokenRefresh, MessagePayload } from "firebase/messaging";
 import { api } from './services/api'; // Assuming your API service is set up to send the token
 
-// TODO: Replace with your app's Firebase project configuration
+// Firebase project configuration pulled from environment variables
 // See: https://firebase.google.com/docs/web/setup#available-libraries
 const firebaseConfig = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_AUTH_DOMAIN",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_STORAGE_BUCKET",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID",
-  measurementId: "YOUR_MEASUREMENT_ID" // Optional
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+  measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID
 };
 
-// TODO: Replace with your VAPID key from Firebase Project Settings > Cloud Messaging > Web Push certificates
-const VAPID_KEY = "YOUR_FIREBASE_WEB_PUSH_VAPID_KEY";
+// VAPID key from Firebase Project Settings > Cloud Messaging > Web Push certificates
+const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
 let app: FirebaseApp | null = null;
 
@@ -109,8 +109,17 @@ export const onForegroundMessage = (callback: (payload: MessagePayload) => void)
   });
 };
 
-// TODO: Add logic for onTokenRefresh if needed
-// import { onTokenRefresh } from "firebase/messaging";
-// onTokenRefresh(messaging, () => { getFCMToken(); });
+export const listenToTokenRefresh = () => {
+  const currentApp = initializeFirebaseApp();
+  if (!currentApp) {
+    console.error("Firebase app not initialized for token refresh handling.");
+    return;
+  }
+  const messaging = getMessaging(currentApp);
+  onTokenRefresh(messaging, () => {
+    getFCMToken();
+  });
+};
 
 initializeFirebaseApp(); // Initialize on load
+listenToTokenRefresh();
