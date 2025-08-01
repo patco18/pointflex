@@ -180,10 +180,15 @@ Company (Entreprises)
 ## 🔧 Configuration
 
 ### Paramètres Entreprise
-- Coordonnées GPS du bureau
-- Rayon de pointage autorisé
-- Heure de début de travail
-- Seuil de tolérance pour les retards
+- Les paramètres sont organisés en six onglets pour faciliter la configuration :
+  - **Général** : localisation du bureau, identité visuelle et horaires de travail
+  - **Facturation** : gestion du plan d'abonnement, factures et demandes de prolongation
+  - **Congés** : semaine de travail, code pays pour jours fériés et jours fériés spécifiques
+  - **Notifications** : réglages des emails, notifications push et SMS
+  - **Intégrations** : webhooks, services Mobile Money et accès API
+  - **Exportation** : export CSV/Excel/JSON des employés, pointages, congés et facturation
+
+Pour le détail complet, voir [GUIDE_PARAMETRES_ENTREPRISE.md](docs/GUIDE_PARAMETRES_ENTREPRISE.md).
 
 ### Plans d'Abonnement
 - **Basic** : 10 employés max
