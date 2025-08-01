@@ -1,0 +1,63 @@
+{
+  "subscription_history": {
+    "title": "Historique des abonnements (CI)",
+    "view_history": "Voir l'historique des abonnements (CI)",
+    "history": "Historique (CI)",
+    "current_plan": "Plan actuel (CI)",
+    "changes_history": "Historique des modifications (CI)",
+    "no_history": "Aucun historique de changement d'abonnement disponible (CI)",
+    "date": "Date (CI)",
+    "user": "Utilisateur (CI)",
+    "old_plan": "Ancien plan (CI)",
+    "new_plan": "Nouveau plan (CI)",
+    "max_employees_change": "Changement d'effectif max (CI)",
+    "reason": "Raison (CI)",
+    "no_change": "Pas de changement (CI)",
+    "no_reason": "Pas de raison spécifiée (CI)",
+    "no_previous_plan": "Premier abonnement (CI)",
+    "load_error": "Erreur lors du chargement de l'historique des abonnements (CI)"
+  },
+  "notification": {
+    "subscription_expiration": "Expiration de l'abonnement (CI)",
+    "subscription_expiration_soon": "Votre abonnement expire bientôt (CI)",
+    "subscription_expired": "Votre abonnement a expiré (CI)",
+    "days_remaining": "{{days}} jours restants (CI)"
+  },
+  "notifications": {
+    "title": "Notifications (CI)",
+    "mark_all_read": "Tout marquer comme lu (CI)",
+    "no_notifications": "Aucune notification (CI)",
+    "view_all": "Voir toutes (CI)",
+    "subscription_expiring": "Votre abonnement expire bientôt (CI)",
+    "subscription_expired": "Votre abonnement a expiré (CI)",
+    "subscription_info": "Informations sur l'abonnement (CI)",
+    "new_notification": "Nouvelle notification (CI)",
+    "expired": "Expiré (CI)",
+    "expiring_soon": "Expiration proche (CI)",
+    "days_remaining": "{days} jours restants (CI)",
+    "renewal_info": "Veuillez renouveler votre abonnement pour continuer à utiliser toutes les fonctionnalités (CI)",
+    "contact_admin": "Contactez votre administrateur pour plus d'informations (CI)",
+    "manage_subscription": "Gérer l'abonnement (CI)"
+  },
+  "common": {
+    "back": "Retour (CI)",
+    "system": "Système (CI)",
+    "loading": "Chargement... (CI)",
+    "save": "Enregistrer (CI)",
+    "cancel": "Annuler (CI)",
+    "unknown": "Inconnu (CI)"
+  },
+  "subscription_management": {
+    "company_subscriptions": "Abonnements des entreprises (CI)",
+    "subscription_plan": "Plan d'abonnement (CI)",
+    "change_plan": "Changer de plan (CI)",
+    "change_subscription_plan": "Changer le plan d'abonnement (CI)",
+    "change_plan_for": "Changer le plan d'abonnement pour {{company}} (CI)",
+    "employees": "employés (CI)",
+    "expiration_date": "Date d'expiration (CI)",
+    "max_employees": "Employés max (CI)",
+    "actions": "Actions (CI)",
+    "no_companies": "Aucune entreprise disponible (CI)",
+    "no_plan": "Pas de plan (CI)"
+  }
+}

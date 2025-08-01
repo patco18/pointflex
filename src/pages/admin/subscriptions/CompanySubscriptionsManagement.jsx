@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useI18n } from '../../../contexts/I18nContext';
 import axios from 'axios';
 import {
   Box,
@@ -34,7 +34,7 @@ import { useSnackbar } from 'notistack';
  * Composant pour gérer les abonnements des entreprises
  */
 const CompanySubscriptionsManagement = () => {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const { enqueueSnackbar } = useSnackbar();
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
