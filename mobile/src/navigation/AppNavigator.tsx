@@ -3,11 +3,8 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../contexts/AuthContext';
 
-// Import your screens here
-// Example:
-// import LoginScreen from '../features/Auth/LoginScreen';
-// import HomeScreen from '../features/Home/HomeScreen'; // Placeholder
-// import SplashScreen from '../components/common/SplashScreen'; // Placeholder for loading
+import LoginScreen from '../screens/LoginScreen';
+import HomeScreen from '../screens/HomeScreen';
 
 // Define types for your navigation stacks if using TypeScript
 export type AuthStackParamList = {
@@ -25,14 +22,8 @@ export type MainStackParamList = {
 const AuthStack = createNativeStackNavigator<AuthStackParamList>();
 const MainStack = createNativeStackNavigator<MainStackParamList>();
 
-// Placeholder SplashScreen
-const SplashScreen = () => <></>; // Replace with actual splash screen component
-
-// Placeholder LoginScreen
-const LoginScreen = () => <></>; // Replace with actual LoginScreen from features/Auth/LoginScreen.tsx
-
-// Placeholder HomeScreen
-const HomeScreen = () => <></>; // Replace with actual HomeScreen
+// Basic SplashScreen placeholder while auth state loads
+const SplashScreen = () => <></>;
 
 const AppNavigator = () => {
   const { user, isLoading } = useAuth();

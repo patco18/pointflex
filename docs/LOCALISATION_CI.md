@@ -42,6 +42,16 @@ Les exemples d'adresses ont été mis à jour pour refléter la géographie loca
 - Références aux pratiques professionnelles locales
 - Codes de mission adaptés (ex: ABI2024-153)
 
+### Jours fériés nationaux
+
+La fonction `get_ci_holidays` renvoie désormais les principaux jours fériés ivoiriens,
+par exemple :
+
+- 1 janvier : Jour de l'An
+- 1 mai : Fête du Travail
+- 7 août : Fête nationale
+- 25 décembre : Noël
+
 ## Modifications principales
 
 Les fichiers suivants ont été modifiés :
@@ -57,9 +67,15 @@ Les fichiers suivants ont été modifiés :
 9. `src/components/MyLeaveHistory.tsx` - Format de date ivoirien
 10. `src/utils/dateFormat.ts` (nouveau) - Utilitaires de formatage standardisés
 
+## Fonctionnalités ajoutées
+
+- Récupération des jours fériés ivoiriens via `get_ci_holidays`
+- Endpoint `/api/mobile-money/pay` pour enregistrer un paiement Mobile Money
+- Exports de facturation enrichis avec l'opérateur Mobile Money et les montants en FCFA
+
 ## Tâches futures de localisation
 
-- Ajouter des jours fériés spécifiques à la Côte d'Ivoire
-- Intégrer les moyens de paiement locaux (Mobile Money, etc.)
-- Adapter les rapports et statistiques aux pratiques administratives locales
+- ~~Ajouter des jours fériés spécifiques à la Côte d'Ivoire~~ (implémenté via `get_ci_holidays` dans `backend/utils/holiday_utils.py`)
+- ~~Intégrer les moyens de paiement locaux (Mobile Money, etc.)~~ (nouvelle route `/api/mobile-money/pay` et champ `mobile_money_operator`)
+- ~~Adapter les rapports et statistiques aux pratiques administratives locales~~ (exports incluent opérateur de paiement et montants en FCFA)
 - Ajouter une option pour basculer entre le français et les langues locales

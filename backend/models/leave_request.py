@@ -8,6 +8,7 @@ from .user import User  # Added User import
 
 from .company import Company  # To fetch company policy
 from .company_holiday import CompanyHoliday  # To fetch company specific holidays
+from backend.utils.holiday_utils import get_national_holidays
 
 # Updated function to calculate working days considering company policies and partial days
 def calculate_workdays(
@@ -61,11 +62,7 @@ def calculate_workdays(
     # Fetch national holidays once
     # The holidays library is efficient, but for very wide date ranges, consider year-by-year fetching if needed.
     # Ensure years are correctly handled for multi-year leave requests.
-    national_holidays_years = list(range(start_date.year, end_date.year + 1))
-    try:
-        national_holidays = getattr(holidays, country_code.upper())(years=national_holidays_years)
-    except (AttributeError, TypeError): # Handle invalid country_code or issues with holidays lib
-        national_holidays = {} # No national holidays if code is bad or lib fails
+    national_holidays = get_national_holidays(country_code, start_date.year, end_date.year)
 
     for _ in range(num_total_days):
         # weekday(): Monday is 0 and Sunday is 6

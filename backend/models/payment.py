@@ -15,6 +15,7 @@ class Payment(db.Model):
     company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)
     amount = db.Column(db.Float, nullable=False)
     payment_method = db.Column(db.String(50), nullable=True)
+    mobile_money_operator = db.Column(db.String(20), nullable=True)
     transaction_id = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(20), default='completed')  # completed, failed
     payment_date = db.Column(db.Date, default=datetime.utcnow().date)
@@ -31,6 +32,7 @@ class Payment(db.Model):
             'company_id': self.company_id,
             'amount': self.amount,
             'payment_method': self.payment_method,
+            'mobile_money_operator': self.mobile_money_operator,
             'transaction_id': self.transaction_id,
             'status': self.status,
             'payment_date': self.payment_date.isoformat() if self.payment_date else None,
