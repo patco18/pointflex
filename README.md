@@ -422,12 +422,11 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://user:pass@host:port/db'
 - ✅ Calendrier des absences d'équipe avec filtres par département et type de congé
 - ✅ Interface d'approbation pour les responsables avec notifications et commentaires
 - ✅ Intégration complète avec le système de soldes de congés
+- ✅ Logique d'accumulation annuelle automatique et statistiques d'utilisation
 
-**Autres améliorations possibles / Prochaines étapes de développement:**
-- Amélioration de la logique d'accumulation annuelle des congés.
+-**Autres améliorations possibles / Prochaines étapes de développement:**
 - Finalisation de l'interface utilisateur (Frontend) pour la gestion des Webhooks par les administrateurs d'entreprise.
 - Implémentation complète de l'application mobile React Native.
-- Intégration de la logique d'accumulation annuelle automatique pour les soldes de congés.
 - Tests unitaires et d'intégration exhaustifs pour toutes les nouvelles fonctionnalités.
 - Documentation utilisateur et administrateur pour les nouvelles fonctionnalités.
 - Optimisations de performance et de sécurité continues.

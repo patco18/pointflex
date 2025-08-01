@@ -822,6 +822,14 @@ export const leaveService = {
       console.error('Get team members error:', error);
       throw error;
     }
+  },
+  getLeaveStatistics: async () => {
+    try {
+      return await api.get('/leave/statistics');
+    } catch (error) {
+      console.error('Get leave statistics error:', error);
+      throw error;
+    }
   }
 };
 
