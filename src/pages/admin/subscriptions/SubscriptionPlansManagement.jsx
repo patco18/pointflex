@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useTranslation } from 'react-i18next';
+import { useI18n } from '../../../contexts/I18nContext';
 import { 
   Box, 
   Button, 
@@ -46,7 +46,7 @@ import { Link } from 'react-router-dom';
  * Ce composant permet aux administrateurs de créer, modifier et supprimer des plans d'abonnement
  */
 const SubscriptionPlansManagement = () => {
-  const { t } = useTranslation();
+  const { t } = useI18n();
   const { enqueueSnackbar } = useSnackbar();
   const { currentUser } = useAuth();
   

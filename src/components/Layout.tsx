@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermissions } from '../hooks/usePermissions'
 import NotificationCenter from './NotificationCenter'
+import { useI18n } from '../contexts/I18nContext'
 import { 
   Home, 
   Clock,
@@ -39,6 +40,7 @@ interface LayoutProps {
 export default function Layout({ children }: LayoutProps) {
   const { user, logout } = useAuth()
   const { permissions, checkPermission } = usePermissions()
+  const { language, setLanguage } = useI18n()
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = React.useState(false)
@@ -410,7 +412,16 @@ export default function Layout({ children }: LayoutProps) {
             <div className="flex items-center gap-x-4 lg:gap-x-6">
               {/* Notification Center */}
               <NotificationCenter />
-              
+
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className="text-sm border rounded px-1 py-0.5"
+              >
+                <option value="fr">Français</option>
+                <option value="ci">Langues locales</option>
+              </select>
+
               <div className="flex items-center gap-x-2">
                 <div className="text-right">
                   <span className="text-sm font-medium text-gray-700">

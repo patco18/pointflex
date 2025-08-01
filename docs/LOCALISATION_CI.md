@@ -78,4 +78,4 @@ Les fichiers suivants ont été modifiés :
 - ~~Ajouter des jours fériés spécifiques à la Côte d'Ivoire~~ (implémenté via `get_ci_holidays` dans `backend/utils/holiday_utils.py`)
 - ~~Intégrer les moyens de paiement locaux (Mobile Money, etc.)~~ (nouvelle route `/api/mobile-money/pay` et champ `mobile_money_operator`)
 - ~~Adapter les rapports et statistiques aux pratiques administratives locales~~ (exports incluent opérateur de paiement et montants en FCFA)
-- Ajouter une option pour basculer entre le français et les langues locales
+- ~~Ajouter une option pour basculer entre le français et les langues locales~~ (sélecteur de langue dans l'interface)

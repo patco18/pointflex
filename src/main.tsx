@@ -1,13 +1,16 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
+import { I18nProvider } from './contexts/I18nContext'
 import './index.css'
 import { Toaster } from 'react-hot-toast'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
-    <Toaster 
+    <I18nProvider>
+      <App />
+    </I18nProvider>
+    <Toaster
       position="top-right"
       toastOptions={{
         duration: 4000,
