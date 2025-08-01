@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp, FirebaseApp } from "firebase/app";
-import { getMessaging, getToken, onMessage, onTokenRefresh, MessagePayload } from "firebase/messaging";
+import { getMessaging, getToken, onMessage, MessagePayload } from "firebase/messaging";
 import { api } from './services/api'; // Assuming your API service is set up to send the token
 
 // Firebase project configuration pulled from environment variables
@@ -109,16 +109,26 @@ export const onForegroundMessage = (callback: (payload: MessagePayload) => void)
   });
 };
 
-export const listenToTokenRefresh = () => {
+export const listenToTokenRefresh = async () => {
   const currentApp = initializeFirebaseApp();
   if (!currentApp) {
     console.error("Firebase app not initialized for token refresh handling.");
     return;
   }
-  const messaging = getMessaging(currentApp);
-  onTokenRefresh(messaging, () => {
-    getFCMToken();
-  });
+  if (!('serviceWorker' in navigator)) {
+    console.error('Service workers are not supported in this browser.');
+    return;
+  }
+  try {
+    // Ensure messaging is initialized so the service worker subscription is active
+    getMessaging(currentApp);
+    const registration = await navigator.serviceWorker.ready;
+    registration.addEventListener('pushsubscriptionchange', () => {
+      getFCMToken();
+    });
+  } catch (error) {
+    console.error('Failed to attach token refresh listener:', error);
+  }
 };
 
 initializeFirebaseApp(); // Initialize on load
