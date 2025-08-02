@@ -30,9 +30,20 @@ def office_checkin():
         
         data = request.get_json()
         coordinates = data.get('coordinates', {})
-        
+
         if not coordinates.get('latitude') or not coordinates.get('longitude'):
             return jsonify(message="Coordonnées GPS requises"), 400
+        if coordinates.get('accuracy') is None:
+            return jsonify(message="Précision GPS requise"), 400
+
+        max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
+        if coordinates['accuracy'] > max_accuracy:
+            return jsonify(
+                message=(
+                    f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). "
+                    f"Maximum autorisé: {max_accuracy}m"
+                )
+            ), 400
         
         # Vérifier si l'utilisateur a déjà pointé aujourd'hui
         today = date.today()
