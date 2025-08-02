@@ -66,6 +66,13 @@ export default function EnhancedSettings() {
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([])
   const [auditPage, setAuditPage] = useState(1)
   const [auditTotal, setAuditTotal] = useState(0)
+  const [auditFilters, setAuditFilters] = useState({
+    startDate: '',
+    endDate: '',
+    userEmail: '',
+    action: '',
+    resourceType: '',
+  })
 
   useEffect(() => {
     if (permissions.canGlobalManagement) {
@@ -99,12 +106,39 @@ export default function EnhancedSettings() {
 
   const loadAuditLogs = async (page = 1) => {
     try {
-      const response = await superAdminService.getAuditLogs({ page, per_page: 20 })
+      const response = await superAdminService.getAuditLogs({
+        page,
+        per_page: 20,
+        action: auditFilters.action || undefined,
+      })
       setAuditLogs(response.data.logs)
       setAuditTotal(response.data.pagination.total)
       setAuditPage(page)
     } catch (error) {
       console.error('Erreur lors du chargement des logs:', error)
+    }
+  }
+
+  const handleDownloadAuditPdf = async () => {
+    try {
+      const response = await superAdminService.downloadAuditLogPdf({
+        startDate: auditFilters.startDate || undefined,
+        endDate: auditFilters.endDate || undefined,
+        userEmail: auditFilters.userEmail || undefined,
+        action: auditFilters.action || undefined,
+        resourceType: auditFilters.resourceType || undefined,
+      })
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = 'audit_logs.pdf'
+      a.click()
+      window.URL.revokeObjectURL(url)
+      toast.success('Rapport téléchargé')
+    } catch (error) {
+      console.error('Erreur lors du téléchargement du rapport audit', error)
+      toast.error('Erreur lors du téléchargement du PDF')
     }
   }
 
@@ -978,20 +1012,58 @@ export default function EnhancedSettings() {
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold text-gray-900">Logs d'Audit</h3>
             <div className="flex space-x-2">
-              <button
-                onClick={() => loadAuditLogs(auditPage)}
-                className="btn-secondary"
-              >
+              <button onClick={() => loadAuditLogs(auditPage)} className="btn-secondary">
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Actualiser
               </button>
-              <button className="btn-secondary">
+              <button className="btn-secondary" onClick={handleDownloadAuditPdf}>
                 <Download className="h-4 w-4 mr-2" />
                 Exporter
               </button>
             </div>
           </div>
-          
+
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-2 mb-4">
+            <input
+              type="date"
+              className="input-field"
+              value={auditFilters.startDate}
+              onChange={(e) => setAuditFilters({ ...auditFilters, startDate: e.target.value })}
+            />
+            <input
+              type="date"
+              className="input-field"
+              value={auditFilters.endDate}
+              onChange={(e) => setAuditFilters({ ...auditFilters, endDate: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Email utilisateur"
+              className="input-field"
+              value={auditFilters.userEmail}
+              onChange={(e) => setAuditFilters({ ...auditFilters, userEmail: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Action"
+              className="input-field"
+              value={auditFilters.action}
+              onChange={(e) => setAuditFilters({ ...auditFilters, action: e.target.value })}
+            />
+            <input
+              type="text"
+              placeholder="Ressource"
+              className="input-field"
+              value={auditFilters.resourceType}
+              onChange={(e) => setAuditFilters({ ...auditFilters, resourceType: e.target.value })}
+            />
+          </div>
+          <div className="flex justify-end mb-4">
+            <button className="btn-secondary" onClick={() => loadAuditLogs(1)}>
+              Filtrer
+            </button>
+          </div>
+
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">

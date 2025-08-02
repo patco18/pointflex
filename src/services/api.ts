@@ -650,6 +650,29 @@ export const superAdminService = {
       throw error
     }
   },
+  downloadAuditLogPdf: async (params?: {
+    startDate?: string
+    endDate?: string
+    userEmail?: string
+    action?: string
+    resourceType?: string
+  }) => {
+    try {
+      return await api.get('/superadmin/system/audit-log-report/pdf', {
+        params: {
+          start_date: params?.startDate,
+          end_date: params?.endDate,
+          user_email: params?.userEmail,
+          action: params?.action,
+          resource_type: params?.resourceType,
+        },
+        responseType: 'blob',
+      })
+    } catch (error) {
+      console.error('Download audit log pdf service error:', error)
+      throw error
+    }
+  },
 
   getSystemHealth: async () => {
     try {
@@ -1297,6 +1320,34 @@ export const adminService = {
       })
     } catch (error) {
       console.error('Download attendance pdf service error:', error)
+      throw error
+    }
+  },
+  downloadEmployeeAttendancePdf: async (
+    employeeId: number,
+    params?: {
+      startDate?: string
+      endDate?: string
+      pointageType?: string
+      pointageStatus?: string
+      sortBy?: string
+      sortDirection?: string
+    }
+  ) => {
+    try {
+      return await api.get(`/admin/employees/${employeeId}/attendance-report/pdf`, {
+        params: {
+          start_date: params?.startDate,
+          end_date: params?.endDate,
+          pointage_type: params?.pointageType,
+          pointage_status: params?.pointageStatus,
+          sort_by: params?.sortBy,
+          sort_direction: params?.sortDirection,
+        },
+        responseType: 'blob',
+      })
+    } catch (error) {
+      console.error('Download employee attendance pdf service error:', error)
       throw error
     }
   },
