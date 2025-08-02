@@ -28,11 +28,13 @@ export default function CheckInMethods() {
     // Redirection vers la page de scan QR dédiée
     window.location.href = '/attendance/qr-scanner';
   }
-  
+
   const handleOfflineCheckIn = () => {
-    // Enregistrer le pointage localement
+    // Enregistrer le pointage localement dans un tableau
     const timestamp = new Date().toISOString()
-    localStorage.setItem('offline_checkin', timestamp)
+    const existing = JSON.parse(localStorage.getItem('offline_checkins') || '[]')
+    existing.push(timestamp)
+    localStorage.setItem('offline_checkins', JSON.stringify(existing))
     toast.success('Pointage hors-ligne enregistré. Sera synchronisé automatiquement.')
     setActiveMethod(null)
     window.location.reload()

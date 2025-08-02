@@ -1,4 +1,4 @@
-import React, { lazy, Suspense } from 'react'
+import React, { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { usePermissions } from './hooks/usePermissions'
@@ -67,6 +67,7 @@ import LeaveApprovalManager from './pages/leave/LeaveApprovalPage';
 import LeaveBalancesPage from './pages/leave/LeaveBalancesPage';
 import RoleTestPage from './pages/RoleTestPage';
 import Layout from './components/Layout'
+import { attendanceService } from './services/api'
 
 function ProtectedRoute({ 
   children, 
@@ -106,6 +107,32 @@ function ProtectedRoute({
   return <>{children}</>
 }
 function App() {
+  useEffect(() => {
+    const syncOfflineCheckins = async () => {
+      const stored = localStorage.getItem('offline_checkins')
+      if (stored) {
+        const checkins: string[] = JSON.parse(stored)
+        const remaining: string[] = []
+        for (const timestamp of checkins) {
+          try {
+            await attendanceService.checkInOffline(timestamp)
+          } catch (error) {
+            remaining.push(timestamp)
+          }
+        }
+        if (remaining.length > 0) {
+          localStorage.setItem('offline_checkins', JSON.stringify(remaining))
+        } else {
+          localStorage.removeItem('offline_checkins')
+        }
+      }
+    }
+
+    window.addEventListener('online', syncOfflineCheckins)
+    syncOfflineCheckins()
+    return () => window.removeEventListener('online', syncOfflineCheckins)
+  }, [])
+
   return (
     <AuthProvider>
       <Router>
