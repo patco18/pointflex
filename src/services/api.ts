@@ -152,7 +152,7 @@ export const authService = {
 }
 
 export const attendanceService = {
-  checkInOffice: async (coordinates: { latitude: number; longitude: number; qrCode?: string }) => {
+  checkInOffice: async (coordinates: { latitude: number; longitude: number; accuracy?: number; qrCode?: string }) => {
     try {
       // Ne pas logger les coordonnées en production pour des raisons de confidentialité
       // console.log('🏢 Pointage bureau avec coordonnées:', coordinates)

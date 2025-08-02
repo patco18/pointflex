@@ -18,7 +18,7 @@ test('mission checkin calls service', async () => {
   const { attendanceService } = require('../services/api');
   // mock geolocation
   const mockGetCurrentPosition = jest.fn().mockImplementation((success) => {
-    success({ coords: { latitude: 1, longitude: 2 } });
+    success({ coords: { latitude: 1, longitude: 2, accuracy: 5 } });
   });
   // @ts-ignore
   global.navigator.geolocation = { getCurrentPosition: mockGetCurrentPosition };
@@ -27,5 +27,5 @@ test('mission checkin calls service', async () => {
   fireEvent.click(screen.getByText('Pointage Mission'));
   fireEvent.change(screen.getByLabelText("Numéro d'ordre de mission"), { target: { value: 'M1' } });
   fireEvent.click(screen.getByText('Pointer en Mission'));
-  await waitFor(() => expect(attendanceService.checkInMission).toHaveBeenCalledWith('M1', { latitude: 1, longitude: 2 }));
+  await waitFor(() => expect(attendanceService.checkInMission).toHaveBeenCalledWith('M1', { latitude: 1, longitude: 2, accuracy: 5 }));
 });

@@ -9,7 +9,7 @@ export default function CheckInMethods() {
   const [activeMethod, setActiveMethod] = useState<'geo' | 'qr' | 'nfc' | 'offline' | null>(null)
   const [loading, setLoading] = useState(false)
   
-  const handleGeoCheckIn = async (coordinates: {latitude: number, longitude: number}) => {
+  const handleGeoCheckIn = async (coordinates: {latitude: number, longitude: number, accuracy: number}) => {
     setLoading(true)
     try {
       const { data } = await attendanceService.checkInOffice(coordinates)

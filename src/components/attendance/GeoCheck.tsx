@@ -3,13 +3,13 @@ import { MapPin, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface Props {
-  onCheckIn: (coordinates: {latitude: number, longitude: number}) => void
+  onCheckIn: (coordinates: {latitude: number, longitude: number, accuracy: number}) => void
   onCancel: () => void
   loading: boolean
 }
 
 export default function GeoCheck({ onCheckIn, onCancel, loading }: Props) {
-  const [coordinates, setCoordinates] = useState<{latitude: number, longitude: number} | null>(null)
+  const [coordinates, setCoordinates] = useState<{latitude: number, longitude: number, accuracy: number} | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
   const [loadingLocation, setLoadingLocation] = useState(true)
 
@@ -25,7 +25,8 @@ export default function GeoCheck({ onCheckIn, onCancel, loading }: Props) {
         (position) => {
           setCoordinates({
             latitude: position.coords.latitude,
-            longitude: position.coords.longitude
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy
           })
           setLoadingLocation(false)
         },

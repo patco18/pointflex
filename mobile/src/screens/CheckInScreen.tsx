@@ -17,7 +17,7 @@ export default function CheckInScreen({ onDone }: { onDone: () => void }) {
         return;
       }
       const loc = await Location.getCurrentPositionAsync({});
-      await checkInOffice({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      await checkInOffice({ latitude: loc.coords.latitude, longitude: loc.coords.longitude, accuracy: loc.coords.accuracy });
       setMessage('Pointage effectué');
     } catch (e) {
       console.error(e);

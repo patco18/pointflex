@@ -7,7 +7,7 @@ export default function CheckIn() {
   const [activeTab, setActiveTab] = useState<'office' | 'mission'>('office')
   const [loading, setLoading] = useState(false)
   const [missionOrderNumber, setMissionOrderNumber] = useState('')
-  const [currentLocation, setCurrentLocation] = useState<{latitude: number, longitude: number} | null>(null)
+  const [currentLocation, setCurrentLocation] = useState<{latitude: number, longitude: number, accuracy: number} | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
 
   // Obtenir la position actuelle au chargement du composant
@@ -26,7 +26,8 @@ export default function CheckIn() {
       (position) => {
         const newLocation = {
           latitude: position.coords.latitude,
-          longitude: position.coords.longitude
+          longitude: position.coords.longitude,
+          accuracy: position.coords.accuracy
         }
         
         // Validation des coordonnées

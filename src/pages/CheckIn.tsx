@@ -33,7 +33,8 @@ export default function CheckIn() {
       const position = await getCurrentLocation()
       const coordinates = {
         latitude: position.coords.latitude,
-        longitude: position.coords.longitude
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
       }
 
       const { data } = await attendanceService.checkInOffice(coordinates)
@@ -68,7 +69,8 @@ export default function CheckIn() {
       const position = await getCurrentLocation()
       const coordinates = {
         latitude: position.coords.latitude,
-        longitude: position.coords.longitude
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
       }
 
       const { data } = await attendanceService.checkInMission(
