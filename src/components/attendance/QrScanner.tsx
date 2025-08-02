@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { QrCode, Camera, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { Html5Qrcode } from 'html5-qrcode'
 
 interface Props {
   onScan: (data: string) => void
@@ -11,9 +12,8 @@ interface Props {
 export default function QrScanner({ onScan, onCancel, loading }: Props) {
   const [hasCamera, setHasCamera] = useState<boolean | null>(null)
   const [scanActive, setScanActive] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [scanInterval, setScanIntervalState] = useState<number | null>(null)
+  const scannerRef = useRef<HTMLDivElement>(null)
+  const html5QrCodeRef = useRef<Html5Qrcode | null>(null)
 
   // Vérifie si la caméra est disponible
   useEffect(() => {
@@ -32,22 +32,28 @@ export default function QrScanner({ onScan, onCancel, loading }: Props) {
     
     // Nettoyage à la destruction du composant
     return () => {
-      if (scanInterval) {
-        clearInterval(scanInterval)
-      }
       stopCamera()
     }
   }, [])
 
   const startCamera = async () => {
     try {
-      if (videoRef.current) {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
-        })
-        videoRef.current.srcObject = stream
+      if (scannerRef.current) {
+        const html5QrCode = new Html5Qrcode(scannerRef.current.id)
+        html5QrCodeRef.current = html5QrCode
+        await html5QrCode.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            handleQrDetected(decodedText)
+          },
+          (errorMessage) => {
+            if (!errorMessage.includes('NotFoundException')) {
+              console.warn('Erreur de décodage:', errorMessage)
+            }
+          }
+        )
         setScanActive(true)
-        startScanning()
       }
     } catch (error) {
       console.error('Erreur lors de l\'activation de la caméra:', error)
@@ -56,58 +62,15 @@ export default function QrScanner({ onScan, onCancel, loading }: Props) {
   }
 
   const stopCamera = () => {
-    if (videoRef.current && videoRef.current.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks()
-      tracks.forEach(track => track.stop())
-      videoRef.current.srcObject = null
+    if (html5QrCodeRef.current) {
+      html5QrCodeRef.current.stop().catch(err => {
+        console.error('Erreur lors de l\'arrêt du scanner:', err)
+      }).finally(() => {
+        html5QrCodeRef.current?.clear()
+        html5QrCodeRef.current = null
+      })
     }
     setScanActive(false)
-    if (scanInterval) {
-      clearInterval(scanInterval)
-      setScanIntervalState(null)
-    }
-  }
-
-  const startScanning = () => {
-    if (scanInterval) {
-      clearInterval(scanInterval)
-    }
-    
-    // Cette fonction serait idéalement remplacée par une bibliothèque de scan QR comme jsQR
-    // Ce code est une implémentation simplifiée pour démonstration
-    const interval = window.setInterval(() => {
-      try {
-        captureFrame()
-      } catch (error) {
-        console.error('Erreur lors du scan:', error)
-      }
-    }, 500) as unknown as number
-    
-    setScanIntervalState(interval)
-  }
-
-  const captureFrame = () => {
-    if (videoRef.current && canvasRef.current && videoRef.current.readyState === videoRef.current.HAVE_ENOUGH_DATA) {
-      const canvas = canvasRef.current
-      const video = videoRef.current
-      
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return
-      
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-      
-      // Dans une implémentation réelle, on utiliserait une bibliothèque comme jsQR ici
-      // pour analyser l'image et détecter un code QR
-      // Pour ce prototype, on simule une détection après quelques secondes
-      setTimeout(() => {
-        if (Math.random() > 0.7 && scanActive) { // Simulation de détection
-          const fakeQrData = `OFFICE-${Math.floor(Math.random() * 1000)}`
-          handleQrDetected(fakeQrData)
-        }
-      }, 3000)
-    }
   }
   
   const handleQrDetected = (data: string) => {
@@ -164,14 +127,12 @@ export default function QrScanner({ onScan, onCancel, loading }: Props) {
       <div className="relative max-w-sm mx-auto">
         {scanActive && (
           <>
-            <video 
-              ref={videoRef}
+            <div
+              ref={scannerRef}
+              id="qr-reader"
               className="w-full h-auto rounded-lg border-2 border-purple-300"
-              autoPlay 
-              playsInline
-            ></video>
+            ></div>
             <div className="absolute inset-0 border-2 border-purple-500 rounded-lg pointer-events-none"></div>
-            <canvas ref={canvasRef} className="hidden"></canvas>
           </>
         )}
       </div>
