@@ -30,11 +30,85 @@ import {
   Crown,
   Globe,
   CreditCard,
-  DollarSign
+  DollarSign,
+  ChevronDown
 } from 'lucide-react'
 
 interface LayoutProps {
   children: React.ReactNode
+}
+
+interface NavItem {
+  name: string
+  href: string
+  icon: React.ComponentType<any>
+  priority?: boolean
+}
+
+interface NavCategory {
+  title: string
+  items: NavItem[]
+}
+
+function SidebarSection({
+  category,
+  currentPath,
+  onLinkClick
+}: {
+  category: NavCategory
+  currentPath: string
+  onLinkClick?: () => void
+}) {
+  const [open, setOpen] = React.useState(true)
+
+  return (
+    <div className="mb-2">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between px-2 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 hover:text-gray-700"
+      >
+        <span>{category.title}</span>
+        <ChevronDown
+          className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+      </button>
+      <div className={`${open ? 'mt-1 space-y-1' : 'hidden'}`}>
+        {category.items.map((item) => {
+          const Icon = item.icon
+          const isActive = currentPath === item.href
+          const isPriority = item.priority
+
+          return (
+            <Link
+              key={item.name}
+              to={item.href}
+              className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
+                isActive
+                  ? isPriority
+                    ? 'bg-primary-600 text-white border-r-2 border-primary-800'
+                    : 'bg-primary-100 text-primary-900 border-r-2 border-primary-600'
+                  : isPriority
+                    ? 'text-primary-700 hover:bg-primary-50 hover:text-primary-900 font-semibold'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+              }`}
+              onClick={onLinkClick}
+            >
+              <Icon
+                className={`mr-3 h-5 w-5 ${
+                  isActive && isPriority
+                    ? 'text-white'
+                    : isPriority
+                      ? 'text-primary-600'
+                      : ''
+                }`}
+              />
+              {item.name}
+            </Link>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export default function Layout({ children }: LayoutProps) {
@@ -53,98 +127,98 @@ export default function Layout({ children }: LayoutProps) {
 
   // Navigation adaptée aux rôles spécifiés
   const getNavigation = () => {
-    const nav = [
-      { name: 'Accueil', href: '/', icon: Home, priority: true, permission: null }
+    const categories: NavCategory[] = []
+
+    const generalItems: NavItem[] = [
+      { name: 'Accueil', href: '/', icon: Home, priority: true }
     ]
 
     // SUPERADMIN - Administration globale, configuration système, gestion des comptes entreprises
     if (permissions.canGlobalManagement) {
-      nav.push(
-        { name: 'Dashboard SuperAdmin', href: '/superadmin', icon: Crown, priority: false, permission: null },
-        { name: 'Gestion Entreprises', href: '/superadmin/companies', icon: Building, priority: false, permission: null },
-        { name: 'Gestion Abonnements', href: '/superadmin/subscription', icon: CreditCard, priority: false, permission: null },
-        // L'option Plans Abonnement a été supprimée car elle redirige vers Gestion Abonnements
-        { name: 'Demandes Abonnement', href: '/superadmin/extension-requests', icon: Clock, priority: false, permission: null },
-        { name: 'Facturation', href: '/superadmin/billing', icon: DollarSign, priority: false, permission: null },
-        { name: 'Configuration Système', href: '/settings', icon: Settings, priority: false, permission: null },
-        { name: 'Rôles & Privilèges', href: '/roles', icon: Shield, priority: false, permission: null },
-        { name: 'Analytics Globales', href: '/reports', icon: BarChart3, priority: false, permission: null }
-      )
+      categories.push({
+        title: 'Super Admin',
+        items: [
+          { name: 'Dashboard SuperAdmin', href: '/superadmin', icon: Crown },
+          { name: 'Gestion Entreprises', href: '/superadmin/companies', icon: Building },
+          { name: 'Gestion Abonnements', href: '/superadmin/subscription', icon: CreditCard },
+          { name: 'Demandes Abonnement', href: '/superadmin/extension-requests', icon: Clock },
+          { name: 'Facturation', href: '/superadmin/billing', icon: DollarSign },
+          { name: 'Configuration Système', href: '/settings', icon: Settings },
+          { name: 'Rôles & Privilèges', href: '/roles', icon: Shield },
+          { name: 'Analytics Globales', href: '/reports', icon: BarChart3 }
+        ]
+      })
     }
 
     // ADMINISTRATEUR ENTREPRISE - Gestion globale de l'entreprise
     else if (permissions.canManageCompanySettings || permissions.canManageTeam) {
-      // Tableau de bord administratif
-      nav.push({ name: 'Tableau de Bord', href: '/admin', icon: BarChart3, priority: true, permission: null })
-      
-      // Section Gestion du Personnel
-      nav.push({ name: 'Gestion Employés', href: '/admin/employees', icon: Users, priority: false, permission: null })
-      nav.push({ name: 'Organisation', href: '/admin/organization', icon: Layers, priority: false, permission: null })
-      nav.push({ name: 'Calendrier Équipe', href: '/admin/team-calendar', icon: Calendar, priority: false, permission: null })
-      
-      // Section Infrastructure
-      nav.push({ name: 'Gestion Bureaux', href: '/admin/offices', icon: Building, priority: false, permission: null })
-      nav.push({ name: 'Géofencing', href: '/admin/geofencing', icon: MapPin, priority: false, permission: null })
-      nav.push({ name: 'Pointage QR Code', href: '/admin/qr-code', icon: Target, priority: false, permission: null })
-      
-      // Section Analyses et Paramètres
-      nav.push({ name: 'Historique Pointages', href: '/admin/attendance-history', icon: History, priority: false, permission: null })
-      nav.push({ name: 'Rapports Entreprise', href: '/admin/reports', icon: FileText, priority: false, permission: null })
-      nav.push({ name: 'Webhooks', href: '/admin/webhooks', icon: Globe, priority: false, permission: null })
-      nav.push({ name: 'Paramètres Entreprise', href: '/admin/settings', icon: Cog, priority: false, permission: null })
+      categories.push({
+        title: 'Administration',
+        items: [
+          { name: 'Tableau de Bord', href: '/admin', icon: BarChart3, priority: true },
+          { name: 'Gestion Employés', href: '/admin/employees', icon: Users },
+          { name: 'Organisation', href: '/admin/organization', icon: Layers },
+          { name: 'Calendrier Équipe', href: '/admin/team-calendar', icon: Calendar },
+          { name: 'Gestion Bureaux', href: '/admin/offices', icon: Building },
+          { name: 'Géofencing', href: '/admin/geofencing', icon: MapPin },
+          { name: 'Pointage QR Code', href: '/admin/qr-code', icon: Target },
+          { name: 'Historique Pointages', href: '/admin/attendance-history', icon: History },
+          { name: 'Rapports Entreprise', href: '/admin/reports', icon: FileText },
+          { name: 'Webhooks', href: '/admin/webhooks', icon: Globe },
+          { name: 'Paramètres Entreprise', href: '/admin/settings', icon: Cog }
+        ]
+      })
     }
 
     // AUTRES RÔLES - Fonctionnalités selon permissions
     else {
-      // Gestion d'équipe pour chefs de service/projet et managers
+      const teamItems: NavItem[] = []
+
       if (permissions.canManageTeam || permissions.canViewTeamAttendance) {
-        nav.push({ name: 'Gestion Équipe', href: '/admin/employees', icon: Users, priority: false, permission: null })
+        teamItems.push({ name: 'Gestion Équipe', href: '/admin/employees', icon: Users })
       }
 
-      // Missions pour chefs de projet et chefs de service
       if (permissions.canCreateMissions || permissions.canTrackMissions) {
-        nav.push({ name: 'Missions', href: '/missions', icon: Target, priority: false, permission: null })
+        teamItems.push({ name: 'Missions', href: '/missions', icon: Target })
       }
 
-      // Calendrier équipe pour managers et plus
       if (permissions.canViewTeamAttendance) {
-        nav.push({ name: 'Calendrier Équipe', href: '/team-calendar', icon: Calendar, priority: false, permission: null })
+        teamItems.push({ name: 'Calendrier Équipe', href: '/team-calendar', icon: Calendar })
       }
 
-      // Rapports selon niveau
       if (permissions.canViewTeamReports || permissions.canViewDepartmentReports) {
-        nav.push({ name: 'Rapports', href: '/reports', icon: FileText, priority: false, permission: null })
+        teamItems.push({ name: 'Rapports', href: '/reports', icon: FileText })
+      }
+
+      if (teamItems.length > 0) {
+        categories.push({ title: 'Équipe', items: teamItems })
       }
     }
 
-    // Pointage regroupé pour tous (sauf auditeur)
     if (permissions.canSelfCheckIn) {
-      nav.push({ name: 'Pointage', href: '/attendance/home', icon: Clock, priority: true, permission: null })
+      generalItems.push({ name: 'Pointage', href: '/attendance/home', icon: Clock, priority: true })
     }
 
-    // Historique personnel pour tous
-    nav.push({ name: 'Historique', href: '/history', icon: History, priority: false, permission: null })
-    
-    // Menu Gestion des congés
+    generalItems.push({ name: 'Historique', href: '/history', icon: History })
+
     if (checkPermission('leave.view_personal')) {
-      nav.push({ name: 'Congés', href: '/leave', icon: Calendar, priority: true, permission: null })
+      generalItems.push({ name: 'Congés', href: '/leave', icon: Calendar, priority: true })
     }
-    
-    // Tableau de bord analytique pour les rôles qui ont les permissions nécessaires
+
     if (checkPermission('analytics.access_basic')) {
-      nav.push({ name: 'Tableau de Bord', href: '/analytics', icon: BarChart3, priority: true, permission: null })
+      generalItems.push({ name: 'Tableau de Bord', href: '/analytics', icon: BarChart3, priority: true })
     }
 
-    // Fonctionnalités avancées pour tous
-    nav.push({ name: 'Fonctionnalités Avancées', href: '/advanced', icon: Zap, priority: false, permission: null })
+    generalItems.push({ name: 'Fonctionnalités Avancées', href: '/advanced', icon: Zap })
+    generalItems.push({ name: 'Profil', href: '/profile', icon: User })
 
-    // Profil pour tous
-    nav.push({ name: 'Profil', href: '/profile', icon: User, priority: false, permission: null })
+    categories.unshift({ title: 'Général', items: generalItems })
 
-    return nav
+    return categories
   }
 
   const navigation = getNavigation()
+  const flatNavigation = navigation.flatMap((cat) => cat.items)
 
   const getRoleIcon = () => {
     switch (user?.role) {
@@ -236,35 +310,15 @@ export default function Layout({ children }: LayoutProps) {
               <X className="h-6 w-6" />
             </button>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = location.pathname === item.href
-              const isPriority = item.priority
-              
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? isPriority 
-                        ? 'bg-primary-600 text-white border-r-2 border-primary-800'
-                        : 'bg-primary-100 text-primary-900 border-r-2 border-primary-600'
-                      : isPriority
-                        ? 'text-primary-700 hover:bg-primary-50 hover:text-primary-900 font-semibold'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                  onClick={() => setSidebarOpen(false)}
-                >
-                  <Icon className={`mr-3 h-5 w-5 ${
-                    isActive && isPriority ? 'text-white' : 
-                    isPriority ? 'text-primary-600' : ''
-                  }`} />
-                  {item.name}
-                </Link>
-              )
-            })}
+          <nav className="flex-1 px-2 py-4 overflow-y-auto">
+            {navigation.map((category) => (
+              <SidebarSection
+                key={category.title}
+                category={category}
+                currentPath={location.pathname}
+                onLinkClick={() => setSidebarOpen(false)}
+              />
+            ))}
           </nav>
           
           {/* User info in mobile sidebar */}
@@ -329,34 +383,14 @@ export default function Layout({ children }: LayoutProps) {
               </div>
             </div>
           </div>
-          <nav className="flex-1 space-y-1 px-2 py-4">
-            {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = location.pathname === item.href
-              const isPriority = item.priority
-              
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={`group flex items-center px-2 py-2 text-sm font-medium rounded-md transition-colors ${
-                    isActive
-                      ? isPriority 
-                        ? 'bg-primary-600 text-white border-r-2 border-primary-800'
-                        : 'bg-primary-100 text-primary-900 border-r-2 border-primary-600'
-                      : isPriority
-                        ? 'text-primary-700 hover:bg-primary-50 hover:text-primary-900 font-semibold'
-                        : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <Icon className={`mr-3 h-5 w-5 ${
-                    isActive && isPriority ? 'text-white' : 
-                    isPriority ? 'text-primary-600' : ''
-                  }`} />
-                  {item.name}
-                </Link>
-              )
-            })}
+          <nav className="flex-1 px-2 py-4 overflow-y-auto">
+            {navigation.map((category) => (
+              <SidebarSection
+                key={category.title}
+                category={category}
+                currentPath={location.pathname}
+              />
+            ))}
           </nav>
         </div>
       </div>
@@ -387,7 +421,7 @@ export default function Layout({ children }: LayoutProps) {
                   <>
                     <span className="text-gray-400">/</span>
                     <span className="text-gray-600">
-                      {navigation.find(item => item.href === location.pathname)?.name || 'Page actuelle'}
+                      {flatNavigation.find(item => item.href === location.pathname)?.name || 'Page actuelle'}
                     </span>
                   </>
                 )}
