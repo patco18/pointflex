@@ -1,8 +1,7 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { CalendarDays, CalendarCheck, CalendarClock, Users, Settings, BarChart, FileText } from 'lucide-react';
+import { CalendarDays, CalendarCheck, CalendarClock, Settings, BarChart, FileText, ChevronDown } from 'lucide-react';
 import { usePermissions } from '../../hooks/usePermissions';
-import RoleBasedAccess from '../../components/RoleBasedAccess';
 
 /**
  * Composant de menu de navigation pour la gestion des congés,
@@ -11,7 +10,7 @@ import RoleBasedAccess from '../../components/RoleBasedAccess';
 export default function LeaveNavigation() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { checkPermission, userRole } = usePermissions();
+  const { checkPermission } = usePermissions();
 
   // Obtention des permissions spécifiques aux congés
   const canRequestLeave = checkPermission('leave.request');
@@ -29,68 +28,103 @@ export default function LeaveNavigation() {
                             checkPermission('leave.manage_balances_department') || 
                             checkPermission('leave.manage_balances_all');
 
-  // Définition des éléments de menu en fonction des permissions
-  const menuItems = [
-    // Demande de congés - disponible pour tous sauf auditeurs
+  // Définition des catégories et éléments de menu en fonction des permissions
+  const categories = [
     {
-      id: 'request',
-      label: 'Demander un congé',
-      path: '/leave/request',
-      icon: <CalendarClock className="h-5 w-5" />,
-      show: canRequestLeave
+      id: 'my-requests',
+      label: 'Mes demandes',
+      items: [
+        {
+          id: 'request',
+          label: 'Demander un congé',
+          path: '/leave/request',
+          icon: <CalendarClock className="h-5 w-5" />,
+          show: canRequestLeave
+        },
+        {
+          id: 'my-history',
+          label: 'Mes congés',
+          path: '/leave/my-history',
+          icon: <CalendarDays className="h-5 w-5" />,
+          show: canViewPersonalLeave
+        }
+      ]
     },
-    // Mes congés - disponible pour tous sauf auditeurs
     {
-      id: 'my-history',
-      label: 'Mes congés',
-      path: '/leave/my-history',
-      icon: <CalendarDays className="h-5 w-5" />,
-      show: canViewPersonalLeave
+      id: 'team',
+      label: 'Équipe',
+      items: [
+        {
+          id: 'team-calendar',
+          label: 'Calendrier d\'équipe',
+          path: '/leave/team-calendar',
+          icon: <CalendarCheck className="h-5 w-5" />,
+          show: canViewTeamLeave || canViewDepartmentLeave || canViewAllLeave
+        },
+        {
+          id: 'approvals',
+          label: 'Approbation des congés',
+          path: '/leave/approvals',
+          icon: <FileText className="h-5 w-5" />,
+          show: canApproveLeave
+        },
+        {
+          id: 'balances',
+          label: 'Gestion des soldes',
+          path: '/leave/balances',
+          icon: <BarChart className="h-5 w-5" />,
+          show: canManageBalances
+        }
+      ]
     },
-    // Calendrier d'équipe - pour managers et au-dessus
     {
-      id: 'team-calendar',
-      label: 'Calendrier d\'équipe',
-      path: '/leave/team-calendar',
-      icon: <CalendarCheck className="h-5 w-5" />,
-      show: canViewTeamLeave || canViewDepartmentLeave || canViewAllLeave
+      id: 'administration',
+      label: 'Administration',
+      items: [
+        {
+          id: 'admin',
+          label: 'Administration des congés',
+          path: '/leave/admin',
+          icon: <Settings className="h-5 w-5" />,
+          show: canManageLeaveTypes || canManageLeavePolicy
+        }
+      ]
     },
-    // Approbation des congés - pour managers et au-dessus
-    {
-      id: 'approvals',
-      label: 'Approbation des congés',
-      path: '/leave/approvals',
-      icon: <FileText className="h-5 w-5" />,
-      show: canApproveLeave
-    },
-    // Gestion des soldes - pour managers et au-dessus
-    {
-      id: 'balances',
-      label: 'Gestion des soldes',
-      path: '/leave/balances',
-      icon: <BarChart className="h-5 w-5" />,
-      show: canManageBalances
-    },
-    // Administration des congés - pour admins uniquement
-    {
-      id: 'admin',
-      label: 'Administration des congés',
-      path: '/leave/admin',
-      icon: <Settings className="h-5 w-5" />,
-      show: canManageLeaveTypes || canManageLeavePolicy
-    },
-    // Rapports de congés - pour managers et au-dessus
     {
       id: 'reports',
-      label: 'Rapports de congés',
-      path: '/leave/reports',
-      icon: <BarChart className="h-5 w-5" />,
-      show: canViewLeaveReports
+      label: 'Rapports',
+      items: [
+        {
+          id: 'reports',
+          label: 'Rapports de congés',
+          path: '/leave/reports',
+          icon: <BarChart className="h-5 w-5" />,
+          show: canViewLeaveReports
+        }
+      ]
     }
   ];
 
   // Filtrer les éléments de menu selon les permissions
-  const visibleMenuItems = menuItems.filter(item => item.show);
+  const visibleCategories = categories
+    .map(category => ({
+      ...category,
+      items: category.items.filter(item => item.show)
+    }))
+    .filter(category => category.items.length > 0);
+
+  // Gestion de l'état des catégories collapsibles
+  const [openCategories, setOpenCategories] = React.useState<Record<string, boolean>>(() => {
+    const initial: Record<string, boolean> = {};
+    visibleCategories.forEach(category => {
+      initial[category.id] = category.items.some(item => location.pathname === item.path);
+    });
+    return initial;
+  });
+
+  const toggleCategory = (id: string) => {
+    setOpenCategories(prev => ({ ...prev, [id]: !prev[id] }));
+  };
 
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
@@ -102,27 +136,44 @@ export default function LeaveNavigation() {
       </div>
       
       <nav className="p-4">
-        <ul className="space-y-2">
-          {visibleMenuItems.map((item) => (
-            <li key={item.id}>
-              <a
-                href={item.path}
-                onClick={(e) => {
-                  e.preventDefault();
-                  navigate(item.path);
-                }}
-                className={`flex items-center px-4 py-2 rounded-md transition-colors ${
-                  location.pathname === item.path
-                    ? 'bg-primary-50 text-primary-700 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100'
+        {visibleCategories.map((category) => (
+          <div key={category.id} className="mb-4">
+            <button
+              onClick={() => toggleCategory(category.id)}
+              className="flex w-full items-center justify-between px-4 py-2 text-left text-gray-700 rounded-md hover:bg-gray-100 transition-colors"
+            >
+              <span className="font-medium">{category.label}</span>
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${
+                  openCategories[category.id] ? 'rotate-180' : ''
                 }`}
-              >
-                <span className="mr-3 text-gray-500">{item.icon}</span>
-                {item.label}
-              </a>
-            </li>
-          ))}
-        </ul>
+              />
+            </button>
+            {openCategories[category.id] && (
+              <ul className="mt-2 space-y-2 pl-4">
+                {category.items.map((item) => (
+                  <li key={item.id}>
+                    <a
+                      href={item.path}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        navigate(item.path);
+                      }}
+                      className={`flex items-center px-4 py-2 rounded-md transition-colors ${
+                        location.pathname === item.path
+                          ? 'bg-primary-50 text-primary-700 font-medium'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <span className="mr-3 text-gray-500">{item.icon}</span>
+                      {item.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
       </nav>
     </div>
   );
