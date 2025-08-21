@@ -4,7 +4,7 @@ import { toast } from 'react-hot-toast'
 import { Coffee, LogOut, Loader } from 'lucide-react'
 import Card from '../components/ui/card'
 import Button from '../components/ui/button'
-import CheckInComponent from '../components/attendance/CheckIn'
+
 
 export default function Attendance() {
   const [onBreak, setOnBreak] = useState(false)
