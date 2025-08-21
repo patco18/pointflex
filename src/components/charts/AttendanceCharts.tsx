@@ -1,6 +1,17 @@
 import React from 'react';
-// Importez Recharts après l'avoir installé
-// import { BarChart, Bar, PieChart, Pie, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  CartesianGrid,
+  XAxis,
+  YAxis
+} from 'recharts';
 
 interface AttendanceStats {
   totalRecords: number;
@@ -38,39 +49,27 @@ export const AttendanceOverviewChart: React.FC<{ stats: AttendanceStats }> = ({ 
     { name: 'Absences', value: stats.totalAbsences, color: '#f87171' }
   ];
 
-  // Simuler des données temporelles (à remplacer par des données réelles si disponibles)
-  const renderPieChart = () => {
-    // Si vous utilisez Recharts, décommentez ce code
-    /* return (
-      <ResponsiveContainer width="100%" height={300}>
-        <PieChart>
-          <Pie
-            data={statusData}
-            cx="50%"
-            cy="50%"
-            labelLine={false}
-            outerRadius={100}
-            fill="#8884d8"
-            dataKey="value"
-            label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-          >
-            {statusData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
-            ))}
-          </Pie>
-          <Tooltip formatter={(value) => [value, 'Nombre']} />
-          <Legend />
-        </PieChart>
-      </ResponsiveContainer>
-    ); */
-
-    // Version temporaire sans Recharts
-    return (
-      <div className="h-64 flex items-center justify-center bg-gray-50 border rounded">
-        <p className="text-gray-500">Graphique en camembert des présences/absences/retards</p>
-      </div>
-    );
-  };
+  const renderPieChart = () => (
+    <ResponsiveContainer width="100%" height={300}>
+      <PieChart>
+        <Pie
+          data={statusData}
+          cx="50%"
+          cy="50%"
+          labelLine={false}
+          outerRadius={100}
+          dataKey="value"
+          label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+        >
+          {statusData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={entry.color} />
+          ))}
+        </Pie>
+        <Tooltip formatter={(value) => [value, 'Nombre']} />
+        <Legend />
+      </PieChart>
+    </ResponsiveContainer>
+  );
 
   return (
     <div className="space-y-4">
@@ -100,31 +99,28 @@ export const DepartmentPerformanceChart: React.FC<{ departmentStats: DepartmentS
     .sort((a, b) => b.attendanceRate - a.attendanceRate)
     .slice(0, 5);
 
-  const renderBarChart = () => {
-    // Si vous utilisez Recharts, décommentez ce code
-    /* return (
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart
-          data={sortedDepartments}
-          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" tick={{ fontSize: 12 }} height={60} interval={0} angle={-45} textAnchor="end" />
-          <YAxis domain={[0, 100]} />
-          <Tooltip formatter={(value) => [`${value}%`, 'Taux de présence']} />
-          <Legend />
-          <Bar dataKey="attendanceRate" name="Taux de présence (%)" fill="#4ade80" />
-        </BarChart>
-      </ResponsiveContainer>
-    ); */
-
-    // Version temporaire sans Recharts
-    return (
-      <div className="h-64 flex items-center justify-center bg-gray-50 border rounded">
-        <p className="text-gray-500">Graphique à barres des performances par département</p>
-      </div>
-    );
-  };
+  const renderBarChart = () => (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart
+        data={sortedDepartments}
+        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis
+          dataKey="name"
+          tick={{ fontSize: 12 }}
+          height={60}
+          interval={0}
+          angle={-45}
+          textAnchor="end"
+        />
+        <YAxis domain={[0, 100]} />
+        <Tooltip formatter={(value) => [`${value}%`, 'Taux de présence']} />
+        <Legend />
+        <Bar dataKey="attendanceRate" name="Taux de présence (%)" fill="#4ade80" />
+      </BarChart>
+    </ResponsiveContainer>
+  );
 
   return (
     <div className="space-y-4">
@@ -140,31 +136,28 @@ export const WorkHoursChart: React.FC<{ departmentStats: DepartmentStat[] }> = (
     .sort((a, b) => b.workHours - a.workHours)
     .slice(0, 5);
 
-  const renderHoursChart = () => {
-    // Si vous utilisez Recharts, décommentez ce code
-    /* return (
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart
-          data={sortedByHours}
-          margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-        >
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" tick={{ fontSize: 12 }} height={60} interval={0} angle={-45} textAnchor="end" />
-          <YAxis />
-          <Tooltip formatter={(value) => [`${value.toFixed(1)}h`, 'Heures travaillées']} />
-          <Legend />
-          <Bar dataKey="workHours" name="Heures travaillées" fill="#60a5fa" />
-        </BarChart>
-      </ResponsiveContainer>
-    ); */
-
-    // Version temporaire sans Recharts
-    return (
-      <div className="h-64 flex items-center justify-center bg-gray-50 border rounded">
-        <p className="text-gray-500">Graphique des heures travaillées par département</p>
-      </div>
-    );
-  };
+  const renderHoursChart = () => (
+    <ResponsiveContainer width="100%" height={300}>
+      <BarChart
+        data={sortedByHours}
+        margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+      >
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis
+          dataKey="name"
+          tick={{ fontSize: 12 }}
+          height={60}
+          interval={0}
+          angle={-45}
+          textAnchor="end"
+        />
+        <YAxis />
+        <Tooltip formatter={(value: number) => [`${value.toFixed(1)}h`, 'Heures travaillées']} />
+        <Legend />
+        <Bar dataKey="workHours" name="Heures travaillées" fill="#60a5fa" />
+      </BarChart>
+    </ResponsiveContainer>
+  );
 
   return (
     <div className="space-y-4">
