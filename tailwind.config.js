@@ -55,6 +55,7 @@ export default {
         22: '5.5rem',
         26: '6.5rem',
       },
+
     },
   },
   plugins: [],

@@ -1,4 +1,6 @@
 import React, { ReactNode } from 'react';
+import Sidebar, { SidebarSection } from './Sidebar';
+import Header from './Header';
 
 
 interface DefaultLayoutProps {

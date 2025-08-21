@@ -17,6 +17,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       position="top-right"
       toastOptions={{
         duration: 4000,
+        className: 'animate-slide-in',
         style: {
           background: '#363636',
           color: '#fff',
