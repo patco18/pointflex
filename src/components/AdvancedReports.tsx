@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import toast from 'react-hot-toast'
+import { toast } from 'react-hot-toast'
 import { Download, TrendingUp, Users, Clock, FileText } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { adminService } from '../services/api'
@@ -43,9 +43,13 @@ export default function AdvancedReports() {
           endDate,
         })
       } else {
-        response = await adminService.downloadAttendancePdf({ startDate, endDate })
+        response = await adminService.downloadAttendancePdf({ 
+          startDate, 
+          endDate 
+        })
       }
 
+      // La réponse contient déjà les données binaires dans response.data
       const blob = new Blob([response.data], { type: 'application/pdf' })
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')

@@ -1,9 +1,11 @@
+
 import React, { useState } from 'react'
 import { attendanceService } from '../services/api'
 import { toast } from 'react-hot-toast'
 import { Coffee, LogOut, Loader } from 'lucide-react'
 import Card from '../components/ui/card'
 import Button from '../components/ui/button'
+import CheckInComponent from '../components/attendance/CheckIn'
 
 
 export default function Attendance() {
@@ -14,7 +16,7 @@ export default function Attendance() {
   const startPause = async () => {
     setLoadingPause(true)
     try {
-      await attendanceService.startPause()
+      await attendanceService.startPause('break') // On utilise 'break' comme type de pause par défaut
       setOnBreak(true)
       toast.success('Pause démarrée avec succès!')
     } catch (err) {
@@ -27,7 +29,9 @@ export default function Attendance() {
   const endPause = async () => {
     setLoadingPause(true)
     try {
-      await attendanceService.endPause()
+      // Note: en situation réelle, il faudrait stocker l'ID de la pause active
+      // Pour l'exemple, nous utilisons 1 comme ID par défaut
+      await attendanceService.endPause(1)
       setOnBreak(false)
       toast.success('Pause terminée avec succès!')
     } catch (err) {
