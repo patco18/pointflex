@@ -34,6 +34,7 @@ export default {
           700: '#047857',
           800: '#065f46',
           900: '#064e3b',
+
         },
       },
       fontFamily: {
@@ -54,25 +55,7 @@ export default {
         22: '5.5rem',
         26: '6.5rem',
       },
-      keyframes: {
-        'fade-in': {
-          from: { opacity: '0' },
-          to: { opacity: '1' },
-        },
-        'slide-in': {
-          from: { transform: 'translateY(0.5rem)', opacity: '0' },
-          to: { transform: 'translateY(0)', opacity: '1' },
-        },
-        'scale-in': {
-          from: { transform: 'scale(0.95)', opacity: '0' },
-          to: { transform: 'scale(1)', opacity: '1' },
-        },
-      },
-      animation: {
-        'fade-in': 'fade-in 0.2s ease-out',
-        'slide-in': 'slide-in 0.2s ease-out',
-        'scale-in': 'scale-in 0.2s ease-out',
-      },
+
     },
   },
   plugins: [],
