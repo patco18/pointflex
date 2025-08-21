@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react' // Added useEffect
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { authService, api } from '../services/api' // Added authService and api
@@ -11,26 +11,64 @@ interface LoginForm {
   password: string
 }
 
+const demoAccounts = [
+  { role: 'Super Administrateur', email: 'superadmin@pointflex.com', password: 'superadmin123' },
+  { role: 'Admin Entreprise', email: 'admin@pointflex.com', password: 'admin123' },
+  { role: 'Employé', email: 'employee@pointflex.com', password: 'employee123' },
+  { role: 'Chef de Service', email: 'chefservice@pointflex.com', password: 'chefservice123' },
+  { role: 'Chef de Projet', email: 'chefprojet@pointflex.com', password: 'chefprojet123' },
+  { role: 'Manager', email: 'manager@pointflex.com', password: 'manager123' },
+  { role: 'Auditeur', email: 'auditeur@pointflex.com', password: 'auditeur123' },
+];
+
 export default function Login() {
   const navigate = useNavigate()
   const [loading, setLoading] = useState(false) // For primary login
   const [showPassword, setShowPassword] = useState(false)
+  const [selectedRole, setSelectedRole] = useState('')
+  const [passwordStrength, setPasswordStrength] = useState(0)
 
   // State for 2FA step
-  const [is2FARequired, setIs2FARequired] = useState(false);
-  const [userIdFor2FA, setUserIdFor2FA] = useState<number | null>(null);
-  const [otpCode, setOtpCode] = useState('');
-  const [loginLoading2FA, setLoginLoading2FA] = useState(false);
-  
-  const { register, handleSubmit, formState: { errors }, reset: resetLoginForm } = useForm<LoginForm>()
+  const [is2FARequired, setIs2FARequired] = useState(false)
+  const [userIdFor2FA, setUserIdFor2FA] = useState<number | null>(null)
+  const [otpCode, setOtpCode] = useState('')
+  const [otpError, setOtpError] = useState('')
+  const [loginLoading2FA, setLoginLoading2FA] = useState(false)
+
+  const { register, handleSubmit, formState: { errors }, reset: resetLoginForm, setValue, watch } = useForm<LoginForm>()
+  const passwordValue = watch('password', '')
   // react-hook-form for OTP form if needed, or simple state management
   // For simplicity, using simple state for otpCode
   const { login: contextLogin, serverStatus, checkServerStatus } = useAuth(); // Renamed login to contextLogin from useAuth
-  const [emailFor2FA, setEmailFor2FA] = useState<string>(''); // Store email for context login
+  const [emailFor2FA, setEmailFor2FA] = useState<string>('') // Store email for context login
+
+  const calculatePasswordStrength = (password: string) => {
+    let strength = 0
+    if (password.length >= 8) strength++
+    if (/[A-Z]/.test(password)) strength++
+    if (/[0-9]/.test(password)) strength++
+    if (/[^A-Za-z0-9]/.test(password)) strength++
+    return strength
+  }
+
+  const strengthLabels = ['Très faible', 'Faible', 'Moyen', 'Bon', 'Excellent']
+  const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500']
 
   useEffect(() => {
     if(checkServerStatus) checkServerStatus();
   }, [checkServerStatus]);
+
+  useEffect(() => {
+    const account = demoAccounts.find(acc => acc.role === selectedRole)
+    if (account) {
+      setValue('email', account.email)
+      setValue('password', account.password)
+    }
+  }, [selectedRole, setValue])
+
+  useEffect(() => {
+    setPasswordStrength(calculatePasswordStrength(passwordValue))
+  }, [passwordValue])
 
   const handlePrimaryLogin = async (data: LoginForm) => {
     if (serverStatus === 'offline') {
@@ -82,10 +120,13 @@ export default function Login() {
   const handle2FASubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userIdFor2FA || !otpCode) {
-      toast.error("Code OTP requis.");
+      const message = "Code OTP requis.";
+      setOtpError(message);
+      toast.error(message);
       return;
     }
     setLoginLoading2FA(true);
+    setOtpError('');
     try {
       const response = await authService.verifyLogin2FA(userIdFor2FA, otpCode);
 
@@ -124,10 +165,13 @@ export default function Login() {
         setOtpCode('');
         resetLoginForm();
       } else {
-        toast.error("Échec de la vérification 2FA. Réponse inattendue.");
+        const message = "Échec de la vérification 2FA. Réponse inattendue.";
+        setOtpError(message);
+        toast.error(message);
       }
     } catch (error: any) {
       const message = error.response?.data?.message || 'Code OTP invalide ou expiré.';
+      setOtpError(message);
       toast.error(message);
     } finally {
       setLoginLoading2FA(false);
@@ -139,6 +183,7 @@ export default function Login() {
     setUserIdFor2FA(null);
     setEmailFor2FA('');
     setOtpCode('');
+    setOtpError('');
   };
 
   const getServerStatusDisplay = () => {
@@ -268,7 +313,10 @@ export default function Login() {
                     id="otpCode"
                     type="text"
                     value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\s/g, '').slice(0,6))}
+                    onChange={(e) => {
+                      setOtpError('')
+                      setOtpCode(e.target.value.replace(/\s/g, '').slice(0, 6))
+                    }}
                     className="input-field pl-10 focus:ring-blue-500 focus:border-blue-500 text-center tracking-widest text-lg"
                     placeholder="123456"
                     maxLength={6}
@@ -277,6 +325,21 @@ export default function Login() {
                     inputMode="numeric"
                     pattern="\d{6}"
                   />
+                </div>
+                <div className="mt-2">
+                  <div className="h-1 bg-gray-200 rounded">
+                    <div
+                      className="h-1 bg-blue-500 rounded transition-all"
+                      style={{ width: `${(otpCode.length / 6) * 100}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-xs text-gray-600 mt-1">{otpCode.length}/6</p>
+                  {otpError && (
+                    <p className="text-sm text-red-600 flex items-center mt-1">
+                      <AlertCircle className="h-4 w-4 mr-1" />
+                      {otpError}
+                    </p>
+                  )}
                 </div>
               </div>
               <button
@@ -299,8 +362,23 @@ export default function Login() {
               </button>
             </form>
           ) : (
-            <>
             <form className="space-y-6" onSubmit={handleSubmit(handlePrimaryLogin)}> {/* Use handlePrimaryLogin */}
+              <div>
+                <label htmlFor="demoRole" className="block text-sm font-medium text-gray-700 mb-2">
+                  Compte de démonstration
+                </label>
+                <select
+                  id="demoRole"
+                  value={selectedRole}
+                  onChange={(e) => setSelectedRole(e.target.value)}
+                  className="input-field"
+                >
+                  <option value="">-- Choisir un rôle --</option>
+                  {demoAccounts.map((acc) => (
+                    <option key={acc.role} value={acc.role}>{acc.role}</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Adresse email
@@ -358,6 +436,15 @@ export default function Login() {
                   {errors.password.message}
                 </p>
               )}
+              <div className="mt-2">
+                <div className="h-2 bg-gray-200 rounded">
+                  <div
+                    className={`h-2 rounded ${strengthColors[passwordStrength]}`}
+                    style={{ width: `${(passwordStrength / 4) * 100}%` }}
+                  ></div>
+                </div>
+                <p className="text-xs text-gray-600 mt-1">{strengthLabels[passwordStrength]}</p>
+              </div>
             </div>
 
             <button
@@ -379,201 +466,6 @@ export default function Login() {
             </button>
           </form>
           
-          {/* Comptes de démonstration */}
-          <div className="mt-8 space-y-4">
-            <div className="text-center">
-              <p className="text-sm text-gray-600 mb-4 font-medium">Comptes de démonstration</p>
-            </div>
-            
-            <div className="space-y-3">
-              {/* SuperAdmin */}
-              <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-red-500 rounded-lg">
-                      <Shield className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-red-900">Super Administrateur</p>
-                      <p className="text-xs text-red-700">Contrôle total de la plateforme</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'superadmin@pointflex.com'
-                      document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'superadmin123'
-                    }}
-                    className="text-xs bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded-lg transition-colors"
-                  >
-                    Utiliser
-                  </button>
-                </div>
-                <div className="mt-2 text-xs font-mono text-red-800 bg-red-100 p-2 rounded">
-                  superadmin@pointflex.com / superadmin123
-                </div>
-              </div>
-              
-              {/* Admin */}
-              <div className="bg-gradient-to-r from-purple-50 to-purple-100 border border-purple-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-purple-500 rounded-lg">
-                      <Shield className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-purple-900">Admin Entreprise</p>
-                      <p className="text-xs text-purple-700">Gestion d'une entreprise</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'admin@pointflex.com'
-                      document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'admin123'
-                    }}
-                    className="text-xs bg-purple-500 hover:bg-purple-600 text-white px-3 py-1 rounded-lg transition-colors"
-                  >
-                    Utiliser
-                  </button>
-                </div>
-                <div className="mt-2 text-xs font-mono text-purple-800 bg-purple-100 p-2 rounded">
-                  admin@pointflex.com / admin123
-                </div>
-              </div>
-              
-                {/* Employé */}
-                <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="p-2 bg-blue-500 rounded-lg">
-                      <Shield className="h-4 w-4 text-white" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-blue-900">Employé</p>
-                      <p className="text-xs text-blue-700">Pointage et consultation</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'employee@pointflex.com'
-                      document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'employee123'
-                    }}
-                    className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-3 py-1 rounded-lg transition-colors"
-                  >
-                    Utiliser
-                  </button>
-                </div>
-
-                {/* Chef de Service */}
-                <div className="bg-gradient-to-r from-indigo-50 to-indigo-100 border border-indigo-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-indigo-500 rounded-lg">
-                        <Shield className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-indigo-900">Chef de Service</p>
-                        <p className="text-xs text-indigo-700">Gestion d'équipe</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'chefservice@pointflex.com'
-                        document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'chefservice123'
-                      }}
-                      className="text-xs bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-1 rounded-lg transition-colors"
-                    >
-                      Utiliser
-                    </button>
-                  </div>
-                  <div className="mt-2 text-xs font-mono text-indigo-800 bg-indigo-100 p-2 rounded">
-                    chefservice@pointflex.com / chefservice123
-                  </div>
-                </div>
-
-                {/* Chef de Projet */}
-                <div className="bg-gradient-to-r from-green-50 to-green-100 border border-green-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-green-500 rounded-lg">
-                        <Shield className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-green-900">Chef de Projet</p>
-                        <p className="text-xs text-green-700">Suivi des missions</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'chefprojet@pointflex.com'
-                        document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'chefprojet123'
-                      }}
-                      className="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg transition-colors"
-                    >
-                      Utiliser
-                    </button>
-                  </div>
-                  <div className="mt-2 text-xs font-mono text-green-800 bg-green-100 p-2 rounded">
-                    chefprojet@pointflex.com / chefprojet123
-                  </div>
-                </div>
-
-                {/* Manager */}
-                <div className="bg-gradient-to-r from-yellow-50 to-yellow-100 border border-yellow-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-yellow-500 rounded-lg">
-                        <Shield className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-yellow-900">Manager</p>
-                        <p className="text-xs text-yellow-700">Supervision d'équipe</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'manager@pointflex.com'
-                        document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'manager123'
-                      }}
-                      className="text-xs bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-lg transition-colors"
-                    >
-                      Utiliser
-                    </button>
-                  </div>
-                  <div className="mt-2 text-xs font-mono text-yellow-800 bg-yellow-100 p-2 rounded">
-                    manager@pointflex.com / manager123
-                  </div>
-                </div>
-
-                {/* Auditeur */}
-                <div className="bg-gradient-to-r from-orange-50 to-orange-100 border border-orange-200 rounded-xl p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="p-2 bg-orange-500 rounded-lg">
-                        <Shield className="h-4 w-4 text-white" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-orange-900">Auditeur</p>
-                        <p className="text-xs text-orange-700">Lecture seule</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => {
-                        document.querySelector<HTMLInputElement>('input[type="email"]')!.value = 'auditeur@pointflex.com'
-                        document.querySelector<HTMLInputElement>('input[type="password"]')!.value = 'auditeur123'
-                      }}
-                      className="text-xs bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded-lg transition-colors"
-                    >
-                      Utiliser
-                    </button>
-                  </div>
-                  <div className="mt-2 text-xs font-mono text-orange-800 bg-orange-100 p-2 rounded">
-                    auditeur@pointflex.com / auditeur123
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </>
         )}
 
         {/* Footer */}
