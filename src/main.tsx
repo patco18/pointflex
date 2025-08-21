@@ -18,10 +18,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       toastOptions={{
         duration: 4000,
         className: 'animate-slide-in',
-        ariaProps: { role: 'status', 'aria-live': 'polite' },
-        success: { icon: '✅' },
-        error: { icon: '❌' },
-        loading: { icon: '⏳' },
+
         style: {
           background: '#363636',
           color: '#fff',
