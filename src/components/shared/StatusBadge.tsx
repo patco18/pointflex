@@ -1,42 +1,43 @@
-import React from 'react'
-import { CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react'
+import React from 'react';
+import { CheckCircle, XCircle, AlertTriangle, Clock } from 'lucide-react';
+import Badge from '../ui/badge';
 
 interface StatusBadgeProps {
-  status: 'active' | 'inactive' | 'pending' | 'warning'
-  text?: string
+  status: 'active' | 'inactive' | 'pending' | 'warning';
+  text?: string;
 }
 
-export default function StatusBadge({ status, text }: StatusBadgeProps) {
-  const configs = {
-    active: {
-      icon: CheckCircle,
-      className: 'bg-green-100 text-green-800',
-      defaultText: 'Actif'
-    },
-    inactive: {
-      icon: XCircle,
-      className: 'bg-red-100 text-red-800',
-      defaultText: 'Inactif'
-    },
-    pending: {
-      icon: Clock,
-      className: 'bg-yellow-100 text-yellow-800',
-      defaultText: 'En attente'
-    },
-    warning: {
-      icon: AlertTriangle,
-      className: 'bg-orange-100 text-orange-800',
-      defaultText: 'Attention'
-    }
-  }
+const configs = {
+  active: {
+    icon: CheckCircle,
+    color: 'success',
+    defaultText: 'Actif',
+  },
+  inactive: {
+    icon: XCircle,
+    color: 'danger',
+    defaultText: 'Inactif',
+  },
+  pending: {
+    icon: Clock,
+    color: 'pending',
+    defaultText: 'En attente',
+  },
+  warning: {
+    icon: AlertTriangle,
+    color: 'warning',
+    defaultText: 'Attention',
+  },
+};
 
-  const config = configs[status]
-  const Icon = config.icon
+export default function StatusBadge({ status, text }: StatusBadgeProps) {
+  const config = configs[status];
+  const Icon = config.icon;
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
+    <Badge color={config.color as any} className="inline-flex items-center">
       <Icon className="h-3 w-3 mr-1" />
       {text || config.defaultText}
-    </span>
-  )
+    </Badge>
+  );
 }
