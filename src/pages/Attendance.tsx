@@ -1,10 +1,12 @@
-import { useState } from 'react'
-import CheckInComponent from '../components/CheckIn'
+import React, { useState } from 'react'
 import { attendanceService } from '../services/api'
+import { toast } from 'react-hot-toast'
 import { Coffee, LogOut, Loader } from 'lucide-react'
-import toast from 'react-hot-toast'
+import Card from '../components/ui/card'
+import Button from '../components/ui/button'
+import CheckInComponent from '../components/CheckIn'
 
-export default function AttendancePage() {
+export default function Attendance() {
   const [onBreak, setOnBreak] = useState(false)
   const [loadingPause, setLoadingPause] = useState(false)
   const [loadingCheckout, setLoadingCheckout] = useState(false)
@@ -13,10 +15,10 @@ export default function AttendancePage() {
     setLoadingPause(true)
     try {
       await attendanceService.startPause()
-      toast.success('Pause démarrée')
       setOnBreak(true)
+      toast.success('Pause démarrée avec succès!')
     } catch (err) {
-      toast.error('Erreur lors du démarrage de la pause')
+      toast.error("Erreur lors du démarrage de la pause")
     } finally {
       setLoadingPause(false)
     }
@@ -26,10 +28,10 @@ export default function AttendancePage() {
     setLoadingPause(true)
     try {
       await attendanceService.endPause()
-      toast.success('Pause terminée')
       setOnBreak(false)
+      toast.success('Pause terminée avec succès!')
     } catch (err) {
-      toast.error('Erreur lors de la fin de la pause')
+      toast.error("Erreur lors de la fin de la pause")
     } finally {
       setLoadingPause(false)
     }
@@ -52,26 +54,26 @@ export default function AttendancePage() {
       <CheckInComponent />
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="card text-center">
+        <Card className="text-center">
           <div className="mb-4 flex justify-center">
             <Coffee className="h-8 w-8 text-yellow-600" />
           </div>
           {onBreak ? (
-            <button onClick={endPause} disabled={loadingPause} className="btn-primary">
+            <Button onClick={endPause} disabled={loadingPause}>
               {loadingPause ? <Loader className="animate-spin h-4 w-4" /> : 'Terminer la pause'}
-            </button>
+            </Button>
           ) : (
-            <button onClick={startPause} disabled={loadingPause} className="btn-primary">
+            <Button onClick={startPause} disabled={loadingPause}>
               {loadingPause ? <Loader className="animate-spin h-4 w-4" /> : 'Démarrer une pause'}
-            </button>
+            </Button>
           )}
-        </div>
+        </Card>
 
-        <div className="card text-center">
+        <Card className="text-center">
           <div className="mb-4 flex justify-center">
             <LogOut className="h-8 w-8 text-red-600" />
           </div>
-          <button onClick={checkout} disabled={loadingCheckout} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+          <Button onClick={checkout} disabled={loadingCheckout}>
             {loadingCheckout ? (
               <div className="flex items-center justify-center">
                 <Loader className="animate-spin h-5 w-5 mr-2" />
@@ -83,8 +85,8 @@ export default function AttendancePage() {
                 Enregistrer ma sortie
               </>
             )}
-          </button>
-        </div>
+          </Button>
+        </Card>
       </div>
     </div>
   )
