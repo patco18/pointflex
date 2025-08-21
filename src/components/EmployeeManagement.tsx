@@ -6,6 +6,7 @@ import { useApi, useAsyncAction } from '../hooks/useApi'
 import toast from 'react-hot-toast'
 import Modal from './shared/Modal'
 import LoadingSpinner from './shared/LoadingSpinner'
+import SkeletonTable from './shared/SkeletonTable'
 import StatusBadge from './shared/StatusBadge'
 import DataTable from './shared/DataTable'
 import {
@@ -292,7 +293,7 @@ export default function EmployeeManagement() {
     )
   }
 
-  if (loading) return <LoadingSpinner size="lg" text="Chargement des employés..." />
+  if (loading) return <SkeletonTable columns={6} rows={6} />
 
   return (
     <div className="space-y-6">
