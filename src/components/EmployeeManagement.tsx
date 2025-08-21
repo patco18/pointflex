@@ -6,6 +6,7 @@ import { useApi, useAsyncAction } from '../hooks/useApi'
 import toast from 'react-hot-toast'
 import Modal from './shared/Modal'
 import LoadingSpinner from './shared/LoadingSpinner'
+import SkeletonTable from './shared/SkeletonTable'
 import StatusBadge from './shared/StatusBadge'
 import DataTable from './shared/DataTable'
 import {
@@ -59,7 +60,6 @@ const COUNTRIES = [
 export default function EmployeeManagement() {
   const { isAdmin, isSuperAdmin, user } = useAuth()
   const [searchTerm, setSearchTerm] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
   const [showModal, setShowModal] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [potentialManagers, setPotentialManagers] = useState<Employee[]>([]);
@@ -103,19 +103,11 @@ export default function EmployeeManagement() {
     }
   }, [employees]);
 
-  const filteredEmployees = Array.isArray(employees) ? employees.filter((emp: Employee) => {
-    const matchesSearch = !searchTerm || 
-      emp.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.prenom.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.email.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesRole = roleFilter === 'all' || emp.role === roleFilter
-    return matchesSearch && matchesRole
-  }) : [];
-
   const columns = [
     {
       key: 'name',
       label: 'Employé',
+      sortable: true,
       render: (_, emp: Employee) => (
         <div className="flex items-center">
           <div className="h-10 w-10 bg-gray-200 rounded-full flex items-center justify-center">
@@ -141,6 +133,12 @@ export default function EmployeeManagement() {
     {
       key: 'role',
       label: 'Rôle',
+      sortable: true,
+      filterOptions: [
+        { label: 'Admin', value: 'admin' },
+        { label: 'Manager', value: 'manager' },
+        { label: 'Employee', value: 'employee' }
+      ],
       render: (_, emp: Employee) => (
         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
           emp.role === 'admin' ? 'bg-purple-100 text-purple-800' :
@@ -154,6 +152,11 @@ export default function EmployeeManagement() {
     {
       key: 'status',
       label: 'Statut',
+      sortable: true,
+      filterOptions: [
+        { label: 'Actif', value: 'true' },
+        { label: 'Inactif', value: 'false' }
+      ],
       render: (_, emp: Employee) => <StatusBadge status={emp.is_active ? 'active' : 'inactive'} />
     }
   ]
@@ -292,7 +295,7 @@ export default function EmployeeManagement() {
     )
   }
 
-  if (loading) return <LoadingSpinner size="lg" text="Chargement des employés..." />
+  if (loading) return <SkeletonTable columns={6} rows={6} />
 
   return (
     <div className="space-y-6">
@@ -307,30 +310,15 @@ export default function EmployeeManagement() {
         </button>
       </div>
 
-      <div className="card">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-          <div></div>
-          <div>
-            <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)} className="input-field">
-              <option value="all">Tous les rôles</option>
-              <option value="admin">Administrateur</option>
-              <option value="manager">Manager</option>
-              <option value="employee">Employé</option>
-            </select>
-          </div>
-          <div className="text-sm text-gray-600 flex items-end">
-            {filteredEmployees.length} employé{filteredEmployees.length > 1 ? 's' : ''} trouvé{filteredEmployees.length > 1 ? 's' : ''}
-          </div>
-        </div>
-      </div>
-
       <DataTable
-        data={filteredEmployees}
+        data={employees}
         columns={columns}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         emptyMessage="Aucun employé trouvé"
         actions={actions}
+        pageSize={10}
+        enableCardView
       />
 
       <Modal

@@ -145,8 +145,8 @@ const NotificationCenter = () => {
   return (
     <div className="relative">
       {/* Bouton de notification */}
-      <button 
-        className="relative p-2 rounded-full hover:bg-gray-100 focus:outline-none"
+      <button
+        className="relative p-2 rounded-full hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500"
         onClick={toggleDropdown}
         aria-label="Notifications"
       >
@@ -160,16 +160,19 @@ const NotificationCenter = () => {
       
       {/* Dropdown des notifications */}
       {showDropdown && (
-        <div 
+        <div
           ref={dropdownRef}
           className="absolute right-0 mt-2 bg-white rounded-lg shadow-lg w-80 max-h-96 overflow-hidden z-50"
+          role="region"
+          aria-live="polite"
+          aria-label="Notifications"
         >
           {/* Entête du dropdown */}
           <div className="flex items-center justify-between p-3 border-b">
             <h3 className="font-semibold">Notifications</h3>
             {unread > 0 && (
-              <button 
-                className="text-blue-600 text-sm hover:text-blue-800"
+              <button
+                className="text-blue-600 text-sm hover:text-blue-800 focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 rounded"
                 onClick={markAllAsRead}
               >
                 Marquer tout comme lu
@@ -190,12 +193,11 @@ const NotificationCenter = () => {
             ) : (
               <ul>
                 {notifications.map((notification) => (
-                  <li 
-                    key={notification.id} 
-                    className={`p-3 border-b hover:bg-gray-50 cursor-pointer ${!notification.read ? 'bg-blue-50' : ''}`}
-                    onClick={() => markAsRead(notification.id)}
-                  >
-                    <div className="flex items-start">
+                  <li key={notification.id} className={!notification.read ? 'bg-blue-50' : ''}>
+                    <button
+                      className="w-full text-left p-3 border-b hover:bg-gray-50 flex items-start focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-primary-500"
+                      onClick={() => markAsRead(notification.id)}
+                    >
                       <div className="mr-3 mt-1">
                         {getNotificationIcon(notification.type)}
                       </div>
@@ -204,7 +206,7 @@ const NotificationCenter = () => {
                         <p className="text-sm text-gray-600 mt-1">{notification.message}</p>
                         <p className="text-xs text-gray-500 mt-1">{formatRelativeTime(notification.created_at)}</p>
                       </div>
-                    </div>
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -214,8 +216,8 @@ const NotificationCenter = () => {
           {/* Pied du dropdown */}
           {notifications.length > 0 && (
             <div className="p-2 text-center border-t">
-              <button 
-                className="text-blue-600 hover:text-blue-800 text-sm"
+              <button
+                className="text-blue-600 hover:text-blue-800 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500 rounded"
                 onClick={() => {
                   setShowDropdown(false);
                   navigate('/notifications/history');
