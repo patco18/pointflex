@@ -1,4 +1,5 @@
 import React, { ReactNode } from 'react';
+import ThemeToggle from '../ThemeToggle';
 
 interface DefaultLayoutProps {
   children: ReactNode;
@@ -6,7 +7,7 @@ interface DefaultLayoutProps {
 
 export default function DefaultLayout({ children }: DefaultLayoutProps) {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       <div className="flex min-h-screen">
         {/* Sidebar would go here in a real implementation */}
         <div className="hidden md:block md:w-64 bg-primary-900 text-white p-4">
@@ -20,8 +21,8 @@ export default function DefaultLayout({ children }: DefaultLayoutProps) {
         {/* Main content */}
         <div className="flex-1">
           {/* Header would go here in a real implementation */}
-          <header className="bg-white border-b h-16 flex items-center px-6 shadow-sm">
-            {/* Header content */}
+          <header className="bg-background border-b border-border h-16 flex items-center justify-end px-6 shadow-sm">
+            <ThemeToggle />
           </header>
           
           {/* Page content */}
