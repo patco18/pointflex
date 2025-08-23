@@ -94,7 +94,8 @@ def delete_mission(mission_id):
         if current_user.role != 'superadmin' and mission.company_id != current_user.company_id:
             return jsonify(message="Accès non autorisé pour supprimer cette mission."), 403
 
-        old_values = mission.to_dict() # Capture data before deletion
+        old_values = mission.to_dict()  # Capture data before deletion
+        notify_ids = [mu.user_id for mu in mission.users]
 
         # MissionUser entries are cascaded deleted due to model relationship.
         db.session.delete(mission)
@@ -103,10 +104,14 @@ def delete_mission(mission_id):
         log_user_action(
             action='DELETE_MISSION',
             resource_type='Mission',
-            resource_id=mission_id, # mission.id is no longer valid after delete, use mission_id from path
-            old_values=old_values
+            resource_id=mission_id,  # mission.id is no longer valid after delete, use mission_id from path
+            old_values=old_values,
+            details={'notified_user_ids': notify_ids}
         )
         # db.session.commit() # If log_user_action doesn't commit itself.
+
+        for uid in notify_ids:
+            send_notification(uid, f"La mission {old_values['title']} a été supprimée")
 
         return jsonify({'message': 'Mission supprimée avec succès'}), 200
     except Exception as e:
@@ -130,16 +135,20 @@ def update_mission(mission_id):
             if field in data:
                 setattr(mission, field, data[field])
 
-        notify_ids = []
+        added_users, removed_users = [], []
         if 'user_ids' in data:
-            # For more detailed audit of user assignments, this part could be logged separately
-            # or changes to user_ids array could be part of old_values/new_values if to_dict captures it well.
-            MissionUser.query.filter_by(mission_id=mission.id).delete() # Simpler to clear and re-add for now
-            for uid in data.get('user_ids', []):
+            existing_ids = {mu.user_id for mu in mission.users}
+            new_ids = set(data.get('user_ids', []))
+            to_add = new_ids - existing_ids
+            to_remove = existing_ids - new_ids
+            for uid in to_remove:
+                MissionUser.query.filter_by(mission_id=mission.id, user_id=uid).delete()
+                removed_users.append(uid)
+            for uid in to_add:
                 user = User.query.get(uid)
                 if user and (current_user.role == 'superadmin' or user.company_id == current_user.company_id):
                     db.session.add(MissionUser(mission_id=mission.id, user_id=uid, status='pending'))
-                    notify_ids.append(uid)
+                    added_users.append(uid)
 
         db.session.commit()
 
@@ -148,11 +157,17 @@ def update_mission(mission_id):
             resource_type='Mission',
             resource_id=mission.id,
             old_values=old_values,
-            new_values=mission.to_dict()
+            new_values=mission.to_dict(),
+            details={
+                'added_user_ids': added_users,
+                'removed_user_ids': removed_users,
+            }
         )
         # db.session.commit() # Main commit above covers this.
-        for uid in notify_ids:
+        for uid in added_users:
             send_notification(uid, f"Vous avez été assigné à la mission {mission.title}")
+        for uid in removed_users:
+            send_notification(uid, f"Vous avez été retiré de la mission {mission.title}")
 
         return jsonify({'mission': mission.to_dict(), 'message': 'Mission mise à jour'}), 200
     except Exception as e:
