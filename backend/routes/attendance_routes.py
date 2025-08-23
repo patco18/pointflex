@@ -198,42 +198,51 @@ def mission_checkin():
             return jsonify(message="Utilisateur non trouvé"), 401
         
         data = request.get_json()
+        mission_id = data.get('mission_id')
         mission_order_number = data.get('mission_order_number')
         coordinates = data.get('coordinates', {})
 
-        if not mission_order_number:
-            return jsonify(message="Numéro d'ordre de mission requis"), 400
+        if not mission_id and not mission_order_number:
+            return jsonify(message="mission_id ou mission_order_number requis"), 400
 
-        mission = Mission.query.filter_by(order_number=mission_order_number).first()
+        mission = None
+        if mission_id:
+            mission = Mission.query.get(mission_id)
+        if not mission and mission_order_number:
+            mission = Mission.query.filter_by(order_number=mission_order_number).first()
+
         if not mission:
-            return jsonify(message="Numéro d'ordre de mission invalide"), 404
+            return jsonify(message="Mission introuvable"), 404
         if current_user.role != 'superadmin' and mission.company_id != current_user.company_id:
             return jsonify(message="Mission non autorisée pour votre entreprise"), 403
 
-        # verify assignment
-        assigned = any(mu.user_id == current_user.id for mu in mission.users)
-        if not assigned:
-            return jsonify(message="Vous n'êtes pas affecté à cette mission"), 403
+        from backend.models.mission_user import MissionUser
+        mu = MissionUser.query.filter_by(mission_id=mission.id, user_id=current_user.id, status='accepted').first()
+        if not mu:
+            return jsonify(message="Mission non acceptée"), 403
 
         if not coordinates.get('latitude') or not coordinates.get('longitude'):
             return jsonify(message="Coordonnées GPS requises"), 400
-        
-        # Vérifier si l'utilisateur a déjà pointé aujourd'hui
+
+        # Vérifier si l'utilisateur a déjà pointé aujourd'hui pour cette mission
         today = date.today()
         existing_pointage = Pointage.query.filter_by(
             user_id=current_user.id,
-            date_pointage=today
+            date_pointage=today,
+            type='mission',
+            mission_id=mission.id
         ).first()
-        
+
         if existing_pointage:
-            send_notification(current_user.id, "Pointage déjà enregistré pour aujourd'hui")
-            return jsonify(message="Vous avez déjà pointé aujourd'hui"), 409
-        
+            send_notification(current_user.id, "Pointage déjà enregistré pour cette mission aujourd'hui")
+            return jsonify(message="Vous avez déjà pointé pour cette mission aujourd'hui"), 409
+
         # Créer le pointage mission
         pointage = Pointage(
             user_id=current_user.id,
             type='mission',
-            mission_order_number=mission_order_number,
+            mission_id=mission.id,
+            mission_order_number=mission.order_number,
             latitude=coordinates['latitude'],
             longitude=coordinates['longitude']
         )
@@ -247,7 +256,8 @@ def mission_checkin():
             resource_type='Pointage',
             resource_id=pointage.id,
             details={
-                'mission_order_number': mission_order_number,
+                'mission_id': mission.id,
+                'mission_order_number': mission.order_number,
                 'status': pointage.statut,
                 'coordinates': coordinates
             }
@@ -289,11 +299,26 @@ def checkout():
         if not current_user:
             return jsonify(message="Utilisateur non trouvé"), 401
 
+        data = request.get_json() or {}
+        pointage_id = data.get('pointage_id')
+        mission_id = data.get('mission_id')
         today = date.today()
-        pointage = Pointage.query.filter_by(
-            user_id=current_user.id,
-            date_pointage=today
-        ).first()
+
+        if pointage_id:
+            pointage = Pointage.query.filter_by(id=pointage_id, user_id=current_user.id).first()
+        elif mission_id:
+            pointage = Pointage.query.filter_by(
+                user_id=current_user.id,
+                date_pointage=today,
+                type='mission',
+                mission_id=mission_id
+            ).first()
+        else:
+            pointage = Pointage.query.filter_by(
+                user_id=current_user.id,
+                date_pointage=today,
+                type='office'
+            ).first()
 
         if not pointage:
             send_notification(current_user.id, "Aucun pointage d'arrivée trouvé pour aujourd'hui")

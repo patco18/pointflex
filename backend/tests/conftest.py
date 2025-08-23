@@ -29,14 +29,15 @@ fernet_mod.InvalidToken = InvalidToken
 sys.modules.setdefault("cryptography", types.ModuleType("cryptography"))
 sys.modules["cryptography.fernet"] = fernet_mod
 
-# Ensure encryption key is available before the app imports security utilities
+# Ensure encryption key and database URL are set before importing the app
 os.environ.setdefault('TWO_FACTOR_ENCRYPTION_KEY', Fernet.generate_key().decode())
+os.environ.setdefault('DATABASE_URL', 'sqlite:///:memory:')
 
 from backend.app import create_app
 
+
 @pytest.fixture
 def client():
-    os.environ['DATABASE_URL'] = 'sqlite:///:memory:'
     app = create_app()
     app.config.update(TESTING=True)
     return app.test_client()
