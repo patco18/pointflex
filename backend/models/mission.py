@@ -35,7 +35,7 @@ class Mission(db.Model):
             'status': self.status,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
-            'users': [mu.user.to_dict() for mu in self.users]
+            'users': [mu.to_dict() for mu in self.users]
         }
 
     def __repr__(self):
