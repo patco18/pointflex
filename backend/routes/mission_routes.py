@@ -9,6 +9,7 @@ from backend.models.user import User
 from backend.database import db
 from backend.middleware.audit import log_user_action # Added for audit logging
 from flask import current_app # For logging
+from backend.utils.notification_utils import send_notification
 
 mission_bp = Blueprint('missions', __name__)
 
@@ -54,10 +55,12 @@ def create_mission():
 
         # assign users if provided
         user_ids = data.get('user_ids', [])
+        notify_ids = []
         for uid in user_ids:
             user = User.query.get(uid)
             if user and (current_user.role == 'superadmin' or user.company_id == current_user.company_id):
-                db.session.add(MissionUser(mission_id=mission.id, user_id=uid))
+                db.session.add(MissionUser(mission_id=mission.id, user_id=uid, status='pending'))
+                notify_ids.append(uid)
 
         db.session.commit()
 
@@ -70,6 +73,8 @@ def create_mission():
         # db.session.commit() # Commit for audit log if log_user_action doesn't commit itself.
                            # AuditLog.log_action (called by log_user_action) adds to session but doesn't commit.
                            # The main commit above should cover this.
+        for uid in notify_ids:
+            send_notification(uid, f"Vous avez été assigné à la mission {mission.title}")
 
         return jsonify({'mission': mission.to_dict(), 'message': 'Mission créée'}), 201
     except Exception as e:
@@ -125,6 +130,7 @@ def update_mission(mission_id):
             if field in data:
                 setattr(mission, field, data[field])
 
+        notify_ids = []
         if 'user_ids' in data:
             # For more detailed audit of user assignments, this part could be logged separately
             # or changes to user_ids array could be part of old_values/new_values if to_dict captures it well.
@@ -132,7 +138,8 @@ def update_mission(mission_id):
             for uid in data.get('user_ids', []):
                 user = User.query.get(uid)
                 if user and (current_user.role == 'superadmin' or user.company_id == current_user.company_id):
-                    db.session.add(MissionUser(mission_id=mission.id, user_id=uid))
+                    db.session.add(MissionUser(mission_id=mission.id, user_id=uid, status='pending'))
+                    notify_ids.append(uid)
 
         db.session.commit()
 
@@ -144,6 +151,8 @@ def update_mission(mission_id):
             new_values=mission.to_dict()
         )
         # db.session.commit() # Main commit above covers this.
+        for uid in notify_ids:
+            send_notification(uid, f"Vous avez été assigné à la mission {mission.title}")
 
         return jsonify({'mission': mission.to_dict(), 'message': 'Mission mise à jour'}), 200
     except Exception as e:
