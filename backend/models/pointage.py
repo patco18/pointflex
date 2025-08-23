@@ -33,6 +33,7 @@ class Pointage(db.Model):
     distance = db.Column(db.Float, nullable=True)  # Distance au bureau en mètres
     
     # Mission (pour pointage mission)
+    mission_id = db.Column(db.Integer, db.ForeignKey('missions.id'), nullable=True)
     mission_order_number = db.Column(db.String(100), nullable=True)
 
     # Indique si l'heure d'arrivée a été égalisée au début de journée
@@ -55,6 +56,7 @@ class Pointage(db.Model):
     
     # Relations
     office = db.relationship('Office', backref='pointages', lazy=True)
+    mission = db.relationship('Mission', backref='pointages', lazy=True)
     
     def __init__(self, **kwargs):
         """Initialisation avec calcul automatique du statut"""
@@ -143,7 +145,8 @@ class Pointage(db.Model):
             'longitude': self.longitude,
             'office_id': self.office_id,
             'distance': self.distance,
-            'mission_order_number': self.mission_order_number,
+            'mission_id': self.mission_id,
+            'mission_order_number': self.mission.order_number if self.mission else self.mission_order_number,
             'worked_hours': self.calculate_worked_hours(),
             'delay_minutes': self.delay_minutes,
             'is_equalized': self.is_equalized,
