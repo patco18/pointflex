@@ -286,9 +286,13 @@ def mission_checkin():
             'pointage': pointage.to_dict()
         }), 201
         
-    except Exception as e:
-        print(f"Erreur lors du pointage mission: {e}")
+    except SQLAlchemyError as e:
         db.session.rollback()
+        current_app.logger.exception("Database error during mission checkin")
+        return jsonify(message="Erreur de base de données lors du pointage"), 500
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Erreur lors du pointage mission")
         return jsonify(message="Erreur interne du serveur"), 500
 
 @attendance_bp.route('/checkout', methods=['POST'])
@@ -356,9 +360,13 @@ def checkout():
             'pointage': pointage.to_dict()
         }), 200
 
-    except Exception as e:
-        print(f"Erreur lors du checkout: {e}")
+    except SQLAlchemyError as e:
         db.session.rollback()
+        current_app.logger.exception("Database error during checkout")
+        return jsonify(message="Erreur de base de données lors de l'enregistrement de la sortie"), 500
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Erreur lors du checkout")
         return jsonify(message="Erreur interne du serveur"), 500
 
 
@@ -383,9 +391,13 @@ def start_pause():
 
         return jsonify({'message': 'Pause démarrée', 'pause': pause.to_dict()}), 201
 
-    except Exception as e:
-        print(f"Erreur start pause: {e}")
+    except SQLAlchemyError as e:
         db.session.rollback()
+        current_app.logger.exception("Database error starting pause")
+        return jsonify(message="Erreur de base de données lors du démarrage de la pause"), 500
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Erreur start pause")
         return jsonify(message="Erreur interne du serveur"), 500
 
 
@@ -408,9 +420,13 @@ def end_pause():
 
         return jsonify({'message': 'Pause terminée', 'pause': pause.to_dict()}), 200
 
-    except Exception as e:
-        print(f"Erreur end pause: {e}")
+    except SQLAlchemyError as e:
         db.session.rollback()
+        current_app.logger.exception("Database error ending pause")
+        return jsonify(message="Erreur de base de données lors de la fin de la pause"), 500
+    except Exception:
+        db.session.rollback()
+        current_app.logger.exception("Erreur end pause")
         return jsonify(message="Erreur interne du serveur"), 500
 
 @attendance_bp.route('', methods=['GET'])
@@ -432,19 +448,24 @@ def get_attendance():
         query = Pointage.query.filter_by(user_id=current_user.id)
         
         # Filtres de date
+        start_date_obj = None
+        end_date_obj = None
         if start_date:
             try:
                 start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
                 query = query.filter(Pointage.date_pointage >= start_date_obj)
             except ValueError:
                 return jsonify(message="Format de date invalide pour start_date (YYYY-MM-DD)"), 400
-        
+
         if end_date:
             try:
                 end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
                 query = query.filter(Pointage.date_pointage <= end_date_obj)
             except ValueError:
                 return jsonify(message="Format de date invalide pour end_date (YYYY-MM-DD)"), 400
+
+        if start_date_obj and end_date_obj and start_date_obj > end_date_obj:
+            return jsonify(message="Plage de dates invalide : start_date est postérieure à end_date"), 400
         
         # Ordonner par date décroissante
         query = query.order_by(Pointage.date_pointage.desc(), Pointage.heure_arrivee.desc())
@@ -464,8 +485,11 @@ def get_attendance():
             }
         }), 200
         
-    except Exception as e:
-        print(f"Erreur lors de la récupération des pointages: {e}")
+    except SQLAlchemyError as e:
+        current_app.logger.exception("Database error retrieving pointages")
+        return jsonify(message="Erreur de base de données lors de la récupération des pointages"), 500
+    except Exception:
+        current_app.logger.exception("Erreur lors de la récupération des pointages")
         return jsonify(message="Erreur interne du serveur"), 500
 
 @attendance_bp.route('/stats', methods=['GET'])
@@ -512,8 +536,11 @@ def get_attendance_stats():
             }
         }), 200
         
-    except Exception as e:
-        print(f"Erreur lors de la récupération des statistiques: {e}")
+    except SQLAlchemyError as e:
+        current_app.logger.exception("Database error retrieving stats")
+        return jsonify(message="Erreur de base de données lors de la récupération des statistiques"), 500
+    except Exception:
+        current_app.logger.exception("Erreur lors de la récupération des statistiques")
         return jsonify(message="Erreur interne du serveur"), 500
 
 @attendance_bp.route('/last7days', methods=['GET'])
@@ -567,8 +594,11 @@ def get_last_7days_stats():
             'stats': daily_stats
         }), 200
         
-    except Exception as e:
-        print(f"Erreur lors de la récupération des statistiques des 7 derniers jours: {e}")
+    except SQLAlchemyError as e:
+        current_app.logger.exception("Database error retrieving last 7 days stats")
+        return jsonify(message="Erreur de base de données lors de la récupération des statistiques"), 500
+    except Exception:
+        current_app.logger.exception("Erreur lors de la récupération des statistiques des 7 derniers jours")
         return jsonify(message="Erreur interne du serveur"), 500
 
 @attendance_bp.route('/calendar', methods=['GET'])
@@ -585,12 +615,22 @@ def download_calendar():
 
         query = Pointage.query.filter_by(user_id=current_user.id)
 
+        start_obj = None
+        end_obj = None
         if start_date:
-            start_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
-            query = query.filter(Pointage.date_pointage >= start_obj)
+            try:
+                start_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                query = query.filter(Pointage.date_pointage >= start_obj)
+            except ValueError:
+                return jsonify(message="Format de date invalide pour start_date (YYYY-MM-DD)"), 400
         if end_date:
-            end_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
-            query = query.filter(Pointage.date_pointage <= end_obj)
+            try:
+                end_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                query = query.filter(Pointage.date_pointage <= end_obj)
+            except ValueError:
+                return jsonify(message="Format de date invalide pour end_date (YYYY-MM-DD)"), 400
+        if start_obj and end_obj and start_obj > end_obj:
+            return jsonify(message="Plage de dates invalide : start_date est postérieure à end_date"), 400
 
         records = query.order_by(Pointage.date_pointage).all()
 
@@ -621,8 +661,11 @@ def download_calendar():
         response.headers['Content-Disposition'] = 'attachment; filename=attendance.ics'
         return response
 
-    except Exception as e:
-        print(f"Erreur generation calendrier: {e}")
+    except SQLAlchemyError as e:
+        current_app.logger.exception("Database error generating calendar")
+        return jsonify(message="Erreur de base de données lors de la génération du calendrier"), 500
+    except Exception:
+        current_app.logger.exception("Erreur generation calendrier")
         return jsonify(message="Erreur interne du serveur"), 500
 
 def calculate_distance(lat1, lon1, lat2, lon2):
