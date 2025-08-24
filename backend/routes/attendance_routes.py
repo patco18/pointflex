@@ -16,6 +16,7 @@ from backend.models.office import Office
 from backend.database import db
 from datetime import datetime, date, timedelta
 import math
+from sqlalchemy.exc import SQLAlchemyError
 
 attendance_bp = Blueprint('attendance', __name__)
 
@@ -670,6 +671,7 @@ def calculate_distance(lat1, lon1, lat2, lon2):
 @jwt_required()
 def get_today_attendance():
     """Récupère le pointage du jour pour l'utilisateur connecté"""
+    current_user = None
     try:
         current_user = get_current_user()
         if not current_user:
@@ -717,7 +719,13 @@ def get_today_attendance():
         }
         
         return jsonify(pointage_data), 200
-    
+
+    except SQLAlchemyError as e:
+        current_app.logger.error(f"Erreur de base de données lors de la récupération du pointage du jour: {e}")
+        log_attendance_error('get_today_attendance', getattr(current_user, 'id', None), str(e))
+        db.session.rollback()
+        return jsonify(message="Erreur de base de données lors de la récupération du pointage du jour"), 500
     except Exception as e:
-        log_attendance_error(None, f"Erreur lors de la récupération du pointage du jour: {str(e)}")
-        return jsonify(message="Erreur de base de données"), 500
+        current_app.logger.error(f"Erreur interne lors de la récupération du pointage du jour: {e}")
+        log_attendance_error('get_today_attendance', getattr(current_user, 'id', None), str(e))
+        return jsonify(message="Erreur interne du serveur lors de la récupération du pointage du jour"), 500
