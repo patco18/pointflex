@@ -2,7 +2,7 @@
 Routes additionnelles pour le système de pointage amélioré
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required
 from backend.middleware.auth import get_current_user
 from backend.models.pointage import Pointage
@@ -170,14 +170,24 @@ def get_pauses():
             user_id=current_user.id,
             date_pointage=today
         ).first()
-        
+
         if not today_attendance:
+            current_app.logger.info(
+                f"Aucun pointage trouvé pour l'utilisateur {current_user.id} le {today}"
+            )
             return jsonify({'pauses': [], 'message': 'Aucun pointage trouvé pour aujourd\'hui'}), 200
-            
+
         # Récupérer les pauses associées au pointage du jour
-        pauses = Pause.query.filter_by(
-            pointage_id=today_attendance.id
-        ).order_by(Pause.start_time).all()
+        try:
+            pauses = Pause.query.filter_by(
+                pointage_id=today_attendance.id
+            ).order_by(Pause.start_time).all()
+        except Exception as e:
+            current_app.logger.error(
+                f"Erreur lors de la récupération des pauses pour le pointage {today_attendance.id}: {e}",
+                exc_info=True,
+            )
+            return jsonify(message="Erreur lors de la récupération des pauses"), 500
         
         result = []
         for pause in pauses:
