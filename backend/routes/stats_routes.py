@@ -62,10 +62,13 @@ def get_weekly_stats():
             days[day_index]['status'] = pointage.statut
             
             if pointage.statut in ['present', 'retard']:
-                days[day_index]['arrival_time'] = pointage.heure_arrivee
-                days[day_index]['departure_time'] = pointage.heure_depart
-                
-                worked_hours = pointage.worked_hours or 0
+                arrival_time = pointage.heure_arrivee.strftime('%H:%M') if pointage.heure_arrivee else None
+                departure_time = pointage.heure_depart.strftime('%H:%M') if pointage.heure_depart else None
+
+                days[day_index]['arrival_time'] = arrival_time
+                days[day_index]['departure_time'] = departure_time
+
+                worked_hours = pointage.calculate_worked_hours() or 0
                 days[day_index]['worked_hours'] = worked_hours
                 total_worked_hours += worked_hours
                 
