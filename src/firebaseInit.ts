@@ -20,8 +20,32 @@ const VAPID_KEY = import.meta.env.VITE_FIREBASE_VAPID_KEY;
 
 let app: FirebaseApp | null = null;
 
+const validateFirebaseConfig = (): boolean => {
+  const missingKeys = Object.entries(firebaseConfig)
+    .filter(([, value]) => value === undefined || value === "")
+    .map(([key]) => key);
+
+  if (missingKeys.length > 0) {
+    missingKeys.forEach((key) => {
+      console.warn(`Firebase config missing value for ${key}`);
+    });
+
+    if (import.meta.env.DEV) {
+      throw new Error(`Missing Firebase config values: ${missingKeys.join(', ')}`);
+    }
+
+    return false;
+  }
+
+  return true;
+};
+
 export const initializeFirebaseApp = () => {
   if (app) return app;
+  if (!validateFirebaseConfig()) {
+    console.warn('Firebase initialization skipped due to missing configuration.');
+    return null;
+  }
   try {
     app = initializeApp(firebaseConfig);
     console.log("Firebase initialized successfully");
