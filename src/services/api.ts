@@ -949,6 +949,14 @@ export const missionService = {
       throw error
     }
   },
+  getActiveMissions: async () => {
+    try {
+      return await api.get('/missions/active')
+    } catch (error) {
+      console.error('Get active missions error:', error)
+      throw error
+    }
+  },
   respond: async (missionId: number, status: 'accepted' | 'declined') => {
     try {
       return await api.post(`/missions/${missionId}/respond`, { status })

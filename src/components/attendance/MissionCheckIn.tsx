@@ -1,11 +1,30 @@
-import React, { useState } from 'react'
-import { attendanceService } from '../../services/api'
+import React, { useState, useEffect } from 'react'
+import { attendanceService, missionService } from '../../services/api'
 import { Briefcase, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+interface Mission {
+  id: number
+  order_number: string
+  status: string
+}
 
 export default function MissionCheckIn() {
   const [loading, setLoading] = useState(false)
   const [missionOrderNumber, setMissionOrderNumber] = useState('')
+  const [missions, setMissions] = useState<Mission[]>([])
+
+  useEffect(() => {
+    const loadMissions = async () => {
+      try {
+        const resp = await missionService.getActiveMissions()
+        setMissions(resp.data.missions || [])
+      } catch (error) {
+        toast.error('Erreur lors du chargement des missions')
+      }
+    }
+    loadMissions()
+  }, [])
 
   const getCurrentLocation = (): Promise<GeolocationPosition> => {
     return new Promise((resolve, reject) => {
@@ -28,7 +47,13 @@ export default function MissionCheckIn() {
 
   const handleMissionCheckIn = async () => {
     if (!missionOrderNumber.trim()) {
-      toast.error("Veuillez saisir le numéro d'ordre de mission")
+      toast.error('Veuillez sélectionner une mission')
+      return
+    }
+
+    const mission = missions.find(m => m.order_number === missionOrderNumber)
+    if (!mission || mission.status !== 'accepted') {
+      toast.error('Mission non acceptée')
       return
     }
 
@@ -41,10 +66,10 @@ export default function MissionCheckIn() {
       }
 
       const { data } = await attendanceService.checkInMission(
-        missionOrderNumber.trim(),
+        mission.order_number,
         coordinates
       )
-      
+
       const respMessage = data?.message || 'Pointage mission enregistré avec succès!'
       if (data?.pointage?.statut === 'retard') {
         const delay = data.pointage.delay_minutes || 0
@@ -52,9 +77,9 @@ export default function MissionCheckIn() {
       } else {
         toast.success(respMessage)
       }
-      
+
       setMissionOrderNumber('')
-      
+
       // Rafraîchir la page après un court délai pour montrer le succès
       setTimeout(() => {
         window.location.reload()
@@ -82,21 +107,26 @@ export default function MissionCheckIn() {
         </h3>
         
         <p className="text-gray-600 mb-6">
-          Saisissez le numéro d'ordre de mission pour enregistrer votre pointage.
+          Sélectionnez la mission acceptée pour enregistrer votre pointage.
         </p>
-        
+
         <div className="max-w-sm mx-auto mb-6">
           <label htmlFor="missionOrder" className="block text-sm font-medium text-gray-700 mb-2">
-            Numéro d'ordre de mission
+            Mission
           </label>
-          <input
-            type="text"
+          <select
             id="missionOrder"
             value={missionOrderNumber}
             onChange={(e) => setMissionOrderNumber(e.target.value)}
             className="input-field"
-            placeholder="Ex: M2024-001"
-          />
+          >
+            <option value="">Sélectionnez une mission</option>
+            {missions
+              .filter(m => m.status === 'accepted')
+              .map(m => (
+                <option key={m.id} value={m.order_number}>{m.order_number}</option>
+              ))}
+          </select>
         </div>
         
         <button
