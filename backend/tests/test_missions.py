@@ -3,6 +3,15 @@ from backend.models.user import User
 from backend.models.mission_user import MissionUser
 
 
+def login_employee(client):
+    resp = client.post(
+        '/api/auth/login',
+        json={'email': 'employee@pointflex.com', 'password': 'employee123'},
+    )
+    assert resp.status_code == 200
+    return resp.get_json()['token']
+
+
 def test_create_and_list_missions(client):
     token = login_admin(client)
     headers = {"Authorization": f"Bearer {token}"}
@@ -144,3 +153,85 @@ def test_delete_mission_notifies_assignees(client, monkeypatch):
     assert resp.status_code == 200
     assert set(notifications) == {emp_id, mgr_id}
     assert set(logs[0]['details']['notified_user_ids']) == {emp_id, mgr_id}
+
+
+def test_mission_user_accepts_assignment(client, monkeypatch):
+    admin_token = login_admin(client)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    notifications = []
+    monkeypatch.setattr(
+        "backend.routes.mission_routes.send_notification",
+        lambda uid, message, **kwargs: notifications.append((uid, message)),
+    )
+
+    with client.application.app_context():
+        admin = User.query.filter_by(email="admin@pointflex.com").first()
+        employee = User.query.filter_by(email="employee@pointflex.com").first()
+        admin_id, employee_id = admin.id, employee.id
+
+    resp = client.post(
+        '/api/missions',
+        json={'order_number': 'RESP-ACC', 'title': 'Mission Accept', 'user_ids': [employee_id]},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 201
+    mission_id = resp.get_json()['mission']['id']
+
+    employee_token = login_employee(client)
+    employee_headers = {"Authorization": f"Bearer {employee_token}"}
+
+    resp = client.post(
+        f'/api/missions/{mission_id}/respond',
+        json={'status': 'accepted'},
+        headers=employee_headers,
+    )
+    assert resp.status_code == 200
+
+    with client.application.app_context():
+        mu = MissionUser.query.filter_by(mission_id=mission_id, user_id=employee_id).first()
+        assert mu.status == 'accepted'
+        assert mu.responded_at is not None
+
+    assert any(uid == admin_id and 'accepté' in msg for uid, msg in notifications)
+
+
+def test_mission_user_declines_assignment(client, monkeypatch):
+    admin_token = login_admin(client)
+    admin_headers = {"Authorization": f"Bearer {admin_token}"}
+
+    notifications = []
+    monkeypatch.setattr(
+        "backend.routes.mission_routes.send_notification",
+        lambda uid, message, **kwargs: notifications.append((uid, message)),
+    )
+
+    with client.application.app_context():
+        admin = User.query.filter_by(email="admin@pointflex.com").first()
+        employee = User.query.filter_by(email="employee@pointflex.com").first()
+        admin_id, employee_id = admin.id, employee.id
+
+    resp = client.post(
+        '/api/missions',
+        json={'order_number': 'RESP-DEC', 'title': 'Mission Decline', 'user_ids': [employee_id]},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 201
+    mission_id = resp.get_json()['mission']['id']
+
+    employee_token = login_employee(client)
+    employee_headers = {"Authorization": f"Bearer {employee_token}"}
+
+    resp = client.post(
+        f'/api/missions/{mission_id}/respond',
+        json={'status': 'declined'},
+        headers=employee_headers,
+    )
+    assert resp.status_code == 200
+
+    with client.application.app_context():
+        mu = MissionUser.query.filter_by(mission_id=mission_id, user_id=employee_id).first()
+        assert mu.status == 'declined'
+        assert mu.responded_at is not None
+
+    assert any(uid == admin_id and 'refusé' in msg for uid, msg in notifications)
