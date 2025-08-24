@@ -174,6 +174,43 @@ def update_mission(mission_id):
         current_app.logger.error(f"Erreur lors de la mise à jour de la mission {mission_id}: {e}", exc_info=True)
         db.session.rollback()
         return jsonify(message="Erreur interne du serveur"), 500
+
+
+@mission_bp.route('/<int:mission_id>/respond', methods=['POST'])
+@jwt_required()
+def respond_mission(mission_id):
+    """Allow an assigned user to accept or decline a mission."""
+    try:
+        current_user = get_current_user()
+        data = request.get_json() or {}
+        status = data.get('status')
+        if status not in ['accepted', 'declined']:
+            return jsonify(message="Statut invalide"), 400
+
+        mu = MissionUser.query.filter_by(mission_id=mission_id, user_id=current_user.id).first()
+        if not mu:
+            return jsonify(message="Accès non autorisé"), 403
+
+        from datetime import datetime
+        mu.status = status
+        mu.responded_at = datetime.utcnow()
+        db.session.add(mu)
+        db.session.commit()
+
+        mission = Mission.query.get(mission_id)
+        admins = User.query.filter(
+            User.company_id == mission.company_id,
+            User.role.in_(['admin', 'admin_rh', 'superadmin'])
+        ).all()
+        message = f"{current_user.prenom} {current_user.nom} a {'accepté' if status == 'accepted' else 'refusé'} la mission {mission.title}"
+        for admin in admins:
+            send_notification(admin.id, message)
+
+        return jsonify({'status': mu.status}), 200
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la réponse à la mission {mission_id}: {e}", exc_info=True)
+        db.session.rollback()
+        return jsonify(message="Erreur interne du serveur"), 500
 @mission_bp.route('/active-legacy', methods=['GET'])
 @jwt_required()
 def get_active_missions_legacy():
