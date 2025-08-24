@@ -66,6 +66,16 @@ export default function Missions() {
     }
   }
 
+  const handleRespond = async (id: number, status: 'accepted' | 'declined') => {
+    try {
+      await missionService.respond(id, status)
+      toast.success(status === 'accepted' ? 'Mission acceptée' : 'Mission refusée')
+      fetchMissions()
+    } catch (error) {
+      toast.error('Erreur lors de la réponse')
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-3xl mx-auto">
       <h1 className="text-2xl font-bold">Missions</h1>
@@ -159,7 +169,25 @@ export default function Missions() {
                   <td className="px-4 py-2">{m.title}</td>
                   <td className="px-4 py-2">{m.start_date || '-'}</td>
                   <td className="px-4 py-2">{m.end_date || '-'}</td>
-                  <td className="px-4 py-2">{m.status}</td>
+                  <td className="px-4 py-2">
+                    {m.status}
+                    {m.status === 'pending' && (
+                      <div className="mt-2 space-x-2">
+                        <button
+                          onClick={() => handleRespond(m.id, 'accepted')}
+                          className="btn-primary text-xs"
+                        >
+                          Accepter
+                        </button>
+                        <button
+                          onClick={() => handleRespond(m.id, 'declined')}
+                          className="btn-secondary text-xs"
+                        >
+                          Refuser
+                        </button>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
               {missions.length === 0 && (
