@@ -260,6 +260,7 @@ cd pointflex
 cp .env.example .env
 
 # Modifier les valeurs (obligatoire pour la production!)
+# Remplissez toutes les variables Firebase (VITE_FIREBASE_API_KEY, VITE_FIREBASE_AUTH_DOMAIN, VITE_FIREBASE_PROJECT_ID, etc.) pour les notifications web push
 # Surtout SECRET_KEY et JWT_SECRET_KEY
 ```
 
