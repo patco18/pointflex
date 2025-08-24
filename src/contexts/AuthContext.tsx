@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react'
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { api, authService, healthService } from '../services/api'
 import { UserRole } from '../types/roles'
 import toast from 'react-hot-toast'
@@ -47,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking')
+  const initializedRef = useRef(false)
 
   // Vérifier l'état du serveur
   const checkServerHealth = async () => {
@@ -74,11 +75,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const initAuth = async () => {
+      if (initializedRef.current) return
+      initializedRef.current = true
+
       console.log('Initialisation de l\'authentification...')
-      
+
       // Vérifier d'abord si le serveur est en ligne
       const isServerOnline = await checkServerHealth()
-      
+
       if (!isServerOnline) {
         setLoading(false)
         toast.error('Le serveur backend n\'est pas accessible. Veuillez le démarrer.')
@@ -87,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const token = localStorage.getItem('token')
       console.log('Token trouvé dans localStorage:', token ? 'Oui' : 'Non')
-      
+
       if (token) {
         setAuthToken(token)
         try {
