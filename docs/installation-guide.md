@@ -2,6 +2,11 @@
 
 Ce document décrit comment installer et lancer les différents composants de PointFlex.
 
+## Configuration initiale
+
+Copiez le fichier `.env.example` en `.env` à la racine puis renseignez toutes les variables Firebase nécessaires (`VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, etc.). Ces paramètres sont requis pour les notifications web push.
+
+
 ## Backend Flask
 
 ### Installation
