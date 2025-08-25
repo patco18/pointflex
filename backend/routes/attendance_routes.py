@@ -40,25 +40,12 @@ def office_checkin():
             return jsonify(message="Précision GPS requise"), 400
 
         max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
-        if coordinates['accuracy'] > max_accuracy:
-            return jsonify(
-                message=(
-                    f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). "
-                    f"Maximum autorisé: {max_accuracy}m"
-                )
-            ), 400
-
-        tz_name = SystemSettings.get_setting('general', 'default_timezone', 'UTC')
-        pointage = None
 
         if current_user.company_id:
             offices = Office.query.filter_by(
                 company_id=current_user.company_id,
                 is_active=True
             ).all()
-
-            nearest_office = None
-            min_distance = float('inf')
 
             for office in offices:
                 distance = calculate_distance(
@@ -69,6 +56,18 @@ def office_checkin():
                     min_distance = distance
                     nearest_office = office
 
+            if nearest_office and nearest_office.geolocation_max_accuracy is not None:
+                max_accuracy = nearest_office.geolocation_max_accuracy
+
+        if coordinates['accuracy'] > max_accuracy:
+            return jsonify(
+                message=(
+                    f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). "
+                    f"Maximum autorisé: {max_accuracy}m"
+                )
+            ), 400
+
+        if current_user.company_id:
             if offices:
                 if nearest_office and min_distance <= nearest_office.radius:
                     tz_name = nearest_office.timezone or tz_name

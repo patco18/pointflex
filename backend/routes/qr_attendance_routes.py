@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -133,6 +133,24 @@ def qr_checkin():
     office = Office.query.get(token_data['office_id'])
     if not office:
         return jsonify({"success": False, "message": "Bureau non trouvé"}), 404
+
+    if location_data:
+        if location_data.get('accuracy') is None:
+            return jsonify({"success": False, "message": "Précision GPS requise"}), 400
+        max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
+        company = office.company
+        if company and company.geolocation_max_accuracy is not None:
+            max_accuracy = company.geolocation_max_accuracy
+        if office.geolocation_max_accuracy is not None:
+            max_accuracy = office.geolocation_max_accuracy
+        if location_data['accuracy'] > max_accuracy:
+            return jsonify({
+                "success": False,
+                "message": (
+                    f"Précision de localisation insuffisante ({int(location_data['accuracy'])}m). "
+                    f"Maximum autorisé: {max_accuracy}m"
+                ),
+            }), 400
     
     # Déterminer le type de pointage (entrée ou sortie)
     tz_name = office.timezone if office and office.timezone else SystemSettings.get_setting('general', 'default_timezone', 'UTC')

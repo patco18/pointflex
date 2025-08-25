@@ -1109,7 +1109,7 @@ def update_company_settings():
         
         # Mettre à jour les champs
         updatable_fields = [
-            'office_latitude', 'office_longitude', 'office_radius',
+            'office_latitude', 'office_longitude', 'office_radius', 'geolocation_max_accuracy',
             'work_start_time', 'late_threshold', 'logo_url', 'theme_color'
         ]
         

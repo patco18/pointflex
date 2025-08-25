@@ -3,6 +3,7 @@ Modèle Company - Gestion des entreprises
 """
 
 from backend.database import db
+from backend.config import Config
 from datetime import datetime, timedelta
 
 class Company(db.Model):
@@ -54,6 +55,8 @@ class Company(db.Model):
     office_longitude = db.Column(db.Float, default=2.3522)
     # Rayon par défaut autorisé autour du siège (en mètres)
     office_radius = db.Column(db.Integer, default=200)
+    # Précision maximale de la géolocalisation en mètres
+    geolocation_max_accuracy = db.Column(db.Integer, default=Config.GEOLOCATION_MAX_ACCURACY)
     work_start_time = db.Column(db.Time, default=datetime.strptime('09:00', '%H:%M').time())
     late_threshold = db.Column(db.Integer, default=15)  # minutes
     # Minutes de tolérance pour l'égalisation de l'heure d'arrivée
@@ -282,6 +285,7 @@ class Company(db.Model):
                 'office_latitude': self.office_latitude,
                 'office_longitude': self.office_longitude,
                 'office_radius': self.office_radius,
+                'geolocation_max_accuracy': self.geolocation_max_accuracy,
                 'work_start_time': self.work_start_time.strftime('%H:%M') if self.work_start_time else None,
                 'late_threshold': self.late_threshold,
                 'equalization_threshold': self.equalization_threshold,

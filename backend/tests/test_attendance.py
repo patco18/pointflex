@@ -8,6 +8,12 @@ def login_employee(client):
     return resp.get_json()['token']
 
 
+def login_admin(client):
+    resp = client.post('/api/auth/login', json={'email': 'admin@pointflex.com', 'password': 'admin123'})
+    assert resp.status_code == 200
+    return resp.get_json()['token']
+
+
 def test_office_checkin(client):
     token = login_employee(client)
     headers = {'Authorization': f'Bearer {token}'}
@@ -17,6 +23,63 @@ def test_office_checkin(client):
     body = resp.get_json()
     assert body['pointage']['type'] == 'office'
     assert 'is_equalized' in body['pointage']
+
+
+def test_office_checkin_respects_company_accuracy(client):
+    token = login_employee(client)
+    headers = {'Authorization': f'Bearer {token}'}
+    from backend.models.company import Company
+    from backend.database import db
+    with client.application.app_context():
+        company = Company.query.first()
+        company.geolocation_max_accuracy = 10
+        db.session.commit()
+    resp = client.post(
+        '/api/attendance/checkin/office',
+        json={'coordinates': {'latitude': 48.8566, 'longitude': 2.3522, 'accuracy': 50}},
+        headers=headers,
+    )
+    assert resp.status_code == 400
+
+
+def test_qr_checkin_respects_office_accuracy(client):
+    admin_token = login_admin(client)
+    employee_token = login_employee(client)
+    from backend.models.company import Company
+    from backend.models.office import Office
+    from backend.database import db
+    with client.application.app_context():
+        company = Company.query.first()
+        office = Office(
+            company_id=company.id,
+            name='HQ',
+            address='A',
+            city='Paris',
+            country='FR',
+            latitude=48.8566,
+            longitude=2.3522,
+            radius=200,
+            geolocation_max_accuracy=5,
+        )
+        db.session.add(office)
+        db.session.commit()
+        office_id = office.id
+    admin_headers = {'Authorization': f'Bearer {admin_token}'}
+    resp = client.post(
+        '/api/attendance/generate-qr-token',
+        json={'office_id': office_id},
+        headers=admin_headers,
+    )
+    assert resp.status_code == 200
+    token = resp.get_json()['token']
+    headers = {'Authorization': f'Bearer {employee_token}'}
+    loc = {'latitude': 48.8566, 'longitude': 2.3522, 'accuracy': 10}
+    resp = client.post(
+        '/api/attendance/qr-checkin',
+        json={'token': token, 'location': loc},
+        headers=headers,
+    )
+    assert resp.status_code == 400
 
 
 def test_mission_checkin_requires_acceptance(client):
@@ -159,7 +222,11 @@ def test_multiple_checkins_same_day(client):
 def test_get_attendance_stats(client):
     token = login_employee(client)
     headers = {'Authorization': f'Bearer {token}'}
-    client.post('/api/attendance/checkin/office', json={'coordinates': {'latitude': 48.8566, 'longitude': 2.3522}}, headers=headers)
+    client.post(
+        '/api/attendance/checkin/office',
+        json={'coordinates': {'latitude': 48.8566, 'longitude': 2.3522, 'accuracy': 5}},
+        headers=headers,
+    )
     resp = client.get('/api/attendance/stats', headers=headers)
     assert resp.status_code == 200
     data = resp.get_json()

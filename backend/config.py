@@ -51,6 +51,9 @@ class Config:
     # Limites système
     MAX_COMPANIES = 1000
     MAX_USERS_PER_COMPANY = 999
+
+    # Géolocalisation
+    GEOLOCATION_MAX_ACCURACY = int(os.environ.get('GEOLOCATION_MAX_ACCURACY') or 100)
     
     # Sécurité des mots de passe
     PASSWORD_MIN_LENGTH = 8
