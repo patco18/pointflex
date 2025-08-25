@@ -19,6 +19,9 @@ class Mission(db.Model):
     status = db.Column(db.String(20), default='planned', nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    latitude = db.Column(db.Float, nullable=True)
+    longitude = db.Column(db.Float, nullable=True)
+    radius = db.Column(db.Integer, nullable=True)
 
     company = db.relationship('Company', backref='missions', lazy=True)
     users = db.relationship('MissionUser', back_populates='mission', lazy=True, cascade='all, delete-orphan')
@@ -35,6 +38,9 @@ class Mission(db.Model):
             'status': self.status,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'radius': self.radius,
             'users': [mu.to_dict() for mu in self.users]
         }
 

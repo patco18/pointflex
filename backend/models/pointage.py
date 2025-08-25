@@ -4,6 +4,8 @@ Modèle Pointage - Gestion des pointages
 
 from backend.database import db
 from datetime import datetime, time
+from zoneinfo import ZoneInfo
+from backend.models.system_settings import SystemSettings
 
 class Pointage(db.Model):
     """Modèle pour les pointages des employés"""
@@ -44,6 +46,7 @@ class Pointage(db.Model):
     is_offline = db.Column(db.Boolean, default=False)
     sync_status = db.Column(db.String(20), default='synced')  # 'synced', 'pending', 'failed'
     offline_timestamp = db.Column(db.DateTime, nullable=True)
+    device_id = db.Column(db.String(255), nullable=True)
     
     # Justification des retards
     delay_reason = db.Column(db.String(100), nullable=True)
@@ -71,25 +74,37 @@ class Pointage(db.Model):
             self.calculate_status()
     
     def calculate_status(self):
-        """Calcule le statut du pointage (présent/retard)"""
+        """Calcule le statut du pointage (présent/retard) en tenant compte du fuseau horaire"""
         from backend.models.user import User
-        
+
         user = User.query.get(self.user_id)
         if not user or not user.company:
             self.statut = 'present'
             return
-        
+
         company = user.company
         work_start = company.work_start_time or time(9, 0)  # 9h par défaut
         late_threshold = company.late_threshold or 15  # 15 min par défaut
-        
-        # Convertir l'heure d'arrivée en minutes depuis minuit
-        arrival_minutes = self.heure_arrivee.hour * 60 + self.heure_arrivee.minute
+
+        # Déterminer le fuseau horaire à utiliser
+        tz_name = 'UTC'
+        if self.office and self.office.timezone:
+            tz_name = self.office.timezone
+        else:
+            tz_name = SystemSettings.get_setting('general', 'default_timezone', 'UTC')
+
+        tz = ZoneInfo(tz_name)
+
+        # Convertir l'heure d'arrivée UTC vers le fuseau local
+        arrival_dt_utc = datetime.combine(self.date_pointage, self.heure_arrivee, tzinfo=ZoneInfo('UTC'))
+        arrival_local = arrival_dt_utc.astimezone(tz)
+
+        arrival_minutes = arrival_local.hour * 60 + arrival_local.minute
         work_start_minutes = work_start.hour * 60 + work_start.minute
-        
+
         # Calculer le retard en minutes
         delay_minutes = arrival_minutes - work_start_minutes
-        
+
         if delay_minutes <= late_threshold:
             self.statut = 'present'
         else:
@@ -98,40 +113,53 @@ class Pointage(db.Model):
         # Appliquer l'égalisation si configurée
         equal_thresh = getattr(company, 'equalization_threshold', 0)
         if 0 < delay_minutes <= equal_thresh:
-            self.heure_arrivee = work_start
+            self.heure_arrivee = datetime.combine(self.date_pointage, work_start, tzinfo=tz).astimezone(ZoneInfo('UTC')).time()
             self.is_equalized = True
     
     def calculate_worked_hours(self):
-        """Calcule les heures travaillées si heure de départ renseignée"""
+        """Calcule les heures travaillées en soustrayant les pauses"""
         if not self.heure_depart:
             return None
-        
-        # Convertir en minutes
+
         start_minutes = self.heure_arrivee.hour * 60 + self.heure_arrivee.minute
         end_minutes = self.heure_depart.hour * 60 + self.heure_depart.minute
-        
-        # Gérer le cas où le départ est le lendemain
+
         if end_minutes < start_minutes:
             end_minutes += 24 * 60
-        
+
         worked_minutes = end_minutes - start_minutes
-        return round(worked_minutes / 60, 2)  # Retourner en heures
+        pause_minutes = sum(p.duration_minutes or 0 for p in self.pauses)
+        worked_minutes -= pause_minutes
+        worked_minutes = max(0, worked_minutes)
+
+        return round(worked_minutes / 60, 2)
     
     @property
     def delay_minutes(self):
-        """Retourne le retard en minutes"""
+        """Retourne le retard en minutes en tenant compte du fuseau horaire"""
         if not self.user or not self.user.company:
             return 0
-        
+
         work_start = self.user.company.work_start_time or time(9, 0)
-        arrival_minutes = self.heure_arrivee.hour * 60 + self.heure_arrivee.minute
+
+        tz_name = 'UTC'
+        if self.office and self.office.timezone:
+            tz_name = self.office.timezone
+        else:
+            tz_name = SystemSettings.get_setting('general', 'default_timezone', 'UTC')
+
+        tz = ZoneInfo(tz_name)
+        arrival_dt_utc = datetime.combine(self.date_pointage, self.heure_arrivee, tzinfo=ZoneInfo('UTC'))
+        arrival_local = arrival_dt_utc.astimezone(tz)
+        arrival_minutes = arrival_local.hour * 60 + arrival_local.minute
         work_start_minutes = work_start.hour * 60 + work_start.minute
-        
+
         delay = arrival_minutes - work_start_minutes
         return max(0, delay)
     
     def to_dict(self):
         """Convertit le pointage en dictionnaire"""
+        worked_hours = self.calculate_worked_hours()
         data = {
             'id': self.id,
             'user_id': self.user_id,
@@ -143,11 +171,14 @@ class Pointage(db.Model):
             'statut': self.statut,
             'latitude': self.latitude,
             'longitude': self.longitude,
+            'offline_timestamp': self.offline_timestamp.isoformat() if self.offline_timestamp else None,
+            'device_id': self.device_id,
             'office_id': self.office_id,
             'distance': self.distance,
             'mission_id': self.mission_id,
             'mission_order_number': self.mission.order_number if self.mission else self.mission_order_number,
-            'worked_hours': self.calculate_worked_hours(),
+            'worked_hours': worked_hours,
+            'worked_hours_adjusted': worked_hours,
             'delay_minutes': self.delay_minutes,
             'is_equalized': self.is_equalized,
             'created_at': self.created_at.isoformat(),

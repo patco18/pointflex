@@ -49,6 +49,9 @@ def create_mission():
             start_date=data.get('start_date'),
             end_date=data.get('end_date'),
             status=data.get('status', 'planned'),
+            latitude=data.get('latitude'),
+            longitude=data.get('longitude'),
+            radius=data.get('radius'),
         )
         db.session.add(mission)
         db.session.flush()
@@ -131,7 +134,7 @@ def update_mission(mission_id):
         old_values = mission.to_dict() # Capture state before changes
         data = request.get_json() or {}
 
-        for field in ['title', 'description', 'start_date', 'end_date', 'status']:
+        for field in ['title', 'description', 'start_date', 'end_date', 'status', 'latitude', 'longitude', 'radius']:
             if field in data:
                 setattr(mission, field, data[field])
 
