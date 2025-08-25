@@ -25,6 +25,8 @@ class Office(db.Model):
     longitude = db.Column(db.Float, nullable=False)
     # Rayon autorisé pour le pointage en mètres
     radius = db.Column(db.Integer, default=200, nullable=False)
+    # Précision maximale de la géolocalisation pour ce bureau (en mètres)
+    geolocation_max_accuracy = db.Column(db.Integer, nullable=True)
     
     # Informations complémentaires
     timezone = db.Column(db.String(50), default='Europe/Paris', nullable=False)
@@ -66,6 +68,7 @@ class Office(db.Model):
             'latitude': self.latitude,
             'longitude': self.longitude,
             'radius': self.radius,
+            'geolocation_max_accuracy': self.geolocation_max_accuracy,
             'timezone': self.timezone,
             'capacity': self.capacity,
             'amenities': amenities_list,

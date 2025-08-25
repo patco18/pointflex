@@ -38,13 +38,8 @@ def office_checkin():
             return jsonify(message="Précision GPS requise"), 400
 
         max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
-        if coordinates['accuracy'] > max_accuracy:
-            return jsonify(
-                message=(
-                    f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). "
-                    f"Maximum autorisé: {max_accuracy}m"
-                )
-            ), 400
+        if current_user.company and current_user.company.geolocation_max_accuracy is not None:
+            max_accuracy = current_user.company.geolocation_max_accuracy
         
         # Vérifier si l'utilisateur a déjà pointé aujourd'hui
         today = date.today()
@@ -52,20 +47,20 @@ def office_checkin():
             user_id=current_user.id,
             date_pointage=today
         ).first()
-        
+
         if existing_pointage:
             send_notification(current_user.id, "Pointage déjà enregistré pour aujourd'hui")
             return jsonify(message="Vous avez déjà pointé aujourd'hui"), 409
-        
+
         # Récupérer les bureaux de l'entreprise
+        nearest_office = None
+        min_distance = float('inf')
+        offices = []
         if current_user.company_id:
             offices = Office.query.filter_by(
                 company_id=current_user.company_id,
                 is_active=True
             ).all()
-
-            nearest_office = None
-            min_distance = float('inf')
 
             for office in offices:
                 distance = calculate_distance(
@@ -77,6 +72,18 @@ def office_checkin():
                     min_distance = distance
                     nearest_office = office
 
+            if nearest_office and nearest_office.geolocation_max_accuracy is not None:
+                max_accuracy = nearest_office.geolocation_max_accuracy
+
+        if coordinates['accuracy'] > max_accuracy:
+            return jsonify(
+                message=(
+                    f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). "
+                    f"Maximum autorisé: {max_accuracy}m"
+                )
+            ), 400
+
+        if current_user.company_id:
             if offices:
                 # Lorsqu'il existe des bureaux configurés, se baser uniquement sur ceux-ci
                 if nearest_office and min_distance <= nearest_office.radius:
