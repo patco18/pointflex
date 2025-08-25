@@ -46,6 +46,7 @@ class Pointage(db.Model):
     is_offline = db.Column(db.Boolean, default=False)
     sync_status = db.Column(db.String(20), default='synced')  # 'synced', 'pending', 'failed'
     offline_timestamp = db.Column(db.DateTime, nullable=True)
+    device_id = db.Column(db.String(255), nullable=True)
     
     # Justification des retards
     delay_reason = db.Column(db.String(100), nullable=True)
@@ -116,20 +117,22 @@ class Pointage(db.Model):
             self.is_equalized = True
     
     def calculate_worked_hours(self):
-        """Calcule les heures travaillées si heure de départ renseignée"""
+        """Calcule les heures travaillées en soustrayant les pauses"""
         if not self.heure_depart:
             return None
-        
-        # Convertir en minutes
+
         start_minutes = self.heure_arrivee.hour * 60 + self.heure_arrivee.minute
         end_minutes = self.heure_depart.hour * 60 + self.heure_depart.minute
-        
-        # Gérer le cas où le départ est le lendemain
+
         if end_minutes < start_minutes:
             end_minutes += 24 * 60
-        
+
         worked_minutes = end_minutes - start_minutes
-        return round(worked_minutes / 60, 2)  # Retourner en heures
+        pause_minutes = sum(p.duration_minutes or 0 for p in self.pauses)
+        worked_minutes -= pause_minutes
+        worked_minutes = max(0, worked_minutes)
+
+        return round(worked_minutes / 60, 2)
     
     @property
     def delay_minutes(self):
@@ -156,6 +159,7 @@ class Pointage(db.Model):
     
     def to_dict(self):
         """Convertit le pointage en dictionnaire"""
+        worked_hours = self.calculate_worked_hours()
         data = {
             'id': self.id,
             'user_id': self.user_id,
@@ -167,11 +171,14 @@ class Pointage(db.Model):
             'statut': self.statut,
             'latitude': self.latitude,
             'longitude': self.longitude,
+            'offline_timestamp': self.offline_timestamp.isoformat() if self.offline_timestamp else None,
+            'device_id': self.device_id,
             'office_id': self.office_id,
             'distance': self.distance,
             'mission_id': self.mission_id,
             'mission_order_number': self.mission.order_number if self.mission else self.mission_order_number,
-            'worked_hours': self.calculate_worked_hours(),
+            'worked_hours': worked_hours,
+            'worked_hours_adjusted': worked_hours,
             'delay_minutes': self.delay_minutes,
             'is_equalized': self.is_equalized,
             'created_at': self.created_at.isoformat(),

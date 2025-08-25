@@ -224,13 +224,9 @@ def mission_checkin():
         if not mu:
             return jsonify(message="Mission non acceptée"), 403
 
-        if not coordinates.get('latitude') or not coordinates.get('longitude'):
+        if coordinates.get('latitude') is None or coordinates.get('longitude') is None:
             return jsonify(message="Coordonnées GPS requises"), 400
 
-        tz_name = SystemSettings.get_setting('general', 'default_timezone', 'UTC')
-        now_local = datetime.now(ZoneInfo(tz_name))
-        now_utc = now_local.astimezone(ZoneInfo('UTC'))
-        today = now_utc.date()
 
         existing_pointage = Pointage.query.filter_by(
             user_id=current_user.id,
@@ -250,8 +246,7 @@ def mission_checkin():
             mission_order_number=mission.order_number,
             latitude=coordinates['latitude'],
             longitude=coordinates['longitude'],
-            date_pointage=today,
-            heure_arrivee=now_utc.time()
+
         )
 
         db.session.add(pointage)
@@ -266,7 +261,8 @@ def mission_checkin():
                 'mission_id': mission.id,
                 'mission_order_number': mission.order_number,
                 'status': pointage.statut,
-                'coordinates': coordinates
+                'coordinates': coordinates,
+                'distance': distance
             }
         )
 
