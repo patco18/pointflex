@@ -222,8 +222,28 @@ def mission_checkin():
         if not mu:
             return jsonify(message="Mission non acceptée"), 403
 
-        if not coordinates.get('latitude') or not coordinates.get('longitude'):
+        if coordinates.get('latitude') is None or coordinates.get('longitude') is None:
             return jsonify(message="Coordonnées GPS requises"), 400
+
+        distance = None
+        if (
+            mission.latitude is not None
+            and mission.longitude is not None
+            and mission.radius is not None
+        ):
+            distance = calculate_distance(
+                coordinates['latitude'],
+                coordinates['longitude'],
+                mission.latitude,
+                mission.longitude,
+            )
+            if distance > mission.radius:
+                return jsonify(
+                    message=(
+                        f"Vous êtes trop loin de la mission ({int(distance)}m). "
+                        f"Rayon autorisé: {mission.radius}m"
+                    )
+                ), 403
 
         # Vérifier si l'utilisateur a déjà pointé aujourd'hui pour cette mission
         today = date.today()
@@ -245,7 +265,8 @@ def mission_checkin():
             mission_id=mission.id,
             mission_order_number=mission.order_number,
             latitude=coordinates['latitude'],
-            longitude=coordinates['longitude']
+            longitude=coordinates['longitude'],
+            distance=distance,
         )
         
         db.session.add(pointage)
@@ -260,7 +281,8 @@ def mission_checkin():
                 'mission_id': mission.id,
                 'mission_order_number': mission.order_number,
                 'status': pointage.statut,
-                'coordinates': coordinates
+                'coordinates': coordinates,
+                'distance': distance
             }
         )
         
