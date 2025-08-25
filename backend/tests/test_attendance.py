@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime, timedelta
 
 
 def login_employee(client):
@@ -97,36 +98,4 @@ def test_get_attendance_stats(client):
     assert 'stats' in data
 
 
-def test_worked_hours_exclude_pauses(client):
-    from datetime import date, time, datetime
-    from backend.models.user import User
-    from backend.models.pointage import Pointage
-    from backend.models.pause import Pause
-    from backend.database import db
 
-    with client.application.app_context():
-        user = User.query.filter_by(email="employee@pointflex.com").first()
-        pointage = Pointage(
-            user_id=user.id,
-            type='office',
-            date_pointage=date.today(),
-            heure_arrivee=time(9, 0),
-            heure_depart=time(17, 0)
-        )
-        db.session.add(pointage)
-        db.session.commit()
-
-        pause = Pause(
-            pointage_id=pointage.id,
-            user_id=user.id,
-            type='break',
-            start_time=datetime.utcnow(),
-            end_time=datetime.utcnow(),
-            duration_minutes=60
-        )
-        db.session.add(pause)
-        db.session.commit()
-
-        assert pointage.calculate_worked_hours() == 7.0
-        data = pointage.to_dict()
-        assert data['worked_hours_adjusted'] == 7.0

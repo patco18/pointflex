@@ -9,9 +9,11 @@ from backend.models.pointage import Pointage
 from backend.models.pause import Pause
 from backend.models.mission import Mission
 from backend.models.user import User
+from backend.models.office import Office
 from backend.database import db
 from datetime import datetime, date, timedelta
 import json
+import math
 
 attendance_extras_bp = Blueprint('attendance_extras', __name__)
 
@@ -401,13 +403,28 @@ def offline_checkin():
         current_user = get_current_user()
         if not current_user:
             return jsonify(message="Utilisateur non trouvé"), 401
-        
+
         data = request.get_json()
         timestamp = data.get('timestamp')
-        
+        coordinates = data.get('coordinates', {})
+
         if not timestamp:
             return jsonify(message="Horodatage manquant"), 400
-        
+
+        if coordinates.get('latitude') is None or coordinates.get('longitude') is None:
+            return jsonify(message="Coordonnées GPS requises"), 400
+        if coordinates.get('accuracy') is None:
+            return jsonify(message="Précision GPS requise"), 400
+
+        max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
+        if coordinates['accuracy'] > max_accuracy:
+            return jsonify(
+                message=(
+                    f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). "
+                    f"Maximum autorisé: {max_accuracy}m"
+                )
+            ), 400
+
         # Convertir l'horodatage en objets date et time
         try:
             dt = datetime.fromisoformat(timestamp)
@@ -415,32 +432,111 @@ def offline_checkin():
             pointage_time = dt.time()
         except ValueError:
             return jsonify(message="Format d'horodatage invalide"), 400
-        
+
+        now = datetime.utcnow()
+        if dt > now:
+            return jsonify(message="Horodatage futur invalide"), 400
+        if now - dt > timedelta(hours=24):
+            return jsonify(message="Horodatage trop ancien"), 400
+
         # Vérifier si un pointage existe déjà pour cette date
         existing_pointage = Pointage.query.filter_by(
             user_id=current_user.id,
             date_pointage=pointage_date
         ).first()
-        
+
         if existing_pointage:
             return jsonify(message="Un pointage existe déjà pour cette date"), 409
-        
-        # Créer le pointage avec l'horodatage fourni
-        pointage = Pointage(
-            user_id=current_user.id,
-            type='office',
-            date_pointage=pointage_date,
-            heure_arrivee=pointage_time,
-            sync_status='synced',
-            is_offline=True  # Champ à ajouter au modèle Pointage
-        )
-        
-        # Calculer le statut basé sur l'heure fournie
+
+        if current_user.company_id:
+            offices = Office.query.filter_by(
+                company_id=current_user.company_id,
+                is_active=True
+            ).all()
+
+            nearest_office = None
+            min_distance = float('inf')
+
+            for office in offices:
+                distance = calculate_distance(
+                    coordinates['latitude'], coordinates['longitude'],
+                    office.latitude, office.longitude
+                )
+
+                if distance < min_distance:
+                    min_distance = distance
+                    nearest_office = office
+
+            if offices:
+                if nearest_office and min_distance <= nearest_office.radius:
+                    pointage = Pointage(
+                        user_id=current_user.id,
+                        type='office',
+                        date_pointage=pointage_date,
+                        heure_arrivee=pointage_time,
+                        latitude=coordinates['latitude'],
+                        longitude=coordinates['longitude'],
+                        office_id=nearest_office.id,
+                        distance=min_distance,
+                        sync_status='synced',
+                        is_offline=True,
+                        offline_timestamp=dt,
+                        device_id=data.get('device_id')
+                    )
+                else:
+                    return jsonify(
+                        message=(
+                            f"Vous êtes trop loin du bureau ({int(min_distance)}m). "
+                            f"Rayon autorisé: {nearest_office.radius if nearest_office else 'N/A'}m"
+                        )
+                    ), 403
+            else:
+                company = current_user.company
+                if company and company.office_latitude and company.office_longitude:
+                    distance = calculate_distance(
+                        coordinates['latitude'], coordinates['longitude'],
+                        company.office_latitude, company.office_longitude
+                    )
+
+                    if distance > company.office_radius:
+                        return jsonify(
+                            message=(
+                                f"Vous êtes trop loin du bureau ({int(distance)}m). "
+                                f"Rayon autorisé: {company.office_radius}m"
+                            )
+                        ), 403
+
+                pointage = Pointage(
+                    user_id=current_user.id,
+                    type='office',
+                    date_pointage=pointage_date,
+                    heure_arrivee=pointage_time,
+                    latitude=coordinates['latitude'],
+                    longitude=coordinates['longitude'],
+                    sync_status='synced',
+                    is_offline=True,
+                    offline_timestamp=dt,
+                    device_id=data.get('device_id')
+                )
+        else:
+            pointage = Pointage(
+                user_id=current_user.id,
+                type='office',
+                date_pointage=pointage_date,
+                heure_arrivee=pointage_time,
+                latitude=coordinates['latitude'],
+                longitude=coordinates['longitude'],
+                sync_status='synced',
+                is_offline=True,
+                offline_timestamp=dt,
+                device_id=data.get('device_id')
+            )
+
         pointage.calculate_status()
-        
+
         db.session.add(pointage)
         db.session.commit()
-        
+
         return jsonify(
             message="Pointage hors ligne synchronisé avec succès",
             pointage={
@@ -450,7 +546,7 @@ def offline_checkin():
                 'statut': pointage.statut
             }
         ), 201
-    
+
     except Exception as e:
         db.session.rollback()
         print(f"Erreur offline_checkin: {e}")
@@ -502,3 +598,45 @@ def justify_delay(pointage_id):
         db.session.rollback()
         print(f"Erreur justify_delay: {e}")
         return jsonify(message="Une erreur est survenue"), 500
+
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    """Calcule la distance entre deux points GPS en mètres"""
+    try:
+        if not all(isinstance(coord, (int, float)) for coord in [lat1, lon1, lat2, lon2]):
+            current_app.logger.error(
+                f"Invalid coordinate types: {type(lat1)}, {type(lon1)}, {type(lat2)}, {type(lon2)}"
+            )
+            return float('inf')
+
+        if not (
+            -90 <= lat1 <= 90 and -90 <= lat2 <= 90 and -180 <= lon1 <= 180 and -180 <= lon2 <= 180
+        ):
+            current_app.logger.error(
+                f"Coordinates out of range: {lat1}, {lon1}, {lat2}, {lon2}"
+            )
+            return float('inf')
+
+        R = 6371000
+
+        lat1_rad = math.radians(lat1)
+        lon1_rad = math.radians(lon1)
+        lat2_rad = math.radians(lat2)
+        lon2_rad = math.radians(lon2)
+
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+
+        a = (
+            math.sin(dlat / 2) * math.sin(dlat / 2)
+            + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) * math.sin(dlon / 2)
+        )
+
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        distance = R * c
+
+        return distance
+    except Exception as e:
+        current_app.logger.error(f"Error calculating distance: {e}")
+        return float('inf')
