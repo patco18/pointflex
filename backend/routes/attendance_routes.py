@@ -15,6 +15,8 @@ from backend.models.mission import Mission
 from backend.models.office import Office
 from backend.database import db
 from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
+from backend.models.system_settings import SystemSettings
 import math
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -28,7 +30,7 @@ def office_checkin():
         current_user = get_current_user()
         if not current_user:
             return jsonify(message="Utilisateur non trouvé"), 401
-        
+
         data = request.get_json()
         coordinates = data.get('coordinates', {})
 
@@ -45,19 +47,10 @@ def office_checkin():
                     f"Maximum autorisé: {max_accuracy}m"
                 )
             ), 400
-        
-        # Vérifier si l'utilisateur a déjà pointé aujourd'hui
-        today = date.today()
-        existing_pointage = Pointage.query.filter_by(
-            user_id=current_user.id,
-            date_pointage=today
-        ).first()
-        
-        if existing_pointage:
-            send_notification(current_user.id, "Pointage déjà enregistré pour aujourd'hui")
-            return jsonify(message="Vous avez déjà pointé aujourd'hui"), 409
-        
-        # Récupérer les bureaux de l'entreprise
+
+        tz_name = SystemSettings.get_setting('general', 'default_timezone', 'UTC')
+        pointage = None
+
         if current_user.company_id:
             offices = Office.query.filter_by(
                 company_id=current_user.company_id,
@@ -72,21 +65,20 @@ def office_checkin():
                     coordinates['latitude'], coordinates['longitude'],
                     office.latitude, office.longitude
                 )
-
                 if distance < min_distance:
                     min_distance = distance
                     nearest_office = office
 
             if offices:
-                # Lorsqu'il existe des bureaux configurés, se baser uniquement sur ceux-ci
                 if nearest_office and min_distance <= nearest_office.radius:
-                    # Créer le pointage avec référence au bureau
+                    tz_name = nearest_office.timezone or tz_name
                     pointage = Pointage(
                         user_id=current_user.id,
                         type='office',
                         latitude=coordinates['latitude'],
                         longitude=coordinates['longitude'],
                         office_id=nearest_office.id,
+                        office=nearest_office,
                         distance=min_distance
                     )
                 else:
@@ -94,20 +86,17 @@ def office_checkin():
                         message=f"Vous êtes trop loin du bureau ({int(min_distance)}m). Rayon autorisé: {nearest_office.radius if nearest_office else 'N/A'}m"
                     ), 403
             else:
-                # Aucun bureau n'est configuré, utiliser les paramètres globaux de l'entreprise
                 company = current_user.company
                 if company and company.office_latitude and company.office_longitude:
                     distance = calculate_distance(
                         coordinates['latitude'], coordinates['longitude'],
                         company.office_latitude, company.office_longitude
                     )
-
                     if distance > company.office_radius:
                         return jsonify(
                             message=f"Vous êtes trop loin du bureau ({int(distance)}m). Rayon autorisé: {company.office_radius}m"
                         ), 403
 
-                # Créer le pointage sans référence à un bureau spécifique
                 pointage = Pointage(
                     user_id=current_user.id,
                     type='office',
@@ -115,17 +104,32 @@ def office_checkin():
                     longitude=coordinates['longitude']
                 )
         else:
-            # Créer le pointage sans vérification de distance (cas rare)
             pointage = Pointage(
                 user_id=current_user.id,
                 type='office',
                 latitude=coordinates['latitude'],
                 longitude=coordinates['longitude']
             )
-        
+
+        now_local = datetime.now(ZoneInfo(tz_name))
+        now_utc = now_local.astimezone(ZoneInfo('UTC'))
+        today = now_utc.date()
+
+        existing_pointage = Pointage.query.filter_by(
+            user_id=current_user.id,
+            date_pointage=today
+        ).first()
+
+        if existing_pointage:
+            send_notification(current_user.id, "Pointage déjà enregistré pour aujourd'hui")
+            return jsonify(message="Vous avez déjà pointé aujourd'hui"), 409
+
+        pointage.date_pointage = today
+        pointage.heure_arrivee = now_utc.time()
+
         db.session.add(pointage)
         db.session.flush()
-        
+
         # Logger l'action
         log_user_action(
             action='OFFICE_CHECKIN',
@@ -138,7 +142,7 @@ def office_checkin():
                 'distance': getattr(pointage, 'distance', None)
             }
         )
-        
+
         db.session.commit()
 
         # Journaliser l'événement de pointage
@@ -153,7 +157,6 @@ def office_checkin():
             }
         )
 
-        # Dispatch webhook for pointage creation
         try:
             from backend.utils.webhook_utils import dispatch_webhook_event
             dispatch_webhook_event(
@@ -173,12 +176,12 @@ def office_checkin():
             'message': 'Pointage bureau enregistré avec succès',
             'pointage': pointage.to_dict()
         }), 201
-        
+
     except Exception as e:
         error_details = str(e)
         current_app.logger.error(f"Erreur lors du pointage bureau: {error_details}")
         db.session.rollback()
-        
+
         # Fournir des messages d'erreur plus détaillés selon le type d'exception
         if "coordinates" in error_details.lower():
             return jsonify(message="Erreur de coordonnées GPS"), 400
@@ -188,7 +191,6 @@ def office_checkin():
             return jsonify(message="Erreur de base de données lors du pointage"), 500
         else:
             return jsonify(message="Erreur interne du serveur"), 500
-
 @attendance_bp.route('/checkin/mission', methods=['POST'])
 @jwt_required()
 def mission_checkin():
@@ -197,7 +199,7 @@ def mission_checkin():
         current_user = get_current_user()
         if not current_user:
             return jsonify(message="Utilisateur non trouvé"), 401
-        
+
         data = request.get_json()
         mission_id = data.get('mission_id')
         mission_order_number = data.get('mission_order_number')
@@ -225,8 +227,11 @@ def mission_checkin():
         if not coordinates.get('latitude') or not coordinates.get('longitude'):
             return jsonify(message="Coordonnées GPS requises"), 400
 
-        # Vérifier si l'utilisateur a déjà pointé aujourd'hui pour cette mission
-        today = date.today()
+        tz_name = SystemSettings.get_setting('general', 'default_timezone', 'UTC')
+        now_local = datetime.now(ZoneInfo(tz_name))
+        now_utc = now_local.astimezone(ZoneInfo('UTC'))
+        today = now_utc.date()
+
         existing_pointage = Pointage.query.filter_by(
             user_id=current_user.id,
             date_pointage=today,
@@ -238,19 +243,20 @@ def mission_checkin():
             send_notification(current_user.id, "Pointage déjà enregistré pour cette mission aujourd'hui")
             return jsonify(message="Vous avez déjà pointé pour cette mission aujourd'hui"), 409
 
-        # Créer le pointage mission
         pointage = Pointage(
             user_id=current_user.id,
             type='mission',
             mission_id=mission.id,
             mission_order_number=mission.order_number,
             latitude=coordinates['latitude'],
-            longitude=coordinates['longitude']
+            longitude=coordinates['longitude'],
+            date_pointage=today,
+            heure_arrivee=now_utc.time()
         )
-        
+
         db.session.add(pointage)
         db.session.flush()
-        
+
         # Logger l'action
         log_user_action(
             action='MISSION_CHECKIN',
@@ -263,7 +269,7 @@ def mission_checkin():
                 'coordinates': coordinates
             }
         )
-        
+
         db.session.commit()
 
         # Dispatch webhook for pointage creation (mission type)
@@ -285,7 +291,7 @@ def mission_checkin():
             'message': 'Pointage mission enregistré avec succès',
             'pointage': pointage.to_dict()
         }), 201
-        
+
     except SQLAlchemyError as e:
         db.session.rollback()
         current_app.logger.exception("Database error during mission checkin")
@@ -294,7 +300,6 @@ def mission_checkin():
         db.session.rollback()
         current_app.logger.exception("Erreur lors du pointage mission")
         return jsonify(message="Erreur interne du serveur"), 500
-
 @attendance_bp.route('/checkout', methods=['POST'])
 @jwt_required()
 def checkout():
@@ -307,7 +312,11 @@ def checkout():
         data = request.get_json() or {}
         pointage_id = data.get('pointage_id')
         mission_id = data.get('mission_id')
-        today = date.today()
+
+        tz_name = SystemSettings.get_setting('general', 'default_timezone', 'UTC')
+        now_local = datetime.now(ZoneInfo(tz_name))
+        now_utc = now_local.astimezone(ZoneInfo('UTC'))
+        today = now_utc.date()
 
         if pointage_id:
             pointage = Pointage.query.filter_by(id=pointage_id, user_id=current_user.id).first()
@@ -325,6 +334,12 @@ def checkout():
                 type='office'
             ).first()
 
+        if pointage and pointage.office and pointage.office.timezone:
+            tz_name = pointage.office.timezone
+            now_local = datetime.now(ZoneInfo(tz_name))
+            now_utc = now_local.astimezone(ZoneInfo('UTC'))
+            today = now_utc.date()
+
         if not pointage:
             send_notification(current_user.id, "Aucun pointage d'arrivée trouvé pour aujourd'hui")
             return jsonify(message="Pas de pointage d'arrivée pour aujourd'hui"), 404
@@ -332,7 +347,7 @@ def checkout():
         if pointage.heure_depart:
             return jsonify(message="Heure de départ déjà enregistrée"), 409
 
-        pointage.heure_depart = datetime.utcnow().time()
+        pointage.heure_depart = now_utc.time()
 
         log_user_action(
             action='CHECKOUT',
@@ -368,8 +383,6 @@ def checkout():
         db.session.rollback()
         current_app.logger.exception("Erreur lors du checkout")
         return jsonify(message="Erreur interne du serveur"), 500
-
-
 @attendance_bp.route('/pause/start', methods=['POST'])
 @jwt_required()
 def start_pause():

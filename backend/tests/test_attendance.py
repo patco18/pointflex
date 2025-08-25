@@ -95,3 +95,55 @@ def test_get_attendance_stats(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert 'stats' in data
+
+
+def test_office_checkin_timezone_conversion(client):
+    token = login_employee(client)
+    headers = {'Authorization': f'Bearer {token}'}
+
+    from backend.models.user import User
+    from backend.models.office import Office
+    from backend.database import db
+    from zoneinfo import ZoneInfo
+    from datetime import datetime
+    from unittest.mock import patch
+
+    with client.application.app_context():
+        user = User.query.filter_by(email="employee@pointflex.com").first()
+        ny_office = Office(
+            company_id=user.company_id,
+            name='NY Office',
+            address='NY',
+            city='NY',
+            country='US',
+            latitude=40.7128,
+            longitude=-74.0060,
+            radius=500,
+            timezone='America/New_York',
+            is_active=True
+        )
+        db.session.add(ny_office)
+        db.session.commit()
+
+    fixed_utc = datetime(2024, 1, 1, 14, 0, 0)
+
+    class FixedDatetime(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            if tz:
+                return fixed_utc.replace(tzinfo=ZoneInfo('UTC')).astimezone(tz)
+            return fixed_utc
+
+        @classmethod
+        def utcnow(cls):
+            return fixed_utc
+
+    with patch('backend.routes.attendance_routes.datetime', FixedDatetime), \
+         patch('backend.models.pointage.datetime', FixedDatetime):
+        data = {'coordinates': {'latitude': 40.7128, 'longitude': -74.0060, 'accuracy': 5}}
+        resp = client.post('/api/attendance/checkin/office', json=data, headers=headers)
+
+    assert resp.status_code == 201
+    body = resp.get_json()['pointage']
+    assert body['heure_arrivee'] == '14:00'
+    assert body['statut'] == 'present'

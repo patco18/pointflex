@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
+from backend.models.system_settings import SystemSettings
 import secrets
 import json
 import enum
@@ -133,13 +135,16 @@ def qr_checkin():
         return jsonify({"success": False, "message": "Bureau non trouvé"}), 404
     
     # Déterminer le type de pointage (entrée ou sortie)
-    pointage_type = determine_pointage_type(user_id)
-    
+    tz_name = office.timezone if office and office.timezone else SystemSettings.get_setting('general', 'default_timezone', 'UTC')
+    pointage_type = determine_pointage_type(user_id, tz_name)
+
     # Vérifier si une validation est nécessaire (hors horaires normaux, localisation suspecte, etc.)
     needs_validation = check_if_validation_needed(user_id, office.id, location_data)
-    
+
     # Créer un nouveau pointage
-    now = datetime.utcnow()
+    now_local = datetime.now(ZoneInfo(tz_name))
+    now_utc = now_local.astimezone(ZoneInfo('UTC'))
+    today = now_utc.date()
     
     # Création du pointage selon le type
     new_pointage = None
@@ -147,8 +152,8 @@ def qr_checkin():
         # Pointage d'entrée
         new_pointage = Pointage(
             user_id=user_id,
-            date_pointage=now.date(),
-            heure_arrivee=now.time(),
+            date_pointage=today,
+            heure_arrivee=now_utc.time(),
             type="office",
             office_id=office.id,
             is_qr_scan=True,
@@ -160,21 +165,21 @@ def qr_checkin():
         # Chercher le pointage d'entrée existant pour mettre à jour l'heure de sortie
         existing_pointage = Pointage.query.filter(
             Pointage.user_id == user_id,
-            Pointage.date_pointage == now.date(),
+            Pointage.date_pointage == today,
             Pointage.heure_arrivee.isnot(None),
             Pointage.heure_depart.is_(None)
         ).first()
-        
+
         if existing_pointage:
             # Mettre à jour le pointage existant
-            existing_pointage.heure_depart = now.time()
+            existing_pointage.heure_depart = now_utc.time()
             new_pointage = existing_pointage
         else:
             # Créer un nouveau pointage de sortie si nécessaire
             new_pointage = Pointage(
                 user_id=user_id,
-                date_pointage=now.date(),
-                heure_depart=now.time(),
+                date_pointage=today,
+                heure_depart=now_utc.time(),
                 type="office",
                 office_id=office.id,
                 is_qr_scan=True,
@@ -223,12 +228,12 @@ def qr_checkin():
         }
     })
 
-def determine_pointage_type(user_id):
+def determine_pointage_type(user_id, tz_name='UTC'):
     """
     Détermine le type de pointage en fonction des pointages précédents de l'utilisateur.
     """
-    # Récupérer le dernier pointage de l'utilisateur aujourd'hui
-    today = datetime.utcnow().date()
+    now_local = datetime.now(ZoneInfo(tz_name))
+    today = now_local.astimezone(ZoneInfo('UTC')).date()
     last_pointage = Pointage.query.filter(
         Pointage.user_id == user_id,
         Pointage.date_pointage == today
@@ -258,7 +263,9 @@ def check_if_validation_needed(user_id, office_id, location_data):
     - Utilisateur avec des restrictions de pointage
     """
     # Vérifier l'heure du pointage
-    now = datetime.utcnow()
+    office = Office.query.get(office_id)
+    tz_name = office.timezone if office and office.timezone else SystemSettings.get_setting('general', 'default_timezone', 'UTC')
+    now = datetime.now(ZoneInfo(tz_name))
     hour = now.hour
     
     # Pointage en dehors des heures de bureau standard (exemple: avant 7h ou après 20h)
@@ -267,10 +274,8 @@ def check_if_validation_needed(user_id, office_id, location_data):
     
     # Vérifier la localisation (si fournie)
     if location_data and 'latitude' in location_data and 'longitude' in location_data:
-        # Récupérer les coordonnées du bureau
-        office = Office.query.get(office_id)
+        # Vérifier si la distance est supérieure au rayon défini pour le bureau
         if office:
-            # Vérifier si la distance est supérieure au rayon défini pour le bureau
             distance = calculate_distance(
                 location_data['latitude'], location_data['longitude'],
                 office.latitude, office.longitude
