@@ -44,6 +44,7 @@ class Pointage(db.Model):
     is_offline = db.Column(db.Boolean, default=False)
     sync_status = db.Column(db.String(20), default='synced')  # 'synced', 'pending', 'failed'
     offline_timestamp = db.Column(db.DateTime, nullable=True)
+    device_id = db.Column(db.String(255), nullable=True)
     
     # Justification des retards
     delay_reason = db.Column(db.String(100), nullable=True)
@@ -143,6 +144,8 @@ class Pointage(db.Model):
             'statut': self.statut,
             'latitude': self.latitude,
             'longitude': self.longitude,
+            'offline_timestamp': self.offline_timestamp.isoformat() if self.offline_timestamp else None,
+            'device_id': self.device_id,
             'office_id': self.office_id,
             'distance': self.distance,
             'mission_id': self.mission_id,
