@@ -6,6 +6,7 @@ import QuickActions from '../components/QuickActions'
 import RemindersWidget from '../components/dashboard/RemindersWidget'
 import { Button } from '../components/ui/button'
 import { getRoleStyle } from '../utils/roleStyles'
+import toast from 'react-hot-toast'
 import {
   Clock,
   MapPin,
@@ -81,28 +82,55 @@ export default function Dashboard() {
     try {
       const startDate = format(startOfMonth(new Date()), 'yyyy-MM-dd')
       const endDate = format(endOfMonth(new Date()), 'yyyy-MM-dd')
-      const [attendanceResponse, statsResponse, last7DaysResponse] = await Promise.all([
-        attendanceService.getAttendance(startDate, endDate),
-        attendanceService.getStats(),
-        attendanceService.getLast7DaysStats()
-      ])
-      setAttendanceRecords(attendanceResponse.data.records)
-      setStats(statsResponse.data.stats)
-      if (last7DaysResponse.data.stats && Array.isArray(last7DaysResponse.data.stats)) {
-        setChartData(
-          last7DaysResponse.data.stats.map((day: any) => ({
+      
+      // Récupération des données avec gestion individuelle des erreurs
+      let attendanceData = [];
+      let statsData = null;
+      let last7Days = [];
+      
+      try {
+        const attendanceResponse = await attendanceService.getAttendance(startDate, endDate);
+        attendanceData = attendanceResponse.data.records || [];
+      } catch (error) {
+        console.error('Erreur lors de la récupération des pointages:', error);
+        toast.error('Impossible de charger les données de pointage');
+      }
+      
+      try {
+        const statsResponse = await attendanceService.getStats();
+        statsData = statsResponse.data.stats;
+      } catch (error) {
+        console.error('Erreur lors de la récupération des statistiques:', error);
+        toast.error('Impossible de charger les statistiques');
+      }
+      
+      try {
+        const last7DaysResponse = await attendanceService.getLast7DaysStats();
+        if (last7DaysResponse.data.stats && Array.isArray(last7DaysResponse.data.stats)) {
+          last7Days = last7DaysResponse.data.stats.map((day: any) => ({
             date: day.date,
             present: day.present,
             late: day.late,
             absent: day.absent
-          }))
-        )
+          }));
+        }
+      } catch (error) {
+        console.error('Erreur lors de la récupération des données des 7 derniers jours:', error);
+        generateFallbackChartData();
       }
+      
+      // Mise à jour de l'état avec les données récupérées
+      setAttendanceRecords(attendanceData);
+      if (statsData) setStats(statsData);
+      if (last7Days.length > 0) setChartData(last7Days);
+      else generateFallbackChartData();
+      
     } catch (error) {
-      console.error('Erreur lors du chargement des données:', error)
-      generateFallbackChartData()
+      console.error('Erreur globale lors du chargement des données:', error);
+      toast.error('Une erreur est survenue lors du chargement des données');
+      generateFallbackChartData();
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
   }
 

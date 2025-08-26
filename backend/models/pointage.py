@@ -128,7 +128,23 @@ class Pointage(db.Model):
             end_minutes += 24 * 60
 
         worked_minutes = end_minutes - start_minutes
-        pause_minutes = sum(p.duration_minutes or 0 for p in self.pauses)
+        
+        # Calcul des pauses avec gestion d'erreur
+        try:
+            # Vérifier si self.pauses existe et n'est pas None
+            if hasattr(self, 'pauses') and self.pauses is not None:
+                pause_minutes = sum(p.duration_minutes or 0 for p in self.pauses)
+            else:
+                # Récupérer les pauses manuellement si la relation ne fonctionne pas
+                from backend.models.pause import Pause
+                pauses = Pause.query.filter_by(pointage_id=self.id).all()
+                pause_minutes = sum(p.duration_minutes or 0 for p in pauses)
+        except Exception as e:
+            # En cas d'erreur, logger et ignorer les pauses
+            import logging
+            logging.warning(f"Erreur lors du calcul des pauses pour le pointage {self.id}: {str(e)}")
+            pause_minutes = 0
+            
         worked_minutes -= pause_minutes
         worked_minutes = max(0, worked_minutes)
 

@@ -483,8 +483,28 @@ def get_attendance():
             page=page, per_page=per_page, error_out=False
         )
         
+        # Conversion des pointages en dict avec gestion des erreurs
+        records = []
+        for pointage in pointages.items:
+            try:
+                record = pointage.to_dict()
+                records.append(record)
+            except Exception as e:
+                current_app.logger.error(f"Erreur lors de la conversion du pointage {pointage.id}: {str(e)}", exc_info=e)
+                # Ajouter une version simplifiée pour éviter l'erreur complète
+                records.append({
+                    'id': pointage.id,
+                    'user_id': pointage.user_id,
+                    'date_pointage': pointage.date_pointage.isoformat() if pointage.date_pointage else None,
+                    'heure_arrivee': pointage.heure_arrivee.isoformat() if pointage.heure_arrivee else None,
+                    'heure_depart': pointage.heure_depart.isoformat() if pointage.heure_depart else None,
+                    'statut': pointage.statut,
+                    'type': pointage.type,
+                    'error': 'Erreur de conversion'
+                })
+        
         return jsonify({
-            'records': [pointage.to_dict() for pointage in pointages.items],
+            'records': records,
             'pagination': {
                 'page': page,
                 'pages': pointages.pages,
@@ -532,8 +552,16 @@ def get_attendance_stats():
         late_days = len([p for p in pointages if p.statut == 'retard'])
         absence_days = 0  # Pour l'instant, on ne gère pas les absences
         
-        # Calculer les heures moyennes (simulation)
-        total_hours = sum([p.calculate_worked_hours() or 8 for p in pointages])
+        # Calculer les heures moyennes avec gestion d'erreurs
+        total_hours = 0
+        for p in pointages:
+            try:
+                hours = p.calculate_worked_hours() or 8
+                total_hours += hours
+            except Exception as e:
+                current_app.logger.error(f"Erreur lors du calcul des heures pour le pointage {p.id}: {str(e)}")
+                total_hours += 8  # Valeur par défaut en cas d'erreur
+                
         average_hours = total_hours / total_days if total_days > 0 else 0
         
         return jsonify({
