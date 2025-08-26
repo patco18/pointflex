@@ -494,10 +494,16 @@ def get_attendance():
         }), 200
         
     except SQLAlchemyError as e:
-        current_app.logger.exception("Database error retrieving pointages")
-        return jsonify(message="Erreur de base de données lors de la récupération des pointages"), 500
-    except Exception:
-        current_app.logger.exception("Erreur lors de la récupération des pointages")
+        current_app.logger.error(
+            f"Database error retrieving pointages: {str(e)}", exc_info=e
+        )
+        return jsonify(
+            message="Erreur de base de données lors de la récupération des pointages"
+        ), 500
+    except Exception as e:
+        current_app.logger.error(
+            f"Erreur lors de la récupération des pointages: {str(e)}", exc_info=e
+        )
         return jsonify(message="Erreur interne du serveur"), 500
 
 @attendance_bp.route('/stats', methods=['GET'])
@@ -545,10 +551,16 @@ def get_attendance_stats():
         }), 200
         
     except SQLAlchemyError as e:
-        current_app.logger.exception("Database error retrieving stats")
-        return jsonify(message="Erreur de base de données lors de la récupération des statistiques"), 500
-    except Exception:
-        current_app.logger.exception("Erreur lors de la récupération des statistiques")
+        current_app.logger.error(
+            f"Database error retrieving stats: {str(e)}", exc_info=e
+        )
+        return jsonify(
+            message="Erreur de base de données lors de la récupération des statistiques"
+        ), 500
+    except Exception as e:
+        current_app.logger.error(
+            f"Erreur lors de la récupération des statistiques: {str(e)}", exc_info=e
+        )
         return jsonify(message="Erreur interne du serveur"), 500
 
 @attendance_bp.route('/last7days', methods=['GET'])
