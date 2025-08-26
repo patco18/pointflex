@@ -226,10 +226,12 @@ def mission_checkin():
         if coordinates.get('latitude') is None or coordinates.get('longitude') is None:
             return jsonify(message="Coordonnées GPS requises"), 400
 
+        # Utiliser la date actuelle
+        today_date = datetime.now().date()
 
         existing_pointage = Pointage.query.filter_by(
             user_id=current_user.id,
-            date_pointage=today,
+            date_pointage=today_date,
             type='mission',
             mission_id=mission.id
         ).first()
@@ -238,6 +240,14 @@ def mission_checkin():
             send_notification(current_user.id, "Pointage déjà enregistré pour cette mission aujourd'hui")
             return jsonify(message="Vous avez déjà pointé pour cette mission aujourd'hui"), 409
 
+        # Calcul de distance par rapport au lieu de mission si disponible
+        mission_distance = 0.0
+        if mission.latitude and mission.longitude:
+            mission_distance = calculate_distance(
+                coordinates['latitude'], coordinates['longitude'],
+                mission.latitude, mission.longitude
+            )
+            
         pointage = Pointage(
             user_id=current_user.id,
             type='mission',
@@ -245,7 +255,7 @@ def mission_checkin():
             mission_order_number=mission.order_number,
             latitude=coordinates['latitude'],
             longitude=coordinates['longitude'],
-
+            distance=mission_distance  # Stocker la distance calculée
         )
 
         db.session.add(pointage)
@@ -261,7 +271,7 @@ def mission_checkin():
                 'mission_order_number': mission.order_number,
                 'status': pointage.statut,
                 'coordinates': coordinates,
-                'distance': distance
+                'distance': mission_distance  # Utiliser la distance calculée précédemment
             }
         )
 

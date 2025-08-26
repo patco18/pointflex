@@ -1248,51 +1248,13 @@ def stripe_webhook():
 def get_global_stats():
     """Récupère les statistiques globales de la plateforme"""
     try:
-        # Statistiques de base
-        total_companies = Company.query.count()
-        active_companies = Company.query.filter_by(is_active=True).count()
-        total_users = User.query.count()
-        active_users = User.query.filter_by(is_active=True).count()
-        total_pointages = Pointage.query.count()
-        
-        # Statistiques par plan
-        plans_distribution = {}
-        for plan in ['basic', 'premium', 'enterprise']:
-            count = Company.query.filter_by(subscription_plan=plan).count()
-            plans_distribution[plan] = count
-        
-        # Revenus calculés avec les tarifs actuels
-        plan_prices = get_plan_prices()
-        monthly_revenue = sum(
-            plans_distribution[plan] * plan_prices.get(plan.lower(), 0) 
-            for plan in plans_distribution
-        )
-        
-        # Statistiques temporelles
-        today = datetime.utcnow().date()
-        week_ago = today - timedelta(days=7)
-        month_ago = today - timedelta(days=30)
-        
-        new_companies_week = Company.query.filter(Company.created_at >= week_ago).count()
-        new_users_week = User.query.filter(User.created_at >= week_ago).count()
-        pointages_today = Pointage.query.filter(Pointage.date_pointage == today).count()
-        
-        return jsonify({
-            'stats': {
-                'total_companies': total_companies,
-                'active_companies': active_companies,
-                'total_users': total_users,
-                'active_users': active_users,
-                'total_pointages': total_pointages,
-                'plans_distribution': plans_distribution,
-                'revenue_monthly': monthly_revenue,
-                'new_companies_week': new_companies_week,
-                'new_users_week': new_users_week,
-                'pointages_today': pointages_today
-            }
-        }), 200
+        # Utiliser la version sécurisée du service de statistiques
+        from backend.services.superadmin_stats_service import get_global_stats_safe
+        result = get_global_stats_safe()
+        return jsonify(result), 200
         
     except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des statistiques: {e}")
         print(f"Erreur lors de la récupération des statistiques: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
 
@@ -1796,72 +1758,9 @@ def get_company_subscriptions():
 def get_subscription_stats():
     """Récupère les statistiques globales des abonnements"""
     try:
-        # Comptage des abonnements
-        companies = Company.query.all()
-        
-        total_subscriptions = len(companies)
-        active_subscriptions = 0
-        trial_subscriptions = 0
-        expired_subscriptions = 0
-        revenue_monthly = 0
-        
-        plan_distribution = {
-            'basic': 0,
-            'premium': 0,
-            'enterprise': 0
-        }
-        
-        renewal_upcoming_30_days = 0
-        
-        today = datetime.now().date()
-        thirty_days_future = today + timedelta(days=30)
-        
-        # Calculer les métriques
-        for company in companies:
-            # Distribution des plans
-            plan = company.subscription_plan
-            if plan in plan_distribution:
-                plan_distribution[plan] += 1
-            else:
-                plan_distribution[plan] = 1
-            
-            # Statut et revenus
-            if company.is_active:
-                # Vérifier si on est en période d'essai (moins de 30 jours depuis le début)
-                is_trial = False
-                if company.subscription_start:
-                    days_since_start = (today - company.subscription_start).days
-                    is_trial = days_since_start <= 30 and company.subscription_status != 'expired'
-                
-                if is_trial:
-                    trial_subscriptions += 1
-                else:
-                    active_subscriptions += 1
-                    
-                    # Tarifs mensuels pour calculer les revenus récurrents
-                    plan_prices = get_plan_prices()
-                    plan_price = plan_prices.get(plan.lower(), 0)
-                    revenue_monthly += plan_price
-            
-            # Vérifier si l'abonnement est expiré
-            if company.subscription_end and company.subscription_end < today:
-                expired_subscriptions += 1
-            
-            # Vérifier les renouvellements à venir
-            if (company.subscription_end and 
-                company.subscription_end > today and 
-                company.subscription_end <= thirty_days_future):
-                renewal_upcoming_30_days += 1
-        
-        stats = {
-            'total_subscriptions': total_subscriptions,
-            'active_subscriptions': active_subscriptions,
-            'trial_subscriptions': trial_subscriptions,
-            'expired_subscriptions': expired_subscriptions,
-            'revenue_monthly': revenue_monthly,
-            'plan_distribution': plan_distribution,
-            'renewal_upcoming_30_days': renewal_upcoming_30_days
-        }
+        # Utiliser la version sécurisée du service de statistiques
+        from backend.services.superadmin_stats_service import get_subscription_stats_safe
+        result = get_subscription_stats_safe()
         
         log_user_action(
             action='VIEW_SUBSCRIPTION_STATS',
@@ -1869,10 +1768,7 @@ def get_subscription_stats():
             details=f"Consultation des statistiques d'abonnement"
         )
         
-        return jsonify({
-            'success': True,
-            'stats': stats
-        }), 200
+        return jsonify(result), 200
         
     except Exception as e:
         current_app.logger.error(f"Erreur lors de la récupération des statistiques d'abonnement: {str(e)}")
