@@ -137,7 +137,9 @@ def get_company_attendance():
         }), 200
         
     except Exception as e:
-        print(f"Erreur get_company_attendance: {e}")
+        current_app.logger.error(
+            f"Erreur get_company_attendance: {str(e)}", exc_info=e
+        )
         return jsonify(message="Erreur interne du serveur"), 500
 
 
@@ -271,7 +273,9 @@ def get_company_attendance_stats():
         }), 200
         
     except Exception as e:
-        print(f"Erreur get_company_attendance_stats: {e}")
+        current_app.logger.error(
+            f"Erreur get_company_attendance_stats: {str(e)}", exc_info=e
+        )
         return jsonify(message="Erreur interne du serveur"), 500
 
 
@@ -368,7 +372,9 @@ def get_attendance_by_department():
         }), 200
         
     except Exception as e:
-        print(f"Erreur get_attendance_by_department: {e}")
+        current_app.logger.error(
+            f"Erreur get_attendance_by_department: {str(e)}", exc_info=e
+        )
         return jsonify(message="Erreur interne du serveur"), 500
 
 
@@ -401,7 +407,9 @@ def get_comprehensive_attendance_report():
                 start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
                 print(f"Date de début parsée: {start_date_obj}")
             except ValueError as e:
-                print(f"Erreur de format de date pour start_date: {e}")
+                current_app.logger.error(
+                    f"Erreur de format de date pour start_date: {str(e)}", exc_info=e
+                )
                 return jsonify(message="Format de date invalide pour start_date (YYYY-MM-DD)"), 400
                 
         if not end_date:
@@ -412,7 +420,9 @@ def get_comprehensive_attendance_report():
                 end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
                 print(f"Date de fin parsée: {end_date_obj}")
             except ValueError as e:
-                print(f"Erreur de format de date pour end_date: {e}")
+                current_app.logger.error(
+                    f"Erreur de format de date pour end_date: {str(e)}", exc_info=e
+                )
                 return jsonify(message="Format de date invalide pour end_date (YYYY-MM-DD)"), 400
         
         # Initialiser les données du rapport
@@ -436,7 +446,10 @@ def get_comprehensive_attendance_report():
             ).count()
             report_data['stats']['totalEmployees'] = total_employees
         except Exception as e:
-            print(f"Erreur lors du calcul du nombre d'employés: {e}")
+            current_app.logger.error(
+                f"Erreur lors du calcul du nombre d'employés: {str(e)}",
+                exc_info=e
+            )
             report_data['stats']['totalEmployees'] = 0
             
         # 2. Récupérer les données de pointage pour la période (séparé et simplifié)
@@ -600,7 +613,10 @@ def get_comprehensive_attendance_report():
                         total_work_hours += hours
                         print(f"Pointage {p.id}: {p.heure_arrivee} -> {p.heure_depart} = {hours} heures")
                     except Exception as time_error:
-                        print(f"Erreur lors du calcul des heures pour pointage {p.id}: {time_error}")
+                        current_app.logger.error(
+                            f"Erreur lors du calcul des heures pour pointage {p.id}: {str(time_error)}",
+                            exc_info=time_error
+                        )
                 else:
                     missing_times += 1
             
@@ -642,7 +658,10 @@ def get_comprehensive_attendance_report():
                     'containsSimulatedData': False  # Indicateur que les données sont entièrement réelles
                 })
         except Exception as e:
-            print(f"Erreur lors du calcul des statistiques globales: {e}")
+            current_app.logger.error(
+                f"Erreur lors du calcul des statistiques globales: {str(e)}",
+                exc_info=e
+            )
             report_data['stats'].update({
                 'totalRecords': 0,
                 'totalPresences': 0,
@@ -741,7 +760,10 @@ def get_comprehensive_attendance_report():
                                 hours = delta.total_seconds() / 3600
                                 work_hours += hours
                             except Exception as time_error:
-                                print(f"Erreur lors du calcul des heures pour pointage {p.id}: {time_error}")
+                                current_app.logger.error(
+                                    f"Erreur lors du calcul des heures pour pointage {p.id}: {str(time_error)}",
+                                    exc_info=time_error
+                                )
                     
                     # Calculer le taux de présence
                     total_points = present_count + late_count + absent_count
@@ -772,7 +794,10 @@ def get_comprehensive_attendance_report():
                         if sim_dept['id'] not in real_dept_ids:
                             report_data['departmentStats'].append(sim_dept)
         except Exception as e:
-            print(f"Erreur lors du calcul des statistiques par département: {e}")
+            current_app.logger.error(
+                f"Erreur lors du calcul des statistiques par département: {str(e)}",
+                exc_info=e
+            )
             
         # 4. Récupérer les statistiques par employé (séparé et simplifié)
         try:
@@ -894,7 +919,10 @@ def get_comprehensive_attendance_report():
                                 hours = delta.total_seconds() / 3600
                                 work_hours += hours
                             except Exception as time_error:
-                                print(f"Erreur lors du calcul des heures pour pointage {p.id}: {time_error}")
+                                current_app.logger.error(
+                                    f"Erreur lors du calcul des heures pour pointage {p.id}: {str(time_error)}",
+                                    exc_info=time_error
+                                )
                     
                     # Calculer le taux de présence
                     total_points = present_count + late_count + absent_count
@@ -948,7 +976,10 @@ def get_comprehensive_attendance_report():
                     # Utiliser les employés simulés pour les meilleurs employés si nécessaire
                     report_data['topEmployees'] = simulated_employee_stats[:5]
         except Exception as e:
-            print(f"Erreur lors du calcul des statistiques par employé: {e}")
+            current_app.logger.error(
+                f"Erreur lors du calcul des statistiques par employé: {str(e)}",
+                exc_info=e
+            )
         
         # Journal d'audit
         try:
@@ -963,15 +994,17 @@ def get_comprehensive_attendance_report():
                 }
             )
         except Exception as audit_error:
-            print(f"Erreur lors de l'enregistrement de l'audit: {audit_error}")
+            current_app.logger.error(
+                f"Erreur lors de l'enregistrement de l'audit: {str(audit_error)}",
+                exc_info=audit_error
+            )
         
         return jsonify(report_data), 200
         
     except Exception as e:
-        import traceback
-        error_details = traceback.format_exc()
-        print(f"Erreur get_comprehensive_attendance_report: {e}")
-        print(f"Détails: {error_details}")
+        current_app.logger.error(
+            f"Erreur get_comprehensive_attendance_report: {str(e)}", exc_info=e
+        )
         return jsonify(message="Erreur interne du serveur"), 500
 
 
@@ -1062,5 +1095,7 @@ def get_today_company_attendance():
         }), 200
         
     except Exception as e:
-        print(f"Erreur get_today_company_attendance: {e}")
+        current_app.logger.error(
+            f"Erreur get_today_company_attendance: {str(e)}", exc_info=e
+        )
         return jsonify(message="Erreur interne du serveur"), 500
