@@ -100,33 +100,42 @@ def get_attendance_safe(user_id, start_date=None, end_date=None, page=1, per_pag
             # En cas d'erreur ORM, utiliser une requête SQL directe
             conn = db.engine.raw_connection()
             cursor = conn.cursor()
-            
-            # Construire la requête SQL
-            base_query = """
-                SELECT id, user_id, type, date_pointage, heure_arrivee, heure_depart, 
-                       statut, latitude, longitude, office_id, distance, 
-                       is_equalized, is_qr_scan, is_offline, sync_status, 
-                       offline_timestamp, device_id, delay_reason, 
-                       delay_category, is_justified, created_at, updated_at
+
+            # Vérifier les colonnes disponibles dans la table
+            cursor.execute("PRAGMA table_info(pointages)")
+            available_columns = {row[1] for row in cursor.fetchall()}
+
+            base_columns = [
+                'id', 'user_id', 'type', 'date_pointage', 'heure_arrivee', 'heure_depart',
+                'statut', 'latitude', 'longitude', 'office_id', 'distance',
+                'is_equalized', 'is_qr_scan', 'is_offline', 'sync_status',
+                'offline_timestamp', 'device_id', 'delay_reason',
+                'delay_category', 'is_justified', 'created_at', 'updated_at'
+            ]
+
+            select_columns = [col for col in base_columns if col in available_columns]
+
+            base_query = f"""
+                SELECT {', '.join(select_columns)}
                 FROM pointages
                 WHERE user_id = ?
             """
-            
+
             params = [user_id]
-            
+
             if start_date_obj:
                 base_query += " AND date_pointage >= ?"
                 params.append(start_date_obj.isoformat())
-                
+
             if end_date_obj:
                 base_query += " AND date_pointage <= ?"
                 params.append(end_date_obj.isoformat())
-                
+
             # Ajout de l'ordre et de la pagination
             base_query += " ORDER BY date_pointage DESC, heure_arrivee DESC LIMIT ? OFFSET ?"
             offset = (page - 1) * per_page
             params.extend([per_page, offset])
-            
+
             # Exécuter la requête
             cursor.execute(base_query, params)
             pointages_data = cursor.fetchall()
@@ -153,33 +162,20 @@ def get_attendance_safe(user_id, start_date=None, end_date=None, page=1, per_pag
             records = []
             for pointage in pointages_data:
                 try:
-                    records.append({
-                        'id': pointage[0],
-                        'user_id': pointage[1],
-                        'type': pointage[2],
-                        'date_pointage': pointage[3],
-                        'heure_arrivee': pointage[4],
-                        'heure_depart': pointage[5],
-                        'statut': pointage[6],
-                        'latitude': pointage[7],
-                        'longitude': pointage[8],
-                        'office_id': pointage[9],
-                        'distance': pointage[10],
-                        'is_equalized': bool(pointage[11]),
-                        'is_qr_scan': bool(pointage[12]),
-                        'is_offline': bool(pointage[13]),
-                        'sync_status': pointage[14],
-                        'offline_timestamp': pointage[15],
-                        'device_id': pointage[16],
-                        'delay_reason': pointage[17],
-                        'delay_category': pointage[18],
-                        'is_justified': bool(pointage[19]),
-                        'created_at': pointage[20],
-                        'updated_at': pointage[21]
-                    })
+                    record = {col: pointage[idx] for idx, col in enumerate(select_columns)}
+
+                    # Ajouter les colonnes manquantes avec valeur None pour compatibilité
+                    for col in base_columns:
+                        record.setdefault(col, None)
+
+                    # Conversion des champs booléens
+                    for bool_col in ['is_equalized', 'is_qr_scan', 'is_offline', 'is_justified']:
+                        if bool_col in record and record[bool_col] is not None:
+                            record[bool_col] = bool(record[bool_col])
+
+                    records.append(record)
                 except Exception as e:
                     current_app.logger.error(f"Erreur lors de la conversion du pointage: {str(e)}")
-                    # Version simplifiée en cas d'erreur
                     records.append({
                         'id': pointage[0] if len(pointage) > 0 else None,
                         'user_id': pointage[1] if len(pointage) > 1 else None,
