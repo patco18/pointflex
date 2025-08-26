@@ -48,6 +48,13 @@ class Config:
     # Push Notifications
     FCM_SERVER_KEY = os.environ.get('FCM_SERVER_KEY')
     
+    # VAPID Keys pour Web Push
+    VAPID_PRIVATE_KEY = os.environ.get('VAPID_PRIVATE_KEY', '6WSow_cxqauhPFor3NzLif55vAxoMh2d5yHEFGupMS8')
+    VAPID_PUBLIC_KEY = os.environ.get('VAPID_PUBLIC_KEY', 'BJm3weyGSlTMs2Dk7_fWXdpC6kM8mEi7l1sqKGdTm_7L2t65tm9MnO2L3fdRiQSDxsGsgCYp58C8kbsZvzE8ibA') 
+    VAPID_CLAIMS = {
+        "sub": f"mailto:{os.environ.get('VAPID_CONTACT_EMAIL', 'admin@pointflex.com')}"
+    }
+    
     # Limites système
     MAX_COMPANIES = 1000
     MAX_USERS_PER_COMPANY = 999

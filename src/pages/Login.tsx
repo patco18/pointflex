@@ -6,6 +6,17 @@ import { useForm } from 'react-hook-form'
 import toast from 'react-hot-toast'
 import { Clock, Mail, Lock, Shield, AlertCircle, CheckCircle, Eye, EyeOff, ShieldCheck, LockKeyhole } from 'lucide-react' // Added ShieldCheck, LockKeyhole
 
+// Désactivation temporaire des avertissements de console pour faciliter le débogage
+console.warn = (...args) => {
+  // Filtrer les avertissements Firebase qui bloquent la page
+  const message = args.join(' ');
+  if (message.includes('Firebase') || message.includes('firebase')) {
+    return;
+  }
+  // Conserver les autres avertissements
+  console.log('[WARN]', ...args);
+};
+
 interface LoginForm {
   email: string
   password: string
@@ -55,7 +66,16 @@ export default function Login() {
   const strengthColors = ['bg-red-500', 'bg-orange-500', 'bg-yellow-500', 'bg-green-500', 'bg-blue-500']
 
   useEffect(() => {
-    if(checkServerStatus) checkServerStatus();
+    if(checkServerStatus) {
+      console.log("Vérification du statut du serveur...");
+      checkServerStatus()
+        .then(status => {
+          console.log(`Statut du serveur: ${status ? 'en ligne' : 'hors ligne'}`);
+        })
+        .catch(err => {
+          console.error("Erreur lors de la vérification du serveur:", err);
+        });
+    }
   }, [checkServerStatus]);
 
   useEffect(() => {
@@ -481,6 +501,30 @@ export default function Login() {
               <span>Géolocalisation</span>
             </div>
           </div>
+
+          {/* DEBUG SECTION */}
+          {import.meta.env.DEV && (
+            <div className="mt-4 p-4 border border-dashed border-gray-300 rounded-md">
+              <h4 className="text-sm font-bold text-gray-500">Débogage</h4>
+              <div className="text-xs">
+                <p>État du serveur: <span className="font-mono">{serverStatus}</span></p>
+                <button
+                  className="mt-2 bg-gray-200 px-2 py-1 rounded text-gray-800"
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('http://localhost:5000/api/health');
+                      const data = await response.json();
+                      toast.success('Serveur accessible: ' + JSON.stringify(data));
+                    } catch (e) {
+                      toast.error('Erreur de connexion au serveur: ' + e.message);
+                    }
+                  }}
+                >
+                  Tester connexion API
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

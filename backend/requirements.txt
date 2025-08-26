@@ -8,6 +8,8 @@ werkzeug==2.3.7
 stripe==8.7.0
 bcrypt==4.0.1
 pyfcm==1.5.4
+pywebpush==1.14.0 # Pour les notifications web push avec VAPID
+py-vapid==1.9.0 # Pour générer des clés VAPID
 reportlab==4.0.4
 holidays>=0.20 # Using a version that's likely to be stable
 jsonschema>=3.0.0 # For webhook event validation

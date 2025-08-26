@@ -199,6 +199,26 @@ def register_cli_commands(app):
                 click.echo(f"Vérification des abonnements terminée: {message}")
             else:
                 click.echo(f"Erreur lors de la vérification des abonnements: {message}", err=True)
+                
+    @app.cli.command('apply-migration')
+    @click.argument('migration_name')
+    def apply_migration_command(migration_name):
+        """Applique une migration spécifique."""
+        try:
+            module_name = f"backend.migrations.{migration_name}"
+            module = __import__(module_name, fromlist=['run_migration'])
+            if hasattr(module, 'run_migration'):
+                success = module.run_migration()
+                if success:
+                    click.echo(f"✅ Migration '{migration_name}' appliquée avec succès.")
+                else:
+                    click.echo(f"❌ Échec de la migration '{migration_name}'.", err=True)
+            else:
+                click.echo(f"❌ La fonction run_migration() n'a pas été trouvée dans le module {module_name}.", err=True)
+        except ImportError:
+            click.echo(f"❌ Module de migration '{migration_name}' introuvable.", err=True)
+        except Exception as e:
+            click.echo(f"❌ Erreur lors de l'application de la migration '{migration_name}': {str(e)}", err=True)
 
     # If you have more CLI commands, you can group them:
     # leave_cli = AppGroup('leave', help='Leave management commands.')

@@ -13,7 +13,7 @@ export const api = axios.create({
 api.interceptors.response.use(
   (response) => {
     // Ne pas logger les réponses réussies en production
-    // console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`)
+    console.log(`✅ ${response.config.method?.toUpperCase()} ${response.config.url} - ${response.status}`)
     return response
   },
   (error) => {
@@ -25,7 +25,8 @@ api.interceptors.response.use(
     }
     
     if (error.code === 'ECONNREFUSED' || error.message.includes('Network Error')) {
-      toast.error('Impossible de se connecter au serveur. Veuillez vérifier que le backend est démarré.')
+      console.error('Impossible de se connecter au serveur. Veuillez vérifier que le backend est démarré.')
+      toast.error('Impossible de se connecter au serveur. Veuillez vérifier que le backend est démarré sur le port 5000.')
       return Promise.reject(error)
     }
     
