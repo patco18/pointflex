@@ -10,6 +10,8 @@ L'application PointFlex rencontrait plusieurs erreurs 500 dans les API backend, 
 
 2. **Erreurs dans les routes SuperAdmin** pour les statistiques, qui tentaient d'accéder aux colonnes manquantes.
 
+3. **Erreurs dans les routes Attendance** pour l'historique des pointages et les statistiques, causées par les mêmes problèmes de schéma.
+
 ## 2. Solutions mises en place
 
 ### 2.1. Migrations de base de données
@@ -23,18 +25,35 @@ Un script batch `fix-db-schema.bat` permet d'exécuter toutes les migrations en 
 
 ### 2.2. Services robustes pour les statistiques
 
-Nous avons créé un nouveau service dédié `superadmin_stats_service.py` qui:
+Nous avons créé deux nouveaux services dédiés:
 
+#### 2.2.1 `superadmin_stats_service.py`
+
+Ce service:
 1. Utilise des requêtes SQL directes pour éviter les erreurs liées aux modèles ORM qui font référence à des colonnes potentiellement manquantes
 2. Ajoute une gestion d'erreurs robuste pour renvoyer des données par défaut même en cas d'échec
 3. Sépare la logique métier des routes, pour une meilleure maintenance
 
-### 2.3. Modification des routes SuperAdmin
+#### 2.2.2 `attendance_service.py`
+
+Service similaire pour les pointages qui:
+1. Propose une approche double: ORM d'abord, puis SQL direct en cas d'échec
+2. Gère la récupération de l'historique des pointages et des statistiques de façon sécurisée
+3. Uniformise les réponses et la gestion des erreurs
+
+### 2.3. Modification des routes
 
 Les routes suivantes ont été mises à jour pour utiliser les nouveaux services sécurisés:
 
+#### 2.3.1 Routes SuperAdmin
+
 1. `@superadmin_bp.route('/stats', methods=['GET'])` 
 2. `@superadmin_bp.route('/subscription/stats', methods=['GET'])`
+
+#### 2.3.2 Routes Attendance
+
+1. `@attendance_bp.route('', methods=['GET'])`
+2. `@attendance_bp.route('/stats', methods=['GET'])`
 
 ## 3. Avantages de cette approche
 

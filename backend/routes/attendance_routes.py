@@ -462,74 +462,31 @@ def get_attendance():
         page = request.args.get('page', 1, type=int)
         per_page = min(request.args.get('per_page', 20, type=int), 100)
         
-        # Construire la requête
-        query = Pointage.query.filter_by(user_id=current_user.id)
-        
-        # Filtres de date
-        start_date_obj = None
-        end_date_obj = None
-        if start_date:
-            try:
-                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
-                query = query.filter(Pointage.date_pointage >= start_date_obj)
-            except ValueError:
-                return jsonify(message="Format de date invalide pour start_date (YYYY-MM-DD)"), 400
-
-        if end_date:
-            try:
-                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
-                query = query.filter(Pointage.date_pointage <= end_date_obj)
-            except ValueError:
-                return jsonify(message="Format de date invalide pour end_date (YYYY-MM-DD)"), 400
-
-        if start_date_obj and end_date_obj and start_date_obj > end_date_obj:
-            return jsonify(message="Plage de dates invalide : start_date est postérieure à end_date"), 400
-        
-        # Ordonner par date décroissante
-        query = query.order_by(Pointage.date_pointage.desc(), Pointage.heure_arrivee.desc())
-        
-        # Pagination
-        pointages = query.paginate(
-            page=page, per_page=per_page, error_out=False
+        # Utiliser le service sécurisé pour récupérer les pointages
+        from backend.services.attendance_service import get_attendance_safe
+        result = get_attendance_safe(
+            user_id=current_user.id,
+            start_date=start_date,
+            end_date=end_date,
+            page=page,
+            per_page=per_page
         )
         
-        # Conversion des pointages en dict avec gestion des erreurs
-        records = []
-        for pointage in pointages.items:
-            try:
-                record = pointage.to_dict()
-                records.append(record)
-            except Exception as e:
-                current_app.logger.error(f"Erreur lors de la conversion du pointage {pointage.id}: {str(e)}", exc_info=e)
-                # Ajouter une version simplifiée pour éviter l'erreur complète
-                records.append({
-                    'id': pointage.id,
-                    'user_id': pointage.user_id,
-                    'date_pointage': pointage.date_pointage.isoformat() if pointage.date_pointage else None,
-                    'heure_arrivee': pointage.heure_arrivee.isoformat() if pointage.heure_arrivee else None,
-                    'heure_depart': pointage.heure_depart.isoformat() if pointage.heure_depart else None,
-                    'statut': pointage.statut,
-                    'type': pointage.type,
-                    'error': 'Erreur de conversion'
-                })
-        
+        # Gérer les erreurs retournées par le service
+        if result.get('error'):
+            return jsonify(message=result.get('message')), result.get('status_code', 500)
+            
+        # Retourner les données en cas de succès
         return jsonify({
-            'records': records,
-            'pagination': {
+            'records': result.get('records', []),
+            'pagination': result.get('pagination', {
                 'page': page,
-                'pages': pointages.pages,
+                'pages': 0,
                 'per_page': per_page,
-                'total': pointages.total
-            }
-        }), 200
+                'total': 0
+            })
+        }), result.get('status_code', 200)
         
-    except SQLAlchemyError as e:
-        current_app.logger.error(
-            f"Database error retrieving pointages: {str(e)}", exc_info=e
-        )
-        return jsonify(
-            message="Erreur de base de données lors de la récupération des pointages"
-        ), 500
     except Exception as e:
         current_app.logger.error(
             f"Erreur lors de la récupération des pointages: {str(e)}", exc_info=e
@@ -545,56 +502,17 @@ def get_attendance_stats():
         if not current_user:
             return jsonify(message="Utilisateur non trouvé"), 401
         
-        # Période par défaut : mois en cours
-        today = date.today()
-        start_of_month = today.replace(day=1)
+        # Utiliser le service sécurisé pour récupérer les statistiques
+        from backend.services.attendance_service import get_attendance_stats_safe
+        result = get_attendance_stats_safe(user_id=current_user.id)
         
-        # Récupérer les pointages du mois
-        pointages = Pointage.query.filter(
-            Pointage.user_id == current_user.id,
-            Pointage.date_pointage >= start_of_month,
-            Pointage.date_pointage <= today
-        ).all()
+        # Gérer les erreurs retournées par le service
+        if result.get('error'):
+            return jsonify(message=result.get('message')), result.get('status_code', 500)
         
-        # Calculer les statistiques
-        total_days = len(pointages)
-        present_days = len([p for p in pointages if p.statut == 'present'])
-        late_days = len([p for p in pointages if p.statut == 'retard'])
-        absence_days = 0  # Pour l'instant, on ne gère pas les absences
+        # Retourner les données en cas de succès
+        return jsonify({'stats': result.get('stats', {})}), result.get('status_code', 200)
         
-        # Calculer les heures moyennes avec gestion d'erreurs
-        total_hours = 0
-        for p in pointages:
-            try:
-                hours = p.calculate_worked_hours() or 8
-                total_hours += hours
-            except Exception as e:
-                current_app.logger.error(f"Erreur lors du calcul des heures pour le pointage {p.id}: {str(e)}")
-                total_hours += 8  # Valeur par défaut en cas d'erreur
-                
-        average_hours = total_hours / total_days if total_days > 0 else 0
-        
-        return jsonify({
-            'stats': {
-                'total_days': total_days,
-                'present_days': present_days,
-                'late_days': late_days,
-                'absence_days': absence_days,
-                'average_hours': round(average_hours, 2),
-                'period': {
-                    'start': start_of_month.isoformat(),
-                    'end': today.isoformat()
-                }
-            }
-        }), 200
-        
-    except SQLAlchemyError as e:
-        current_app.logger.error(
-            f"Database error retrieving stats: {str(e)}", exc_info=e
-        )
-        return jsonify(
-            message="Erreur de base de données lors de la récupération des statistiques"
-        ), 500
     except Exception as e:
         current_app.logger.error(
             f"Erreur lors de la récupération des statistiques: {str(e)}", exc_info=e
