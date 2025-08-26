@@ -6,9 +6,9 @@ import {
   ShieldCheck, ShieldOff, KeyRound, Copy, LockKeyhole, QrCode, Settings // QrCode might not be used if using qrcode.react directly
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { requestNotificationPermission, initializeFirebaseApp } from '../firebaseInit';
 import { QRCodeSVG } from 'qrcode.react'; // For QR code display
 import UserNotificationPreferences from './UserNotificationPreferences';
+import NotificationSettings from './notifications/NotificationSettings';
 
 interface Setup2FAData {
   otp_secret: string;
@@ -38,9 +38,7 @@ export default function EmployeeProfile() {
     confirm_password: ''
   });
 
-  // State for push notification permission
-  const [notificationPermission, setNotificationPermission] = useState(Notification.permission);
-  const [isSubscribingPush, setIsSubscribingPush] = useState(false);
+  // Nous utilisons maintenant le composant NotificationSettings à la place
 
   // State for 2FA
   const [setup2FAData, setSetup2FAData] = useState<Setup2FAData | null>(null);
@@ -68,15 +66,8 @@ export default function EmployeeProfile() {
   }, [user]);
 
 
-  useEffect(() => {
-    initializeFirebaseApp();
-    const interval = setInterval(() => {
-      if (Notification.permission !== notificationPermission) {
-        setNotificationPermission(Notification.permission);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [notificationPermission]);
+  // Suppression de l'effet qui surveillait les permissions de notifications
+  // Nous utilisons maintenant le composant NotificationSettings à la place
 
   const refreshUserData = async () => {
     if (fetchUser) { // fetchUser should be part of your AuthContext to refresh user details
@@ -87,25 +78,8 @@ export default function EmployeeProfile() {
     }
   };
 
-  const handleEnablePushNotifications = async () => {
-    setIsSubscribingPush(true);
-    const token = await requestNotificationPermission();
-    if (token) {
-      toast.success('Notifications push activées !');
-      setNotificationPermission('granted');
-    } else if (Notification.permission === 'denied') {
-      toast.error('Permission de notification refusée. Veuillez l\'activer dans les paramètres de votre navigateur.');
-      setNotificationPermission('denied');
-    } else {
-      toast('Permission de notification non accordée.');
-      setNotificationPermission('default');
-    }
-    setIsSubscribingPush(false);
-  };
-
-  const handleDisablePushNotifications = () => {
-    toast('Pour désactiver les notifications push, veuillez gérer les permissions pour ce site dans les paramètres de votre navigateur.');
-  };
+  // Fonctions de gestion des notifications supprimées
+  // Nous utilisons maintenant le composant NotificationSettings à la place
 
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -323,20 +297,13 @@ export default function EmployeeProfile() {
             </form>
           </div>
 
-          {/* Push Notification Settings Card - Existing */}
+          {/* Push Notification Settings Card - Using our new component */}
           <div className="card">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center"><Bell className="h-5 w-5 mr-2 text-gray-700" />Notifications Push</h3>
-            {/* ... existing push notification JSX ... */}
-            <div className="space-y-3">
-              <p className="text-sm text-gray-600">Recevez des alertes importantes même lorsque l'application n'est pas ouverte.</p>
-              {notificationPermission === 'granted' ? (
-                <div><p className="text-sm text-green-600 font-medium mb-2">Notifications push activées.</p><button onClick={handleDisablePushNotifications} className="btn-secondary text-sm">Désactiver (via navigateur)</button></div>
-              ) : notificationPermission === 'denied' ? (
-                <p className="text-sm text-red-600 font-medium">Notifications push bloquées. Veuillez les autoriser dans les paramètres de votre navigateur.</p>
-              ) : (
-                <button onClick={handleEnablePushNotifications} disabled={isSubscribingPush} className="btn-primary text-sm">{isSubscribingPush ? 'Activation...' : 'Activer Notifications Push'}</button>
-              )}
-            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+              <Bell className="h-5 w-5 mr-2 text-gray-700" />
+              Notifications Push
+            </h3>
+            <NotificationSettings />
           </div>
 
           {/* Two-Factor Authentication Section - NEW */}

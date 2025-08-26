@@ -1,7 +1,8 @@
-import React, { lazy, Suspense, useEffect } from 'react'
+import React, { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { usePermissions } from './hooks/usePermissions'
+import { initializeFirebaseSafely, areNotificationsAvailable } from './utils/firebaseLoader'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import AdminDashboard from './pages/AdminDashboard'
@@ -107,6 +108,10 @@ function ProtectedRoute({
   return <>{children}</>
 }
 function App() {
+  // État pour suivre l'initialisation de Firebase
+  const [firebaseInitAttempted, setFirebaseInitAttempted] = useState(false);
+
+  // Effet pour synchroniser les check-ins hors ligne
   useEffect(() => {
     const syncOfflineCheckins = async () => {
       const stored = localStorage.getItem('offline_checkins')
@@ -132,6 +137,34 @@ function App() {
     syncOfflineCheckins()
     return () => window.removeEventListener('online', syncOfflineCheckins)
   }, [])
+  
+  // Effet pour initialiser Firebase de manière sécurisée
+  useEffect(() => {
+    if (!firebaseInitAttempted) {
+      console.log("Tentative d'initialisation de Firebase en arrière-plan...");
+      
+      // Vérifier si les notifications sont disponibles
+      const notificationsAvailable = areNotificationsAvailable();
+      if (!notificationsAvailable) {
+        console.log("Les notifications ne sont pas disponibles dans ce navigateur.");
+        return;
+      }
+      
+      // Initialiser Firebase de manière sécurisée
+      initializeFirebaseSafely()
+        .then(success => {
+          console.log(success 
+            ? "Firebase initialisé avec succès en arrière-plan" 
+            : "Impossible d'initialiser Firebase en arrière-plan");
+        })
+        .catch(err => {
+          console.error("Erreur lors de l'initialisation de Firebase:", err);
+        })
+        .finally(() => {
+          setFirebaseInitAttempted(true);
+        });
+    }
+  }, [firebaseInitAttempted]);
 
   return (
     <AuthProvider>
