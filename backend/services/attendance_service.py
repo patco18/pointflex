@@ -5,9 +5,16 @@ Service pour les opérations d'attendance avec gestion d'erreurs robuste
 from flask import current_app
 from backend.models.pointage import Pointage
 from backend.models.user import User
+from backend.models.office import Office
+from backend.models.system_settings import SystemSettings
 from backend.database import db
+from backend.utils.notification_utils import send_notification
+from backend.middleware.audit import log_user_action
+from backend.utils.attendance_logger import log_attendance_event, log_attendance_error
 from datetime import datetime, date, timedelta
+from zoneinfo import ZoneInfo
 from sqlalchemy.exc import SQLAlchemyError
+import math
 import traceback
 
 def get_attendance_safe(user_id, start_date=None, end_date=None, page=1, per_page=20):
@@ -322,3 +329,548 @@ def get_attendance_stats_safe(user_id):
             },
             'status_code': 500
         }
+
+def get_last_7days_stats_safe(user_id):
+    """
+    Récupère les statistiques des 7 derniers jours de manière sécurisée
+    """
+    try:
+        from backend.models.user import User
+        
+        # Récupérer l'utilisateur et sa société
+        user = User.query.get(user_id)
+        if not user or not user.company_id:
+            return {
+                'error': True,
+                'message': "Utilisateur non trouvé ou non associé à une entreprise",
+                'status_code': 404,
+                'stats': []
+            }
+        
+        company_id = user.company_id
+        
+        # Récupérer les 7 derniers jours
+        today = date.today()
+        last_7_days = [today - timedelta(days=i) for i in range(6, -1, -1)]  # Du plus ancien au plus récent
+        
+        daily_stats = []
+        
+        try:
+            # Essayer d'abord avec l'ORM
+            for day in last_7_days:
+                # Obtenir les pointages de ce jour pour tous les utilisateurs de l'entreprise
+                daily_pointages = Pointage.query.join(User).filter(
+                    User.company_id == company_id,
+                    Pointage.date_pointage == day
+                ).all()
+                
+                # Calculer les présents, retards et absents
+                presents = len([p for p in daily_pointages if p.statut == 'present'])
+                retards = len([p for p in daily_pointages if p.statut == 'retard'])
+                
+                # Pour les absents, compter les utilisateurs actifs sans pointage
+                total_active_users = User.query.filter_by(company_id=company_id, is_active=True).count()
+                absents = total_active_users - (presents + retards)
+                absents = max(0, absents)  # Éviter les nombres négatifs
+                
+                daily_stats.append({
+                    'date': day.strftime('%d/%m'),
+                    'present': presents,
+                    'late': retards,
+                    'absent': absents,
+                    'total': total_active_users
+                })
+                
+        except SQLAlchemyError:
+            # En cas d'erreur ORM, utiliser SQL direct
+            conn = db.engine.raw_connection()
+            cursor = conn.cursor()
+            
+            # Pour chaque jour, faire une requête SQL directe
+            for day in last_7_days:
+                day_str = day.isoformat()
+                
+                # Compter les présents
+                cursor.execute("""
+                    SELECT COUNT(*) FROM pointages 
+                    JOIN users ON users.id = pointages.user_id
+                    WHERE users.company_id = ? AND pointages.date_pointage = ? AND pointages.statut = 'present'
+                """, (company_id, day_str))
+                presents = cursor.fetchone()[0] or 0
+                
+                # Compter les retards
+                cursor.execute("""
+                    SELECT COUNT(*) FROM pointages 
+                    JOIN users ON users.id = pointages.user_id
+                    WHERE users.company_id = ? AND pointages.date_pointage = ? AND pointages.statut = 'retard'
+                """, (company_id, day_str))
+                retards = cursor.fetchone()[0] or 0
+                
+                # Compter les utilisateurs actifs
+                cursor.execute("""
+                    SELECT COUNT(*) FROM users
+                    WHERE company_id = ? AND is_active = 1
+                """, (company_id,))
+                total_active_users = cursor.fetchone()[0] or 0
+                
+                absents = total_active_users - (presents + retards)
+                absents = max(0, absents)  # Éviter les nombres négatifs
+                
+                daily_stats.append({
+                    'date': day.strftime('%d/%m'),
+                    'present': presents,
+                    'late': retards,
+                    'absent': absents,
+                    'total': total_active_users
+                })
+                
+            cursor.close()
+        
+        return {
+            'error': False,
+            'stats': daily_stats,
+            'status_code': 200
+        }
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la récupération des statistiques des 7 derniers jours: {str(e)}")
+        traceback.print_exc()
+        
+        # Fournir des données par défaut en cas d'erreur
+        today = date.today()
+        last_7_days = [today - timedelta(days=i) for i in range(6, -1, -1)]
+        
+        default_stats = []
+        for day in last_7_days:
+            default_stats.append({
+                'date': day.strftime('%d/%m'),
+                'present': 0,
+                'late': 0,
+                'absent': 0,
+                'total': 0
+            })
+        
+        return {
+            'error': True,
+            'message': f"Erreur interne du serveur: {str(e)}",
+            'stats': default_stats,
+            'status_code': 500
+        }
+
+def office_checkin_safe(user_id, coordinates):
+    """
+    Effectue un pointage bureau de manière sécurisée avec gestion des erreurs robuste
+    """
+    try:
+        
+        # Validation des coordonnées
+        if not coordinates.get('latitude') or not coordinates.get('longitude'):
+            return {
+                'error': True,
+                'message': "Coordonnées GPS requises",
+                'status_code': 400
+            }
+        if coordinates.get('accuracy') is None:
+            return {
+                'error': True,
+                'message': "Précision GPS requise",
+                'status_code': 400
+            }
+        
+        # Récupérer l'utilisateur
+        user = User.query.get(user_id)
+        if not user:
+            return {
+                'error': True,
+                'message': "Utilisateur non trouvé",
+                'status_code': 401
+            }
+            
+        # Utiliser toujours UTC pour la simplicité
+        tz_name = 'UTC'
+        
+        # Paramètres par défaut
+        max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
+        min_distance = float('inf')
+        nearest_office = None
+        
+        try:
+            # Vérification des bureaux si l'utilisateur appartient à une entreprise
+            if user.company_id:
+                offices = Office.query.filter_by(
+                    company_id=user.company_id,
+                    is_active=True
+                ).all()
+                
+                for office in offices:
+                    try:
+                        distance = calculate_distance(
+                            coordinates['latitude'], coordinates['longitude'],
+                            office.latitude, office.longitude
+                        )
+                        if distance < min_distance:
+                            min_distance = distance
+                            nearest_office = office
+                    except Exception as e:
+                        current_app.logger.error(f"Erreur lors du calcul de distance pour le bureau {office.id}: {str(e)}")
+                
+                # Utiliser la précision maximale du bureau si définie
+                if nearest_office:
+                    try:
+                        if hasattr(nearest_office, 'geolocation_max_accuracy') and nearest_office.geolocation_max_accuracy is not None:
+                            max_accuracy = nearest_office.geolocation_max_accuracy
+                    except:
+                        pass  # Utiliser la valeur par défaut si la colonne n'existe pas
+            
+        except SQLAlchemyError:
+            # En cas d'erreur ORM, utiliser une approche SQL directe
+            conn = db.engine.raw_connection()
+            cursor = conn.cursor()
+            
+            # Vérifier si la colonne geolocation_max_accuracy existe
+            cursor.execute("PRAGMA table_info(offices)")
+            columns = [column[1] for column in cursor.fetchall()]
+            has_geo_accuracy = 'geolocation_max_accuracy' in columns
+            
+            if user.company_id:
+                # Requête de base pour les bureaux actifs
+                base_query = """
+                    SELECT id, name, latitude, longitude, radius, timezone 
+                    FROM offices 
+                    WHERE company_id = ? AND is_active = 1
+                """
+                
+                # Ajouter geolocation_max_accuracy s'il existe
+                if has_geo_accuracy:
+                    base_query = base_query.replace("timezone", "timezone, geolocation_max_accuracy")
+                
+                cursor.execute(base_query, (user.company_id,))
+                offices_data = cursor.fetchall()
+                
+                for office_data in offices_data:
+                    try:
+                        office_lat = office_data[2]
+                        office_lon = office_data[3]
+                        if office_lat is not None and office_lon is not None:
+                            distance = calculate_distance(
+                                coordinates['latitude'], coordinates['longitude'],
+                                office_lat, office_lon
+                            )
+                            if distance < min_distance:
+                                min_distance = distance
+                                nearest_office = {
+                                    'id': office_data[0],
+                                    'name': office_data[1],
+                                    'latitude': office_lat,
+                                    'longitude': office_lon,
+                                    'radius': office_data[4],
+                                    'timezone': office_data[5]
+                                }
+                                # Ajouter geolocation_max_accuracy s'il existe
+                                if has_geo_accuracy and len(office_data) > 6:
+                                    nearest_office['geolocation_max_accuracy'] = office_data[6]
+                    except Exception as e:
+                        current_app.logger.error(f"Erreur lors du calcul de distance pour le bureau {office_data[0]}: {str(e)}")
+                
+                # Utiliser la précision maximale du bureau si définie
+                if nearest_office and 'geolocation_max_accuracy' in nearest_office and nearest_office['geolocation_max_accuracy'] is not None:
+                    max_accuracy = nearest_office['geolocation_max_accuracy']
+            
+            cursor.close()
+        
+        # Vérifier la précision GPS
+        if coordinates['accuracy'] > max_accuracy:
+            return {
+                'error': True,
+                'message': f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). Maximum autorisé: {max_accuracy}m",
+                'status_code': 400
+            }
+        
+        # Traiter le pointage en fonction de la proximité avec le bureau
+        if user.company_id:
+            # Cas où il y a des bureaux et on est proche d'un bureau
+            if nearest_office and isinstance(nearest_office, dict):  # Cas SQL direct
+                if min_distance <= nearest_office.get('radius', float('inf')):
+                    tz_name = nearest_office.get('timezone') or tz_name
+                    pointage = create_pointage(
+                        user_id=user_id,
+                        type_pointage='office',
+                        latitude=coordinates['latitude'],
+                        longitude=coordinates['longitude'],
+                        office_id=nearest_office['id'],
+                        distance=min_distance
+                    )
+                else:
+                    return {
+                        'error': True,
+                        'message': f"Vous êtes trop loin du bureau ({int(min_distance)}m). Rayon autorisé: {nearest_office.get('radius', 'N/A')}m",
+                        'status_code': 403
+                    }
+            elif nearest_office:  # Cas ORM
+                if min_distance <= nearest_office.radius:
+                    tz_name = nearest_office.timezone or tz_name
+                    pointage = create_pointage(
+                        user_id=user_id,
+                        type_pointage='office',
+                        latitude=coordinates['latitude'],
+                        longitude=coordinates['longitude'],
+                        office_id=nearest_office.id,
+                        distance=min_distance
+                    )
+                else:
+                    return {
+                        'error': True,
+                        'message': f"Vous êtes trop loin du bureau ({int(min_distance)}m). Rayon autorisé: {nearest_office.radius if nearest_office else 'N/A'}m",
+                        'status_code': 403
+                    }
+            else:
+                # Cas où il n'y a pas de bureaux définis mais il y a des coordonnées d'entreprise
+                try:
+                    company = user.company
+                    if company and hasattr(company, 'office_latitude') and hasattr(company, 'office_longitude'):
+                        if company.office_latitude and company.office_longitude:
+                            distance = calculate_distance(
+                                coordinates['latitude'], coordinates['longitude'],
+                                company.office_latitude, company.office_longitude
+                            )
+                            if distance > company.office_radius:
+                                return {
+                                    'error': True,
+                                    'message': f"Vous êtes trop loin du bureau ({int(distance)}m). Rayon autorisé: {company.office_radius}m",
+                                    'status_code': 403
+                                }
+                except Exception as e:
+                    current_app.logger.error(f"Erreur lors de la vérification de la distance par rapport au siège: {str(e)}")
+                
+                # Créer le pointage simple
+                pointage = create_pointage(
+                    user_id=user_id,
+                    type_pointage='office',
+                    latitude=coordinates['latitude'],
+                    longitude=coordinates['longitude']
+                )
+        else:
+            # Cas d'un utilisateur sans entreprise
+            pointage = create_pointage(
+                user_id=user_id,
+                type_pointage='office',
+                latitude=coordinates['latitude'],
+                longitude=coordinates['longitude']
+            )
+        
+        # Retourner le pointage créé
+        if pointage.get('error'):
+            return pointage
+            
+        return {
+            'error': False,
+            'message': 'Pointage bureau enregistré avec succès',
+            'pointage': pointage.get('pointage'),
+            'status_code': 201
+        }
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors du pointage bureau: {str(e)}")
+        traceback.print_exc()
+        return {
+            'error': True,
+            'message': f"Erreur interne du serveur: {str(e)}",
+            'status_code': 500
+        }
+
+def create_pointage(user_id, type_pointage, latitude, longitude, office_id=None, distance=None):
+    """
+    Crée un nouveau pointage avec gestion des erreurs
+    """
+    try:
+        
+        # Utiliser toujours UTC pour la simplicité
+        tz_name = 'UTC'
+        
+        # Pour la simplicité, on garde toujours UTC
+        if office_id:
+            try:
+                office = Office.query.get(office_id)
+            except:
+                pass  # Garder le fuseau par défaut en cas d'erreur        # Utiliser directement UTC
+        now_utc = datetime.now()
+        today = now_utc.date()
+        
+        # Vérifier s'il existe déjà un pointage pour aujourd'hui
+        try:
+            existing_pointage = Pointage.query.filter_by(
+                user_id=user_id,
+                date_pointage=today
+            ).first()
+            
+            if existing_pointage:
+                try:
+                    send_notification(user_id, "Pointage déjà enregistré pour aujourd'hui")
+                except:
+                    pass
+                return {
+                    'error': True,
+                    'message': "Vous avez déjà pointé aujourd'hui",
+                    'status_code': 409
+                }
+        except SQLAlchemyError:
+            # Approche SQL directe en cas d'erreur
+            conn = db.engine.raw_connection()
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT id FROM pointages WHERE user_id = ? AND date_pointage = ?",
+                (user_id, today.isoformat())
+            )
+            if cursor.fetchone():
+                try:
+                    send_notification(user_id, "Pointage déjà enregistré pour aujourd'hui")
+                except:
+                    pass
+                cursor.close()
+                return {
+                    'error': True,
+                    'message': "Vous avez déjà pointé aujourd'hui",
+                    'status_code': 409
+                }
+            cursor.close()
+        
+        # Créer le pointage
+        try:
+            pointage = Pointage(
+                user_id=user_id,
+                type=type_pointage,
+                latitude=latitude,
+                longitude=longitude,
+                date_pointage=today,
+                heure_arrivee=now_utc.time()
+            )
+            
+            if office_id:
+                pointage.office_id = office_id
+                
+            if distance is not None:
+                pointage.distance = distance
+                
+            db.session.add(pointage)
+            db.session.flush()
+            
+            # Logger l'action
+            try:
+                log_user_action(
+                    action='OFFICE_CHECKIN',
+                    resource_type='Pointage',
+                    resource_id=pointage.id,
+                    details={
+                        'coordinates': {'latitude': latitude, 'longitude': longitude},
+                        'status': pointage.statut,
+                        'office_id': getattr(pointage, 'office_id', None),
+                        'distance': getattr(pointage, 'distance', None)
+                    }
+                )
+            except:
+                pass
+                
+            db.session.commit()
+            
+            # Journaliser l'événement de pointage
+            try:
+                log_attendance_event(
+                    event_type='office_checkin',
+                    user_id=user_id,
+                    details={
+                        'pointage_id': pointage.id,
+                        'office_id': getattr(pointage, 'office_id', None),
+                        'status': pointage.statut,
+                        'time': pointage.heure_arrivee.strftime('%H:%M:%S')
+                    }
+                )
+            except:
+                pass
+            
+            # Webhooks
+            try:
+                from backend.utils.webhook_utils import dispatch_webhook_event
+                dispatch_webhook_event(
+                    event_type='pointage.created',
+                    payload_data=pointage.to_dict(),
+                    company_id=User.query.get(user_id).company_id
+                )
+            except Exception as webhook_error:
+                current_app.logger.error(f"Failed to dispatch pointage.created webhook for pointage {pointage.id}: {webhook_error}")
+                try:
+                    log_attendance_error('webhook_failure', user_id, str(webhook_error))
+                except:
+                    pass
+            
+            # Notifications
+            try:
+                send_notification(user_id, "Pointage bureau enregistré")
+                if pointage.statut == 'retard':
+                    send_notification(user_id, "Vous êtes en retard")
+            except:
+                pass
+            
+            return {
+                'error': False,
+                'pointage': pointage.to_dict()
+            }
+            
+        except SQLAlchemyError as e:
+            db.session.rollback()
+            current_app.logger.error(f"Database error creating pointage: {str(e)}")
+            return {
+                'error': True,
+                'message': "Erreur de base de données lors du pointage",
+                'status_code': 500
+            }
+        
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de la création du pointage: {str(e)}")
+        return {
+            'error': True,
+            'message': f"Erreur interne du serveur: {str(e)}",
+            'status_code': 500
+        }
+
+def calculate_distance(lat1, lon1, lat2, lon2):
+    """
+    Calcule la distance en mètres entre deux points géographiques
+    """
+    try:
+        # Validation des entrées
+        if not all(isinstance(coord, (int, float)) for coord in [lat1, lon1, lat2, lon2]):
+            current_app.logger.error(f"Invalid coordinate types: {type(lat1)}, {type(lon1)}, {type(lat2)}, {type(lon2)}")
+            return float('inf')  # Distance infinie en cas d'erreur
+        
+        # Validation des valeurs
+        if not (-90 <= lat1 <= 90 and -90 <= lat2 <= 90 and -180 <= lon1 <= 180 and -180 <= lon2 <= 180):
+            current_app.logger.error(f"Coordinates out of range: {lat1}, {lon1}, {lat2}, {lon2}")
+            return float('inf')  # Distance infinie en cas d'erreur
+        
+        # Rayon de la Terre en mètres
+        R = 6371000
+        
+        # Convertir en radians
+        lat1_rad = math.radians(lat1)
+        lon1_rad = math.radians(lon1)
+        lat2_rad = math.radians(lat2)
+        lon2_rad = math.radians(lon2)
+        
+        # Différences
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+        
+        # Formule de Haversine
+        a = (math.sin(dlat/2) * math.sin(dlat/2) + 
+             math.cos(lat1_rad) * math.cos(lat2_rad) * 
+             math.sin(dlon/2) * math.sin(dlon/2))
+        
+        c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+        
+        # Distance en mètres
+        distance = R * c
+        
+        return distance
+    except Exception as e:
+        current_app.logger.error(f"Error calculating distance: {e}")
+        return float('inf')  # Distance infinie en cas d'erreur

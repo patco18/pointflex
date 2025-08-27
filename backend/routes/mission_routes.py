@@ -243,26 +243,17 @@ def get_active_missions():
         if not current_user:
             return jsonify(message="Utilisateur non trouvé"), 401
 
-        # Récupérer toutes les missions actives attribuées à l'utilisateur
-        # où la date de fin est supérieure ou égale à aujourd'hui
-        from datetime import date
-        today = date.today()
+        # Utiliser le service sécurisé pour récupérer les missions actives
+        from backend.services.mission_service import get_active_missions_safe
+        result = get_active_missions_safe(user_id=current_user.id)
         
-        # Requête pour trouver les missions où l'utilisateur est assigné et qui sont actives
-        user_missions = db.session.query(Mission).join(
-            MissionUser, Mission.id == MissionUser.mission_id
-        ).filter(
-            MissionUser.user_id == current_user.id,
-            Mission.status == 'active',
-            # Mission.end_date est facultatif ou supérieur à aujourd'hui
-            ((Mission.end_date == None) | (Mission.end_date >= today))
-        ).all()
+        # Gérer les erreurs retournées par le service
+        if result.get('error'):
+            return jsonify(message=result.get('message')), result.get('status_code', 500)
         
-        # Convertir en dictionnaire pour la réponse JSON
-        missions_data = [mission.to_dict() for mission in user_missions]
+        # Retourner les données en cas de succès
+        return jsonify(result.get('missions', [])), result.get('status_code', 200)
         
-        return jsonify(missions_data), 200
-    
     except Exception as e:
         current_app.logger.error(f"Erreur lors de la récupération des missions actives: {e}")
         return jsonify(message="Erreur de base de données"), 500

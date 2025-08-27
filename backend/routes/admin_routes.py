@@ -906,19 +906,25 @@ def get_offices():
     try:
         current_user = get_current_user()
         
+        # Utiliser le service sécurisé pour récupérer les bureaux
+        from backend.services.admin_service import get_offices_safe
+        
         # SuperAdmin peut voir tous les bureaux
         if current_user.role == 'superadmin':
-            offices = Office.query.all()
+            result = get_offices_safe()  # Pas de filtre par entreprise
         else:
             # Admin d'entreprise ne voit que ses bureaux
-            offices = Office.query.filter_by(company_id=current_user.company_id).all()
+            result = get_offices_safe(company_id=current_user.company_id)
+            
+        # Gérer les erreurs retournées par le service
+        if result.get('error'):
+            return jsonify(message=result.get('message')), result.get('status_code', 500)
         
-        return jsonify({
-            'offices': [office.to_dict() for office in offices]
-        }), 200
+        # Retourner les données en cas de succès
+        return jsonify({'offices': result.get('offices', [])}), result.get('status_code', 200)
         
     except Exception as e:
-        print(f"Erreur lors de la récupération des bureaux: {e}")
+        current_app.logger.error(f"Erreur lors de la récupération des bureaux: {e}")
         return jsonify(message="Erreur interne du serveur"), 500
 
 @admin_bp.route('/offices', methods=['POST'])

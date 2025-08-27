@@ -33,154 +33,32 @@ def office_checkin():
 
         data = request.get_json()
         coordinates = data.get('coordinates', {})
-
-        if not coordinates.get('latitude') or not coordinates.get('longitude'):
-            return jsonify(message="Coordonnées GPS requises"), 400
-        if coordinates.get('accuracy') is None:
-            return jsonify(message="Précision GPS requise"), 400
-
-        max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
-
-        if current_user.company_id:
-            offices = Office.query.filter_by(
-                company_id=current_user.company_id,
-                is_active=True
-            ).all()
-
-            for office in offices:
-                distance = calculate_distance(
-                    coordinates['latitude'], coordinates['longitude'],
-                    office.latitude, office.longitude
-                )
-                if distance < min_distance:
-                    min_distance = distance
-                    nearest_office = office
-
-            if nearest_office and nearest_office.geolocation_max_accuracy is not None:
-                max_accuracy = nearest_office.geolocation_max_accuracy
-
-        if coordinates['accuracy'] > max_accuracy:
-            return jsonify(
-                message=(
-                    f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). "
-                    f"Maximum autorisé: {max_accuracy}m"
-                )
-            ), 400
-
-        if current_user.company_id:
-            if offices:
-                if nearest_office and min_distance <= nearest_office.radius:
-                    tz_name = nearest_office.timezone or tz_name
-                    pointage = Pointage(
-                        user_id=current_user.id,
-                        type='office',
-                        latitude=coordinates['latitude'],
-                        longitude=coordinates['longitude'],
-                        office_id=nearest_office.id,
-                        office=nearest_office,
-                        distance=min_distance
-                    )
-                else:
-                    return jsonify(
-                        message=f"Vous êtes trop loin du bureau ({int(min_distance)}m). Rayon autorisé: {nearest_office.radius if nearest_office else 'N/A'}m"
-                    ), 403
-            else:
-                company = current_user.company
-                if company and company.office_latitude and company.office_longitude:
-                    distance = calculate_distance(
-                        coordinates['latitude'], coordinates['longitude'],
-                        company.office_latitude, company.office_longitude
-                    )
-                    if distance > company.office_radius:
-                        return jsonify(
-                            message=f"Vous êtes trop loin du bureau ({int(distance)}m). Rayon autorisé: {company.office_radius}m"
-                        ), 403
-
-                pointage = Pointage(
-                    user_id=current_user.id,
-                    type='office',
-                    latitude=coordinates['latitude'],
-                    longitude=coordinates['longitude']
-                )
-        else:
-            pointage = Pointage(
-                user_id=current_user.id,
-                type='office',
-                latitude=coordinates['latitude'],
-                longitude=coordinates['longitude']
-            )
-
-        now_local = datetime.now(ZoneInfo(tz_name))
-        now_utc = now_local.astimezone(ZoneInfo('UTC'))
-        today = now_utc.date()
-
-        existing_pointage = Pointage.query.filter_by(
-            user_id=current_user.id,
-            date_pointage=today
-        ).first()
-
-        if existing_pointage:
-            send_notification(current_user.id, "Pointage déjà enregistré pour aujourd'hui")
-            return jsonify(message="Vous avez déjà pointé aujourd'hui"), 409
-
-        pointage.date_pointage = today
-        pointage.heure_arrivee = now_utc.time()
-
-        db.session.add(pointage)
-        db.session.flush()
-
-        # Logger l'action
-        log_user_action(
-            action='OFFICE_CHECKIN',
-            resource_type='Pointage',
-            resource_id=pointage.id,
-            details={
-                'coordinates': coordinates,
-                'status': pointage.statut,
-                'office_id': getattr(pointage, 'office_id', None),
-                'distance': getattr(pointage, 'distance', None)
-            }
-        )
-
-        db.session.commit()
-
-        # Journaliser l'événement de pointage
-        log_attendance_event(
-            event_type='office_checkin',
-            user_id=current_user.id,
-            details={
-                'pointage_id': pointage.id,
-                'office_id': getattr(pointage, 'office_id', None),
-                'status': pointage.statut,
-                'time': pointage.heure_arrivee.strftime('%H:%M:%S')
-            }
-        )
-
-        try:
-            from backend.utils.webhook_utils import dispatch_webhook_event
-            dispatch_webhook_event(
-                event_type='pointage.created',
-                payload_data=pointage.to_dict(),
-                company_id=current_user.company_id
-            )
-        except Exception as webhook_error:
-            current_app.logger.error(f"Failed to dispatch pointage.created webhook for pointage {pointage.id}: {webhook_error}")
-            log_attendance_error('webhook_failure', current_user.id, str(webhook_error))
-
-        send_notification(current_user.id, "Pointage bureau enregistré")
-        if pointage.statut == 'retard':
-            send_notification(current_user.id, "Vous êtes en retard")
-
+        
+        # Utiliser le service robuste pour le pointage
+        from backend.services.attendance_service import office_checkin_safe
+        result = office_checkin_safe(current_user.id, coordinates)
+        
+        # Gérer le résultat
+        if result.get('error', False):
+            return jsonify(message=result.get('message', "Une erreur s'est produite")), result.get('status_code', 500)
+            
+        # Envoyer les notifications client si le pointage est réussi
+        pointage = result.get('pointage')
+        if pointage:
+            send_notification(current_user.id, "Pointage bureau enregistré")
+            if pointage.get('statut') == 'retard':
+                send_notification(current_user.id, "Vous êtes en retard")
+        
+        # Renvoyer le résultat
         return jsonify({
-            'message': 'Pointage bureau enregistré avec succès',
-            'pointage': pointage.to_dict()
-        }), 201
+            'message': result.get('message', 'Pointage bureau enregistré avec succès'),
+            'pointage': pointage
+        }), result.get('status_code', 201)
 
     except Exception as e:
         error_details = str(e)
         current_app.logger.error(f"Erreur lors du pointage bureau: {error_details}")
-        db.session.rollback()
-
+        
         # Fournir des messages d'erreur plus détaillés selon le type d'exception
         if "coordinates" in error_details.lower():
             return jsonify(message="Erreur de coordonnées GPS"), 400
@@ -190,6 +68,9 @@ def office_checkin():
             return jsonify(message="Erreur de base de données lors du pointage"), 500
         else:
             return jsonify(message="Erreur interne du serveur"), 500
+# La route de test a été supprimée car elle n'est plus nécessaire
+# Le endpoint /api/attendance/checkin/office utilise désormais le service robuste
+
 @attendance_bp.route('/checkin/mission', methods=['POST'])
 @jwt_required()
 def mission_checkin():
@@ -528,53 +409,21 @@ def get_last_7days_stats():
         if not current_user:
             return jsonify(message="Utilisateur non trouvé"), 401
         
-        # Récupérer les 7 derniers jours
-        today = date.today()
-        last_7_days = [today - timedelta(days=i) for i in range(6, -1, -1)]  # Du plus ancien au plus récent
+        # Utiliser le service sécurisé pour récupérer les statistiques des 7 derniers jours
+        from backend.services.attendance_service import get_last_7days_stats_safe
+        result = get_last_7days_stats_safe(user_id=current_user.id)
         
-        daily_stats = []
-        for day in last_7_days:
-            # Obtenir les pointages de ce jour pour tous les utilisateurs de l'entreprise
-            if current_user.company_id:
-                daily_pointages = Pointage.query.join(User).filter(
-                    User.company_id == current_user.company_id,
-                    Pointage.date_pointage == day
-                ).all()
-                
-                # Calculer les présents, retards et absents
-                presents = len([p for p in daily_pointages if p.statut == 'present'])
-                retards = len([p for p in daily_pointages if p.statut == 'retard'])
-                # Pour les absents, une approche simple est de compter combien d'utilisateurs actifs n'ont pas pointé
-                total_active_users = User.query.filter_by(company_id=current_user.company_id, is_active=True).count()
-                absents = total_active_users - (presents + retards)
-                absents = max(0, absents)  # Éviter les nombres négatifs
-                
-                daily_stats.append({
-                    'date': day.strftime('%d/%m'),
-                    'present': presents,
-                    'late': retards,
-                    'absent': absents,
-                    'total': total_active_users
-                })
-            else:
-                # Utilisateur sans entreprise (cas rare)
-                daily_stats.append({
-                    'date': day.strftime('%d/%m'),
-                    'present': 0,
-                    'late': 0,
-                    'absent': 0,
-                    'total': 0
-                })
+        # Gérer les erreurs retournées par le service
+        if result.get('error'):
+            return jsonify(message=result.get('message')), result.get('status_code', 500)
         
-        return jsonify({
-            'stats': daily_stats
-        }), 200
+        # Retourner les données en cas de succès
+        return jsonify({'stats': result.get('stats', [])}), result.get('status_code', 200)
         
-    except SQLAlchemyError as e:
-        current_app.logger.exception("Database error retrieving last 7 days stats")
-        return jsonify(message="Erreur de base de données lors de la récupération des statistiques"), 500
-    except Exception:
-        current_app.logger.exception("Erreur lors de la récupération des statistiques des 7 derniers jours")
+    except Exception as e:
+        current_app.logger.error(
+            f"Erreur lors de la récupération des statistiques des 7 derniers jours: {str(e)}", exc_info=e
+        )
         return jsonify(message="Erreur interne du serveur"), 500
 
 @attendance_bp.route('/calendar', methods=['GET'])
