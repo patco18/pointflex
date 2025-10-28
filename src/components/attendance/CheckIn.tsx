@@ -5,9 +5,7 @@ import Card from '../ui/card';
 import { attendanceService } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import { watchPositionUntilAccurate } from '../../utils/geolocation';
-import CheckInGuidance from './CheckInGuidance';
-import CheckInZoneMap from './CheckInZoneMap';
-import { useGeofencingContext } from '../../hooks/useGeofencingContext';
+
 
 interface CheckInProps {
   onCheckInSuccess?: () => void;
@@ -19,11 +17,7 @@ const CheckIn: React.FC<CheckInProps> = ({ onCheckInSuccess }) => {
   const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null);
   const [searchingPosition, setSearchingPosition] = useState(false);
   const isMountedRef = useRef(true);
-  const {
-    context: geofencingContext,
-    loading: geofencingLoading,
-    error: geofencingError,
-  } = useGeofencingContext();
+
 
   useEffect(() => {
     return () => {
@@ -45,32 +39,7 @@ const CheckIn: React.FC<CheckInProps> = ({ onCheckInSuccess }) => {
         }
       });
 
-      const { latitude, longitude, accuracy, altitude, heading, speed } = position.coords;
 
-      const coordinates: {
-        latitude: number
-        longitude: number
-        accuracy: number
-        altitude?: number
-        heading?: number
-        speed?: number
-      } = {
-        latitude,
-        longitude,
-        accuracy
-      }
-
-      if (altitude != null) {
-        coordinates.altitude = altitude
-      }
-      if (heading != null) {
-        coordinates.heading = heading
-      }
-      if (speed != null) {
-        coordinates.speed = speed
-      }
-
-      await attendanceService.checkInOffice(coordinates);
 
       toast.success('Pointage effectué avec succès!');
       if (onCheckInSuccess) {

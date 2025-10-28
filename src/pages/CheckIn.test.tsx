@@ -21,27 +21,11 @@ beforeEach(() => {
     coords: { latitude: 1, longitude: 2, accuracy: 5 }
   });
 
-  const { attendanceService } = require('../services/api');
-  attendanceService.getGeofencingContext.mockResolvedValue({
-    data: { context: { offices: [], missions: [], fallback: null } }
-  });
-
-  Object.defineProperty(global.navigator, 'geolocation', {
-    value: {
-      watchPosition: jest.fn((success) => {
-        success({ coords: { latitude: 1, longitude: 2, accuracy: 5 } });
-        return 1;
-      }),
-      clearWatch: jest.fn()
-    },
-    configurable: true,
-  });
 });
 
 afterEach(() => {
   jest.clearAllMocks();
-  // @ts-ignore
-  delete global.navigator.geolocation;
+
 });
 
 test('switch to mission tab displays input', () => {

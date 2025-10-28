@@ -493,11 +493,7 @@ def office_checkin_safe(user_id, coordinates):
         
         # Paramètres par défaut
         max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
-        threshold_entity = None
-        company = getattr(user, 'company', None)
-        if company and getattr(company, 'geolocation_max_accuracy', None) is not None:
-            max_accuracy = company.geolocation_max_accuracy
-            threshold_entity = company
+
         min_distance = float('inf')
         nearest_office = None
         
@@ -596,24 +592,7 @@ def office_checkin_safe(user_id, coordinates):
 
         # Vérifier la précision GPS
         if coordinates['accuracy'] > max_accuracy:
-            log_attendance_error(
-                'office_checkin_accuracy_rejected',
-                user_id,
-                {
-                    'applied_threshold': applied_threshold,
-                    'reported_accuracy': coordinates['accuracy'],
-                    'coordinates': {
-                        'latitude': coordinates.get('latitude'),
-                        'longitude': coordinates.get('longitude'),
-                        'altitude': coordinates.get('altitude'),
-                        'heading': coordinates.get('heading'),
-                        'speed': coordinates.get('speed'),
-                    },
-                    'office_id': getattr(nearest_office, 'id', None)
-                    if isinstance(nearest_office, Office)
-                    else (nearest_office.get('id') if isinstance(nearest_office, dict) else None),
-                },
-            )
+
             if adjuster:
                 adjuster.record_failure(coordinates['accuracy'], applied_threshold)
                 db.session.commit()

@@ -14,6 +14,15 @@ interface Coordinates {
   speed?: number
 }
 
+interface Coordinates {
+  latitude: number
+  longitude: number
+  accuracy: number
+  altitude?: number
+  heading?: number
+  speed?: number
+}
+
 interface Props {
   onCheckIn: (coordinates: Coordinates) => void
   onCancel: () => void

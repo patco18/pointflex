@@ -3,9 +3,7 @@ import { attendanceService } from '../services/api'
 import { MapPin, Clock, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { watchPositionUntilAccurate } from '../utils/geolocation'
-import CheckInGuidance from '../components/attendance/CheckInGuidance'
-import CheckInZoneMap from '../components/attendance/CheckInZoneMap'
-import { useGeofencingContext } from '../hooks/useGeofencingContext'
+
 
 export default function CheckIn() {
   const [activeTab, setActiveTab] = useState<'office' | 'mission'>('office')
@@ -14,11 +12,7 @@ export default function CheckIn() {
   const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null)
   const [searchingPosition, setSearchingPosition] = useState(false)
   const isMountedRef = useRef(true)
-  const {
-    context: geofencingContext,
-    loading: geofencingLoading,
-    error: geofencingError,
-  } = useGeofencingContext()
+
 
   useEffect(() => {
     return () => {
@@ -31,8 +25,6 @@ export default function CheckIn() {
       throw new Error('Composant démonté')
     }
 
-    setSearchingPosition(true)
-    setCurrentAccuracy(null)
 
     try {
       return await watchPositionUntilAccurate({
@@ -52,14 +44,7 @@ export default function CheckIn() {
     setLoading(true)
     try {
       const position = await getPrecisePosition()
-      const coordinates: {
-        latitude: number
-        longitude: number
-        accuracy: number
-        altitude?: number
-        heading?: number
-        speed?: number
-      } = {
+
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy
@@ -108,14 +93,7 @@ export default function CheckIn() {
     setLoading(true)
     try {
       const position = await getPrecisePosition()
-      const coordinates: {
-        latitude: number
-        longitude: number
-        accuracy: number
-        altitude?: number
-        heading?: number
-        speed?: number
-      } = {
+
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy
@@ -210,14 +188,7 @@ export default function CheckIn() {
               Cliquez sur le bouton ci-dessous pour enregistrer votre arrivée au bureau.
               Votre position sera automatiquement détectée.
             </p>
-            <CheckInGuidance className="mb-4 text-left" />
-            <CheckInZoneMap
-              context={geofencingContext}
-              loading={geofencingLoading}
-              error={geofencingError}
-              mode="office"
-              className="mb-6"
-            />
+
             {searchingPosition && (
               <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-4 text-sm">
                 Obtention d'une position précise...
