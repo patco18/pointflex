@@ -29,6 +29,10 @@ class Pointage(db.Model):
     # Géolocalisation
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
+    accuracy = db.Column(db.Float, nullable=True)
+    altitude = db.Column(db.Float, nullable=True)
+    heading = db.Column(db.Float, nullable=True)
+    speed = db.Column(db.Float, nullable=True)
     
     # Référence au bureau (pour pointage bureau)
     office_id = db.Column(db.Integer, db.ForeignKey('offices.id'), nullable=True)
@@ -187,6 +191,10 @@ class Pointage(db.Model):
             'statut': self.statut,
             'latitude': self.latitude,
             'longitude': self.longitude,
+            'accuracy': self.accuracy,
+            'altitude': self.altitude,
+            'heading': self.heading,
+            'speed': self.speed,
             'offline_timestamp': self.offline_timestamp.isoformat() if self.offline_timestamp else None,
             'device_id': self.device_id,
             'office_id': self.office_id,

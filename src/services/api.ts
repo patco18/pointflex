@@ -152,8 +152,18 @@ export const authService = {
   }
 }
 
+type CoordinatesPayload = {
+  latitude: number
+  longitude: number
+  accuracy?: number
+  altitude?: number | null
+  heading?: number | null
+  speed?: number | null
+  qrCode?: string
+}
+
 export const attendanceService = {
-  checkInOffice: async (coordinates: { latitude: number; longitude: number; accuracy?: number; qrCode?: string }) => {
+  checkInOffice: async (coordinates: CoordinatesPayload) => {
     try {
       // Ne pas logger les coordonnées en production pour des raisons de confidentialité
       // console.log('🏢 Pointage bureau avec coordonnées:', coordinates)
@@ -168,7 +178,7 @@ export const attendanceService = {
     }
   },
   
-  checkInMission: async (missionOrderNumber: string, coordinates?: { latitude: number; longitude: number }) => {
+  checkInMission: async (missionOrderNumber: string, coordinates?: CoordinatesPayload) => {
     try {
       // Ne pas logger les informations de mission et coordonnées en production
       // console.log('🚀 Pointage mission:', missionOrderNumber, coordinates ? 'avec coordonnées' : 'sans coordonnées')

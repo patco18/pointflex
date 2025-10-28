@@ -22,6 +22,7 @@ class Mission(db.Model):
     latitude = db.Column(db.Float, nullable=True)
     longitude = db.Column(db.Float, nullable=True)
     radius = db.Column(db.Integer, nullable=True)
+    geolocation_max_accuracy = db.Column(db.Integer, nullable=True)
     location = db.Column(db.String(255), nullable=True)
 
     company = db.relationship('Company', backref='missions', lazy=True)
@@ -42,6 +43,7 @@ class Mission(db.Model):
             'latitude': self.latitude,
             'longitude': self.longitude,
             'radius': self.radius,
+            'geolocation_max_accuracy': self.geolocation_max_accuracy,
             'location': self.location,
             'users': [mu.to_dict() for mu in self.users]
         }

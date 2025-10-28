@@ -177,7 +177,11 @@ def qr_checkin():
             is_qr_scan=True,
             statut="present",
             latitude=location_data.get('latitude') if location_data else None,
-            longitude=location_data.get('longitude') if location_data else None
+            longitude=location_data.get('longitude') if location_data else None,
+            accuracy=location_data.get('accuracy') if location_data else None,
+            altitude=location_data.get('altitude') if location_data else None,
+            heading=location_data.get('heading') if location_data else None,
+            speed=location_data.get('speed') if location_data else None,
         )
     elif pointage_type == PointageType.OUT:
         # Chercher le pointage d'entrée existant pour mettre à jour l'heure de sortie
@@ -203,7 +207,11 @@ def qr_checkin():
                 is_qr_scan=True,
                 statut="present",
                 latitude=location_data.get('latitude') if location_data else None,
-                longitude=location_data.get('longitude') if location_data else None
+                longitude=location_data.get('longitude') if location_data else None,
+                accuracy=location_data.get('accuracy') if location_data else None,
+                altitude=location_data.get('altitude') if location_data else None,
+                heading=location_data.get('heading') if location_data else None,
+                speed=location_data.get('speed') if location_data else None,
             )
     
     # Si new_pointage est None, c'est qu'on a un type de pointage non géré
