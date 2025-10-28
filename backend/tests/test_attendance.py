@@ -1,5 +1,9 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+
+from backend.database import db
+from backend.models.geolocation_accuracy_stats import GeolocationAccuracyStats
+from backend.models.pointage import Pointage
 
 
 def login_employee(client):
@@ -103,7 +107,7 @@ def test_mission_checkin_requires_acceptance(client):
 
     resp = client.post(
         '/api/attendance/checkin/mission',
-        json={'mission_id': mission_id, 'coordinates': {'latitude': 0.0, 'longitude': 0.0}},
+        json={'mission_id': mission_id, 'coordinates': {'latitude': 0.0, 'longitude': 0.0, 'accuracy': 5}},
         headers=headers,
     )
     assert resp.status_code == 403
@@ -137,7 +141,7 @@ def test_mission_checkin_accepts_within_radius(client):
 
     resp = client.post(
         '/api/attendance/checkin/mission',
-        json={'mission_id': mission_id, 'coordinates': {'latitude': 0.0, 'longitude': 0.0}},
+        json={'mission_id': mission_id, 'coordinates': {'latitude': 0.0, 'longitude': 0.0, 'accuracy': 10}},
         headers=headers,
     )
     assert resp.status_code == 201
@@ -171,10 +175,178 @@ def test_mission_checkin_rejects_outside_radius(client):
 
     resp = client.post(
         '/api/attendance/checkin/mission',
-        json={'mission_id': mission_id, 'coordinates': {'latitude': 1.0, 'longitude': 1.0}},
+        json={'mission_id': mission_id, 'coordinates': {'latitude': 1.0, 'longitude': 1.0, 'accuracy': 10}},
         headers=headers,
     )
     assert resp.status_code == 403
+
+
+def test_mission_checkin_rejects_when_accuracy_too_high(client):
+    token = login_employee(client)
+    headers = {'Authorization': f'Bearer {token}'}
+
+    from backend.models.user import User
+    from backend.models.mission import Mission
+    from backend.models.mission_user import MissionUser
+    from backend.database import db
+
+    with client.application.app_context():
+        user = User.query.filter_by(email="employee@pointflex.com").first()
+        mission = Mission(
+            company_id=user.company_id,
+            order_number='MISSION-ACCURACY',
+            title='Mission Accuracy',
+            geolocation_max_accuracy=15,
+        )
+        db.session.add(mission)
+        db.session.flush()
+        mu = MissionUser(mission_id=mission.id, user_id=user.id, status='accepted')
+        db.session.add(mu)
+        db.session.commit()
+        mission_id = mission.id
+
+    resp = client.post(
+        '/api/attendance/checkin/mission',
+        json={
+            'mission_id': mission_id,
+            'coordinates': {'latitude': 0.0, 'longitude': 0.0, 'accuracy': 42},
+        },
+        headers=headers,
+    )
+
+    assert resp.status_code == 400
+    assert 'Précision de localisation insuffisante' in resp.get_json()['message']
+
+
+def test_mission_checkin_uses_company_accuracy_when_missing_on_mission(client):
+    token = login_employee(client)
+    headers = {'Authorization': f'Bearer {token}'}
+
+    from backend.models.user import User
+    from backend.models.mission import Mission
+    from backend.models.mission_user import MissionUser
+
+    with client.application.app_context():
+        user = User.query.filter_by(email="employee@pointflex.com").first()
+        user.company.geolocation_max_accuracy = 25
+        mission = Mission(
+            company_id=user.company_id,
+            order_number='MISSION-COMPANY',
+            title='Mission Company Accuracy',
+        )
+        db.session.add(mission)
+        db.session.flush()
+        mu = MissionUser(mission_id=mission.id, user_id=user.id, status='accepted')
+        db.session.add(mu)
+        db.session.commit()
+        mission_id = mission.id
+
+    resp = client.post(
+        '/api/attendance/checkin/mission',
+        json={
+            'mission_id': mission_id,
+            'coordinates': {'latitude': 0.0, 'longitude': 0.0, 'accuracy': 40},
+        },
+        headers=headers,
+    )
+
+    assert resp.status_code == 400
+    body = resp.get_json()
+    assert str(25) in body['message']
+
+
+def test_mission_accuracy_adjusts_down_after_successes(client):
+    token = login_employee(client)
+    headers = {'Authorization': f'Bearer {token}'}
+
+    from backend.models.user import User
+    from backend.models.mission import Mission
+    from backend.models.mission_user import MissionUser
+
+    with client.application.app_context():
+        user = User.query.filter_by(email="employee@pointflex.com").first()
+        mission = Mission(
+            company_id=user.company_id,
+            order_number='MISSION-DYNAMIC-LOWER',
+            title='Mission Adaptive Lower',
+            geolocation_max_accuracy=50,
+        )
+        db.session.add(mission)
+        db.session.flush()
+        mu = MissionUser(mission_id=mission.id, user_id=user.id, status='accepted')
+        db.session.add(mu)
+        db.session.commit()
+        mission_id = mission.id
+
+    for day_shift in range(3):
+        resp = client.post(
+            '/api/attendance/checkin/mission',
+            json={'mission_id': mission_id, 'coordinates': {'latitude': 0.0, 'longitude': 0.0, 'accuracy': 10}},
+            headers=headers,
+        )
+        assert resp.status_code == 201
+        pointage_id = resp.get_json()['pointage']['id']
+
+        with client.application.app_context():
+            pointage = Pointage.query.get(pointage_id)
+            pointage.date_pointage = date.today() - timedelta(days=day_shift + 1)
+            db.session.commit()
+
+    with client.application.app_context():
+        mission = Mission.query.get(mission_id)
+        assert mission.geolocation_max_accuracy == 45
+
+
+def test_mission_accuracy_relaxes_temporarily_after_failures(client):
+    token = login_employee(client)
+    headers = {'Authorization': f'Bearer {token}'}
+
+    from backend.models.user import User
+    from backend.models.mission import Mission
+    from backend.models.mission_user import MissionUser
+
+    with client.application.app_context():
+        user = User.query.filter_by(email="employee@pointflex.com").first()
+        mission = Mission(
+            company_id=user.company_id,
+            order_number='MISSION-DYNAMIC-RELAX',
+            title='Mission Adaptive Relax',
+            geolocation_max_accuracy=20,
+        )
+        db.session.add(mission)
+        db.session.flush()
+        mu = MissionUser(mission_id=mission.id, user_id=user.id, status='accepted')
+        db.session.add(mu)
+        db.session.commit()
+        mission_id = mission.id
+
+    for _ in range(2):
+        resp = client.post(
+            '/api/attendance/checkin/mission',
+            json={'mission_id': mission_id, 'coordinates': {'latitude': 0.0, 'longitude': 0.0, 'accuracy': 100}},
+            headers=headers,
+        )
+        assert resp.status_code == 400
+
+    with client.application.app_context():
+        mission = Mission.query.get(mission_id)
+        stats = GeolocationAccuracyStats.query.filter_by(context_type='mission', context_id=mission.id).first()
+        assert mission.geolocation_max_accuracy == 35
+        assert stats is not None
+        assert stats.temporary_accuracy == 35
+
+    resp = client.post(
+        '/api/attendance/checkin/mission',
+        json={'mission_id': mission_id, 'coordinates': {'latitude': 0.0, 'longitude': 0.0, 'accuracy': 18}},
+        headers=headers,
+    )
+    assert resp.status_code == 201
+
+    with client.application.app_context():
+        mission = Mission.query.get(mission_id)
+        stats = GeolocationAccuracyStats.query.filter_by(context_type='mission', context_id=mission.id).first()
+        assert mission.geolocation_max_accuracy == 20
+        assert stats.temporary_accuracy is None
 
 
 def test_multiple_checkins_same_day(client):
@@ -186,8 +358,6 @@ def test_multiple_checkins_same_day(client):
     from backend.models.mission_user import MissionUser
     from backend.models.pointage import Pointage
     from backend.database import db
-    from datetime import date
-
     with client.application.app_context():
         user = User.query.filter_by(email="employee@pointflex.com").first()
         mission = Mission(company_id=user.company_id, order_number='MISSION-MULTI', title='Mission Multi')
@@ -208,7 +378,7 @@ def test_multiple_checkins_same_day(client):
 
     resp2 = client.post(
         '/api/attendance/checkin/mission',
-        json={'mission_id': mission_id, 'coordinates': {'latitude': 1.0, 'longitude': 2.0}},
+        json={'mission_id': mission_id, 'coordinates': {'latitude': 1.0, 'longitude': 2.0, 'accuracy': 5}},
         headers=headers,
     )
     assert resp2.status_code == 201

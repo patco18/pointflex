@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { attendanceService, missionService } from '../../services/api'
 import { Briefcase, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { watchPositionUntilAccurate } from '../../utils/geolocation'
 
 interface Mission {
   id: number
@@ -13,6 +14,9 @@ export default function MissionCheckIn() {
   const [loading, setLoading] = useState(false)
   const [missionOrderNumber, setMissionOrderNumber] = useState('')
   const [missions, setMissions] = useState<Mission[]>([])
+  const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null)
+  const [searchingPosition, setSearchingPosition] = useState(false)
+  const isMountedRef = useRef(true)
 
   useEffect(() => {
     const loadMissions = async () => {
@@ -24,25 +28,32 @@ export default function MissionCheckIn() {
       }
     }
     loadMissions()
+
+    return () => {
+      isMountedRef.current = false
+    }
   }, [])
 
-  const getCurrentLocation = (): Promise<GeolocationPosition> => {
-    return new Promise((resolve, reject) => {
-      if (!navigator.geolocation) {
-        reject(new Error('Géolocalisation non supportée'))
-        return
-      }
+  const getPrecisePosition = async () => {
+    if (!isMountedRef.current) {
+      throw new Error('Composant démonté')
+    }
 
-      navigator.geolocation.getCurrentPosition(
-        resolve,
-        reject,
-        {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 60000
+    setSearchingPosition(true)
+    setCurrentAccuracy(null)
+
+    try {
+      return await watchPositionUntilAccurate({
+        onUpdate: (pos) => {
+          if (!isMountedRef.current) return
+          setCurrentAccuracy(Math.round(pos.coords.accuracy))
         }
-      )
-    })
+      })
+    } finally {
+      if (isMountedRef.current) {
+        setSearchingPosition(false)
+      }
+    }
   }
 
   const handleMissionCheckIn = async () => {
@@ -59,10 +70,11 @@ export default function MissionCheckIn() {
 
     setLoading(true)
     try {
-      const position = await getCurrentLocation()
+      const position = await getPrecisePosition()
       const coordinates = {
         latitude: position.coords.latitude,
-        longitude: position.coords.longitude
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
       }
 
       const { data } = await attendanceService.checkInMission(
@@ -91,7 +103,10 @@ export default function MissionCheckIn() {
         toast.error(error.response.data.message)
       }
     } finally {
-      setLoading(false)
+      if (isMountedRef.current) {
+        setLoading(false)
+        setCurrentAccuracy(null)
+      }
     }
   }
 
@@ -128,7 +143,21 @@ export default function MissionCheckIn() {
               ))}
           </select>
         </div>
-        
+
+        {searchingPosition && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-4 text-sm">
+            Obtention d'une position précise...
+            {currentAccuracy !== null && (
+              <div className="mt-2 text-blue-800">
+                Précision actuelle : <span className="font-semibold">~{currentAccuracy} m</span>
+              </div>
+            )}
+            <div className="mt-1 text-xs text-blue-600">
+              Restez immobile et assurez-vous que le GPS haute précision est activé.
+            </div>
+          </div>
+        )}
+
         <button
           onClick={handleMissionCheckIn}
           disabled={loading || !missionOrderNumber.trim()}
