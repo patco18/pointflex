@@ -60,8 +60,20 @@ def create_app():
     # Warn if critical environment variables are missing
     if not app.config.get('FCM_SERVER_KEY'):
         app.logger.warning('FCM_SERVER_KEY is not set. Push notifications will be disabled.')
-    if not app.config.get('TWO_FACTOR_ENCRYPTION_KEY'):
-        app.logger.warning('TWO_FACTOR_ENCRYPTION_KEY is not configured. 2FA encryption will fail.')
+
+    two_factor_key = app.config.get('TWO_FACTOR_ENCRYPTION_KEY')
+    if not two_factor_key:
+        if app.config.get('TESTING') or app.config.get('ENV') == 'development':
+            fallback_key = app.config.get('TWO_FACTOR_DEV_FALLBACK_KEY')
+            app.logger.warning(
+                'TWO_FACTOR_ENCRYPTION_KEY is not configured. Using development fallback key; '
+                'never use this value in production.'
+            )
+            app.config['TWO_FACTOR_ENCRYPTION_KEY'] = fallback_key
+            os.environ.setdefault('TWO_FACTOR_ENCRYPTION_KEY', fallback_key)
+        else:
+            raise RuntimeError('TWO_FACTOR_ENCRYPTION_KEY is not configured. Set it before starting the app.')
+
     if app.config.get('RATELIMIT_STORAGE_URL', '').startswith('memory'):
         app.logger.warning('RATELIMIT_STORAGE_URL uses local memory. Configure Redis for production use.')
     

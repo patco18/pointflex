@@ -72,17 +72,7 @@ class TestMailer:
                     logger.error(f"Erreur lors de l'importation des modèles: {e}")
                     return
                 
-                try:
-                    from backend.models.notification_settings import NotificationSettings
-                except ImportError:
-                    # Si le modèle NotificationSettings n'existe pas, créons une classe temporaire
-                    logger.warning("Modèle NotificationSettings non trouvé, création d'un modèle temporaire")
-                    class NotificationSettings(db.Model):
-                        __tablename__ = 'notification_settings'
-                        id = db.Column(db.Integer, primary_key=True)
-                        user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-                        email_notifications = db.Column(db.Boolean, default=True)
-                        push_notifications = db.Column(db.Boolean, default=True)
+                from backend.models.notification_settings import NotificationSettings
                 
                 # Créer les tables
                 logger.info("Création des tables de test...")
@@ -95,6 +85,33 @@ class TestMailer:
                 # Créer des données de test avec des dates d'expiration variables
                 today = datetime.date.today()
                 
+                # Créer des entreprises avec différentes dates d'expiration
+                company1 = Company(
+                    name="Test Entreprise 7j",
+                    email="company1@test.com",
+                    subscription_plan="Standard",
+                    subscription_end=today + datetime.timedelta(days=7)
+                )
+                db.session.add(company1)
+
+                company2 = Company(
+                    name="Test Entreprise 1j",
+                    email="company2@test.com",
+                    subscription_plan="Premium",
+                    subscription_end=today + datetime.timedelta(days=1)
+                )
+                db.session.add(company2)
+
+                company3 = Company(
+                    name="Test Entreprise Expirée",
+                    email="company3@test.com",
+                    subscription_plan="Enterprise",
+                    subscription_end=today - datetime.timedelta(days=1)
+                )
+                db.session.add(company3)
+
+                db.session.flush()
+
                 # Créer des utilisateurs admin
                 admin1 = User(
                     email="admin1@test.com",
@@ -102,73 +119,41 @@ class TestMailer:
                     nom="Test1",
                     password_hash="hashed_password",
                     role="admin",
-                    is_active=True
+                    is_active=True,
+                    company_id=company1.id
                 )
                 db.session.add(admin1)
-                db.session.flush()  # Pour obtenir l'ID de l'utilisateur
-                
-                # Créer des préférences de notification (activer les emails)
-                notif_settings = NotificationSettings(
-                    user_id=admin1.id,
-                    email_notifications=True,
-                    push_notifications=True
-                )
-                db.session.add(notif_settings)
-                
-                # Créer des entreprises avec différentes dates d'expiration
-                company1 = Company(
-                    name="Test Entreprise 7j",
-                    subscription_plan="Standard",
-                    subscription_end_date=(today + datetime.timedelta(days=7))
-                )
-                company1.users.append(admin1)
-                db.session.add(company1)
-                
-                company2 = Company(
-                    name="Test Entreprise 1j",
-                    subscription_plan="Premium",
-                    subscription_end_date=(today + datetime.timedelta(days=1))
-                )
+
                 admin2 = User(
                     email="admin2@test.com",
                     prenom="Admin",
                     nom="Test2",
                     password_hash="hashed_password",
                     role="admin",
-                    is_active=True
+                    is_active=True,
+                    company_id=company2.id
                 )
                 db.session.add(admin2)
-                notif_settings2 = NotificationSettings(
-                    user_id=admin2.id,
-                    email_notifications=True,
-                    push_notifications=True
-                )
-                db.session.add(notif_settings2)
-                company2.users.append(admin2)
-                db.session.add(company2)
-                
-                company3 = Company(
-                    name="Test Entreprise Expirée",
-                    subscription_plan="Enterprise",
-                    subscription_end_date=(today - datetime.timedelta(days=1))
-                )
+
                 admin3 = User(
                     email="admin3@test.com",
                     prenom="Admin",
                     nom="Test3",
                     password_hash="hashed_password",
                     role="admin",
-                    is_active=True
+                    is_active=True,
+                    company_id=company3.id
                 )
                 db.session.add(admin3)
-                notif_settings3 = NotificationSettings(
-                    user_id=admin3.id,
-                    email_notifications=True,
-                    push_notifications=True
-                )
-                db.session.add(notif_settings3)
-                company3.users.append(admin3)
-                db.session.add(company3)
+
+                db.session.flush()
+
+                # Créer des préférences de notification (activer les emails)
+                db.session.add_all([
+                    NotificationSettings(company_id=company1.id, email_notifications=True, push_notifications=True),
+                    NotificationSettings(company_id=company2.id, email_notifications=True, push_notifications=True),
+                    NotificationSettings(company_id=company3.id, email_notifications=True, push_notifications=True),
+                ])
                 
                 # Ajouter un super admin pour tester les notifications admin
                 super_admin = User(

@@ -103,6 +103,12 @@ TWO_FACTOR_ENCRYPTION_KEY=base64_32_bytes_key
 RATELIMIT_STORAGE_URL=redis://localhost:6379/2
 ```
 
+> 💡 Générez la valeur `TWO_FACTOR_ENCRYPTION_KEY` avec :
+>
+> ```bash
+> python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+> ```
+
 ## 🚀 Déploiement Serveur
 
 ### Option 1: VPS avec Docker
