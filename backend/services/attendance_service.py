@@ -6,11 +6,13 @@ from flask import current_app
 from backend.models.pointage import Pointage
 from backend.models.user import User
 from backend.models.office import Office
+from backend.models.company import Company
 from backend.models.system_settings import SystemSettings
 from backend.database import db
 from backend.utils.notification_utils import send_notification
 from backend.middleware.audit import log_user_action
 from backend.utils.attendance_logger import log_attendance_event, log_attendance_error
+from backend.services.geolocation_accuracy_service import GeolocationAccuracyService
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 from sqlalchemy.exc import SQLAlchemyError
@@ -491,6 +493,11 @@ def office_checkin_safe(user_id, coordinates):
         
         # Paramètres par défaut
         max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
+        threshold_entity = None
+        company = getattr(user, 'company', None)
+        if company and getattr(company, 'geolocation_max_accuracy', None) is not None:
+            max_accuracy = company.geolocation_max_accuracy
+            threshold_entity = company
         min_distance = float('inf')
         nearest_office = None
         
@@ -519,6 +526,7 @@ def office_checkin_safe(user_id, coordinates):
                     try:
                         if hasattr(nearest_office, 'geolocation_max_accuracy') and nearest_office.geolocation_max_accuracy is not None:
                             max_accuracy = nearest_office.geolocation_max_accuracy
+                            threshold_entity = nearest_office
                     except:
                         pass  # Utiliser la valeur par défaut si la colonne n'existe pas
             
@@ -577,12 +585,41 @@ def office_checkin_safe(user_id, coordinates):
                     max_accuracy = nearest_office['geolocation_max_accuracy']
             
             cursor.close()
-        
+
+        adjuster = None
+        if isinstance(threshold_entity, Office):
+            adjuster = GeolocationAccuracyService.for_office(threshold_entity, user_id)
+        elif isinstance(threshold_entity, Company):
+            adjuster = GeolocationAccuracyService.for_company(threshold_entity, user_id)
+
+        applied_threshold = max_accuracy
+
         # Vérifier la précision GPS
         if coordinates['accuracy'] > max_accuracy:
+            log_attendance_error(
+                'office_checkin_accuracy_rejected',
+                user_id,
+                {
+                    'applied_threshold': applied_threshold,
+                    'reported_accuracy': coordinates['accuracy'],
+                    'coordinates': {
+                        'latitude': coordinates.get('latitude'),
+                        'longitude': coordinates.get('longitude'),
+                        'altitude': coordinates.get('altitude'),
+                        'heading': coordinates.get('heading'),
+                        'speed': coordinates.get('speed'),
+                    },
+                    'office_id': getattr(nearest_office, 'id', None)
+                    if isinstance(nearest_office, Office)
+                    else (nearest_office.get('id') if isinstance(nearest_office, dict) else None),
+                },
+            )
+            if adjuster:
+                adjuster.record_failure(coordinates['accuracy'], applied_threshold)
+                db.session.commit()
             return {
                 'error': True,
-                'message': f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). Maximum autorisé: {max_accuracy}m",
+                'message': f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). Maximum autorisé: {applied_threshold}m",
                 'status_code': 400
             }
         
@@ -598,7 +635,11 @@ def office_checkin_safe(user_id, coordinates):
                         latitude=coordinates['latitude'],
                         longitude=coordinates['longitude'],
                         office_id=nearest_office['id'],
-                        distance=min_distance
+                        distance=min_distance,
+                        accuracy=coordinates.get('accuracy'),
+                        altitude=coordinates.get('altitude'),
+                        heading=coordinates.get('heading'),
+                        speed=coordinates.get('speed'),
                     )
                 else:
                     return {
@@ -615,7 +656,11 @@ def office_checkin_safe(user_id, coordinates):
                         latitude=coordinates['latitude'],
                         longitude=coordinates['longitude'],
                         office_id=nearest_office.id,
-                        distance=min_distance
+                        distance=min_distance,
+                        accuracy=coordinates.get('accuracy'),
+                        altitude=coordinates.get('altitude'),
+                        heading=coordinates.get('heading'),
+                        speed=coordinates.get('speed'),
                     )
                 else:
                     return {
@@ -647,7 +692,11 @@ def office_checkin_safe(user_id, coordinates):
                     user_id=user_id,
                     type_pointage='office',
                     latitude=coordinates['latitude'],
-                    longitude=coordinates['longitude']
+                    longitude=coordinates['longitude'],
+                    accuracy=coordinates.get('accuracy'),
+                    altitude=coordinates.get('altitude'),
+                    heading=coordinates.get('heading'),
+                    speed=coordinates.get('speed'),
                 )
         else:
             # Cas d'un utilisateur sans entreprise
@@ -655,13 +704,21 @@ def office_checkin_safe(user_id, coordinates):
                 user_id=user_id,
                 type_pointage='office',
                 latitude=coordinates['latitude'],
-                longitude=coordinates['longitude']
+                longitude=coordinates['longitude'],
+                accuracy=coordinates.get('accuracy'),
+                altitude=coordinates.get('altitude'),
+                heading=coordinates.get('heading'),
+                speed=coordinates.get('speed'),
             )
         
         # Retourner le pointage créé
         if pointage.get('error'):
             return pointage
-            
+
+        if adjuster:
+            adjuster.record_success(coordinates['accuracy'], applied_threshold)
+            db.session.commit()
+
         return {
             'error': False,
             'message': 'Pointage bureau enregistré avec succès',
@@ -678,7 +735,18 @@ def office_checkin_safe(user_id, coordinates):
             'status_code': 500
         }
 
-def create_pointage(user_id, type_pointage, latitude, longitude, office_id=None, distance=None):
+def create_pointage(
+    user_id,
+    type_pointage,
+    latitude,
+    longitude,
+    office_id=None,
+    distance=None,
+    accuracy=None,
+    altitude=None,
+    heading=None,
+    speed=None,
+):
     """
     Crée un nouveau pointage avec gestion des erreurs
     """
@@ -741,6 +809,10 @@ def create_pointage(user_id, type_pointage, latitude, longitude, office_id=None,
                 type=type_pointage,
                 latitude=latitude,
                 longitude=longitude,
+                accuracy=accuracy,
+                altitude=altitude,
+                heading=heading,
+                speed=speed,
                 date_pointage=today,
                 heure_arrivee=now_utc.time()
             )
@@ -761,7 +833,14 @@ def create_pointage(user_id, type_pointage, latitude, longitude, office_id=None,
                     resource_type='Pointage',
                     resource_id=pointage.id,
                     details={
-                        'coordinates': {'latitude': latitude, 'longitude': longitude},
+                        'coordinates': {
+                            'latitude': latitude,
+                            'longitude': longitude,
+                            'accuracy': accuracy,
+                            'altitude': altitude,
+                            'heading': heading,
+                            'speed': speed,
+                        },
                         'status': pointage.statut,
                         'office_id': getattr(pointage, 'office_id', None),
                         'distance': getattr(pointage, 'distance', None)
@@ -781,7 +860,11 @@ def create_pointage(user_id, type_pointage, latitude, longitude, office_id=None,
                         'pointage_id': pointage.id,
                         'office_id': getattr(pointage, 'office_id', None),
                         'status': pointage.statut,
-                        'time': pointage.heure_arrivee.strftime('%H:%M:%S')
+                        'time': pointage.heure_arrivee.strftime('%H:%M:%S'),
+                        'accuracy': accuracy,
+                        'altitude': altitude,
+                        'heading': heading,
+                        'speed': speed,
                     }
                 )
             except:

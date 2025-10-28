@@ -10,12 +10,79 @@ from backend.models.pause import Pause
 from backend.models.mission import Mission
 from backend.models.user import User
 from backend.models.office import Office
+from backend.models.mission_user import MissionUser
 from backend.database import db
 from datetime import datetime, date, timedelta
 import json
 import math
 
 attendance_extras_bp = Blueprint('attendance_extras', __name__)
+
+
+@attendance_extras_bp.route('/geofencing/context', methods=['GET'])
+@jwt_required()
+def geofencing_context():
+    """Expose les zones de pointage pertinentes pour l'utilisateur courant."""
+    try:
+        current_user = get_current_user()
+        if not current_user:
+            return jsonify(message="Utilisateur non trouvé"), 401
+
+        payload = {
+            'offices': [],
+            'missions': [],
+            'fallback': None,
+        }
+
+        if current_user.company_id:
+            offices = Office.query.filter_by(
+                company_id=current_user.company_id,
+                is_active=True,
+            ).all()
+            for office in offices:
+                payload['offices'].append({
+                    'id': office.id,
+                    'name': office.name,
+                    'latitude': office.latitude,
+                    'longitude': office.longitude,
+                    'radius': office.radius,
+                    'geolocation_max_accuracy': office.geolocation_max_accuracy,
+                })
+
+        company = current_user.company
+        if company and company.office_latitude is not None and company.office_longitude is not None:
+            payload['fallback'] = {
+                'latitude': company.office_latitude,
+                'longitude': company.office_longitude,
+                'radius': getattr(company, 'office_radius', None),
+                'geolocation_max_accuracy': getattr(company, 'geolocation_max_accuracy', None),
+            }
+
+        mission_links = MissionUser.query.filter_by(user_id=current_user.id, status='accepted').all()
+        mission_ids = [link.mission_id for link in mission_links]
+
+        if mission_ids:
+            missions = Mission.query.filter(Mission.id.in_(mission_ids)).all()
+        else:
+            missions = []
+
+        for mission in missions:
+            payload['missions'].append({
+                'id': mission.id,
+                'order_number': mission.order_number,
+                'title': mission.title,
+                'latitude': mission.latitude,
+                'longitude': mission.longitude,
+                'radius': mission.radius,
+                'geolocation_max_accuracy': mission.geolocation_max_accuracy,
+                'status': mission.status,
+            })
+
+        return jsonify({'context': payload}), 200
+
+    except Exception:  # pragma: no cover - log et retour générique
+        current_app.logger.exception('Erreur lors de la récupération du contexte de géofencing', exc_info=True)
+        return jsonify(message="Impossible de récupérer le contexte de géolocalisation"), 500
 
 @attendance_extras_bp.route('/today', methods=['GET'])
 @jwt_required()
@@ -476,6 +543,10 @@ def offline_checkin():
                         heure_arrivee=pointage_time,
                         latitude=coordinates['latitude'],
                         longitude=coordinates['longitude'],
+                        accuracy=coordinates.get('accuracy'),
+                        altitude=coordinates.get('altitude'),
+                        heading=coordinates.get('heading'),
+                        speed=coordinates.get('speed'),
                         office_id=nearest_office.id,
                         distance=min_distance,
                         sync_status='synced',
@@ -513,6 +584,10 @@ def offline_checkin():
                     heure_arrivee=pointage_time,
                     latitude=coordinates['latitude'],
                     longitude=coordinates['longitude'],
+                    accuracy=coordinates.get('accuracy'),
+                    altitude=coordinates.get('altitude'),
+                    heading=coordinates.get('heading'),
+                    speed=coordinates.get('speed'),
                     sync_status='synced',
                     is_offline=True,
                     offline_timestamp=dt,

@@ -1,17 +1,34 @@
 import React, { useState, useEffect } from 'react'
 import { MapPin, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+import CheckInGuidance from './CheckInGuidance'
+import CheckInZoneMap from './CheckInZoneMap'
+import { useGeofencingContext } from '../../hooks/useGeofencingContext'
+
+interface Coordinates {
+  latitude: number
+  longitude: number
+  accuracy: number
+  altitude?: number
+  heading?: number
+  speed?: number
+}
 
 interface Props {
-  onCheckIn: (coordinates: {latitude: number, longitude: number, accuracy: number}) => void
+  onCheckIn: (coordinates: Coordinates) => void
   onCancel: () => void
   loading: boolean
 }
 
 export default function GeoCheck({ onCheckIn, onCancel, loading }: Props) {
-  const [coordinates, setCoordinates] = useState<{latitude: number, longitude: number, accuracy: number} | null>(null)
+  const [coordinates, setCoordinates] = useState<Coordinates | null>(null)
   const [geoError, setGeoError] = useState<string | null>(null)
   const [loadingLocation, setLoadingLocation] = useState(true)
+  const {
+    context: geofencingContext,
+    loading: geofencingLoading,
+    error: geofencingError,
+  } = useGeofencingContext()
 
   useEffect(() => {
     const getLocation = () => {
@@ -23,11 +40,23 @@ export default function GeoCheck({ onCheckIn, onCancel, loading }: Props) {
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setCoordinates({
+          const nextCoordinates: Coordinates = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude,
             accuracy: position.coords.accuracy
-          })
+          }
+
+          if (position.coords.altitude != null) {
+            nextCoordinates.altitude = position.coords.altitude
+          }
+          if (position.coords.heading != null) {
+            nextCoordinates.heading = position.coords.heading
+          }
+          if (position.coords.speed != null) {
+            nextCoordinates.speed = position.coords.speed
+          }
+
+          setCoordinates(nextCoordinates)
           setLoadingLocation(false)
         },
         (error) => {
@@ -72,10 +101,19 @@ export default function GeoCheck({ onCheckIn, onCancel, loading }: Props) {
       <div className="h-16 w-16 mx-auto bg-blue-100 rounded-full flex items-center justify-center mb-4">
         <MapPin className="h-8 w-8 text-blue-600" />
       </div>
-      
+
       <h3 className="text-lg font-medium mb-2">
         Pointage par géolocalisation
       </h3>
+
+      <CheckInGuidance className="mb-4 text-left" />
+      <CheckInZoneMap
+        context={geofencingContext}
+        loading={geofencingLoading}
+        error={geofencingError}
+        mode="office"
+        className="mb-6"
+      />
 
       {loadingLocation ? (
         <div className="flex flex-col items-center justify-center my-6">
@@ -98,6 +136,9 @@ export default function GeoCheck({ onCheckIn, onCancel, loading }: Props) {
             <p>Position obtenue avec succès!</p>
             <p className="text-xs mt-1 text-gray-600">
               Lat: {coordinates.latitude.toFixed(6)}, Long: {coordinates.longitude.toFixed(6)}
+            </p>
+            <p className="text-xs mt-1 text-gray-600">
+              Précision: ~{Math.round(coordinates.accuracy)} m
             </p>
           </div>
           

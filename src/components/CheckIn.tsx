@@ -3,11 +3,20 @@ import { attendanceService } from '../services/api'
 import { MapPin, Clock, Loader, Navigation, Clipboard } from 'lucide-react'
 import toast from 'react-hot-toast'
 
+type LocationDetails = {
+  latitude: number
+  longitude: number
+  accuracy: number
+  altitude?: number
+  heading?: number
+  speed?: number
+}
+
 export default function CheckIn() {
   const [activeTab, setActiveTab] = useState<'office' | 'mission'>('office')
   const [loading, setLoading] = useState(false)
   const [missionOrderNumber, setMissionOrderNumber] = useState('')
-  const [currentLocation, setCurrentLocation] = useState<{latitude: number, longitude: number, accuracy: number} | null>(null)
+  const [currentLocation, setCurrentLocation] = useState<LocationDetails | null>(null)
   const [locationLoading, setLocationLoading] = useState(false)
 
   // Obtenir la position actuelle au chargement du composant
@@ -24,10 +33,20 @@ export default function CheckIn() {
     setLocationLoading(true)
     navigator.geolocation.getCurrentPosition(
       (position) => {
-        const newLocation = {
+        const newLocation: LocationDetails = {
           latitude: position.coords.latitude,
           longitude: position.coords.longitude,
           accuracy: position.coords.accuracy
+        }
+
+        if (position.coords.altitude != null) {
+          newLocation.altitude = position.coords.altitude
+        }
+        if (position.coords.heading != null) {
+          newLocation.heading = position.coords.heading
+        }
+        if (position.coords.speed != null) {
+          newLocation.speed = position.coords.speed
         }
         
         // Validation des coordonnées
