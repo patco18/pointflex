@@ -23,9 +23,6 @@ export default function CheckIn() {
       throw new Error('Composant démonté')
     }
 
-    setSearchingPosition(true)
-    setCurrentAccuracy(null)
-
     try {
       return await watchPositionUntilAccurate({
         onUpdate: (pos) => {
@@ -44,10 +41,20 @@ export default function CheckIn() {
     setLoading(true)
     try {
       const position = await getPrecisePosition()
-      const coordinates = {
+
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy
+      }
+
+      if (position.coords.altitude != null) {
+        coordinates.altitude = position.coords.altitude
+      }
+      if (position.coords.heading != null) {
+        coordinates.heading = position.coords.heading
+      }
+      if (position.coords.speed != null) {
+        coordinates.speed = position.coords.speed
       }
 
       const { data } = await attendanceService.checkInOffice(coordinates)
@@ -83,10 +90,20 @@ export default function CheckIn() {
     setLoading(true)
     try {
       const position = await getPrecisePosition()
-      const coordinates = {
+
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy
+      }
+
+      if (position.coords.altitude != null) {
+        coordinates.altitude = position.coords.altitude
+      }
+      if (position.coords.heading != null) {
+        coordinates.heading = position.coords.heading
+      }
+      if (position.coords.speed != null) {
+        coordinates.speed = position.coords.speed
       }
 
       const { data } = await attendanceService.checkInMission(

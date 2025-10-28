@@ -61,3 +61,22 @@ def log_attendance_error(error_type, user_id=None, error_details=None):
     
     logger.error(f"ATTENDANCE ERROR: {error_type} - User: {user_id} - Details: {error_details}")
     return log_entry
+
+
+def log_accuracy_alert(user_id=None, context=None, failure_streak=None, reported_accuracy=None, threshold=None, extra=None):
+    """Log a warning highlighting repeated accuracy rejections."""
+
+    details = {
+        "context": context or {},
+        "failure_streak": failure_streak,
+        "reported_accuracy": reported_accuracy,
+        "threshold": threshold,
+        "extra": extra or {},
+    }
+
+    logger.warning(
+        "ATTENDANCE ALERT: ACCURACY_THRESHOLD - User: %s - Details: %s",
+        user_id,
+        details,
+    )
+    return details

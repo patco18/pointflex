@@ -10,6 +10,7 @@ from backend.database import db
 from backend.models.geolocation_accuracy_stats import GeolocationAccuracyStats
 
 
+
 @dataclass
 class GeolocationContext:
     """Small wrapper describing where the adjustment applies."""
@@ -41,6 +42,7 @@ class GeolocationAccuracyService:
     MAX_THRESHOLD = 300
     SUCCESS_STREAK_FOR_IMPROVEMENT = 3
     FAILURE_STREAK_FOR_RELAXATION = 2
+
     IMPROVEMENT_STEP = 5
     RELAXATION_STEP = 15
     RELAXATION_DURATION = timedelta(hours=6)
@@ -93,6 +95,7 @@ class GeolocationAccuracyService:
         stats.register_sample(accuracy)
         stats.failure_streak = (stats.failure_streak or 0) + 1
         stats.success_streak = 0
+
 
         if stats.failure_streak >= self.FAILURE_STREAK_FOR_RELAXATION:
             current_threshold = self.context.get_threshold(applied_threshold)

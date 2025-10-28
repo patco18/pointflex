@@ -128,6 +128,7 @@ def mission_checkin():
                     'mission_id': mission.id,
                     'reported_accuracy': coordinates['accuracy'],
                     'allowed_accuracy': max_accuracy,
+
                 },
             )
             return jsonify(
@@ -188,6 +189,10 @@ def mission_checkin():
             mission_order_number=mission.order_number,
             latitude=coordinates['latitude'],
             longitude=coordinates['longitude'],
+            accuracy=coordinates.get('accuracy'),
+            altitude=coordinates.get('altitude'),
+            heading=coordinates.get('heading'),
+            speed=coordinates.get('speed'),
             distance=mission_distance  # Stocker la distance calculée
         )
 
@@ -206,7 +211,7 @@ def mission_checkin():
                 'mission_order_number': mission.order_number,
                 'status': pointage.statut,
                 'coordinates': coordinates,
-                'distance': mission_distance  # Utiliser la distance calculée précédemment
+                'distance': mission_distance,  # Utiliser la distance calculée précédemment
             }
         )
 
@@ -221,6 +226,7 @@ def mission_checkin():
                 'accuracy': coordinates['accuracy'],
                 'max_accuracy': max_accuracy,
                 'distance': mission_distance,
+
             },
         )
 

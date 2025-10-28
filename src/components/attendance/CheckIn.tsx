@@ -37,13 +37,6 @@ const CheckIn: React.FC<CheckInProps> = ({ onCheckInSuccess }) => {
         }
       });
 
-      const { latitude, longitude, accuracy } = position.coords;
-
-      await attendanceService.checkInOffice({
-        latitude,
-        longitude,
-        accuracy
-      });
 
       toast.success('Pointage effectué avec succès!');
       if (onCheckInSuccess) {

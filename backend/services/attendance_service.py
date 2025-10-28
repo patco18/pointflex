@@ -592,6 +592,7 @@ def office_checkin_safe(user_id, coordinates):
 
         # Vérifier la précision GPS
         if coordinates['accuracy'] > max_accuracy:
+
             if adjuster:
                 adjuster.record_failure(coordinates['accuracy'], applied_threshold)
                 db.session.commit()
@@ -613,7 +614,11 @@ def office_checkin_safe(user_id, coordinates):
                         latitude=coordinates['latitude'],
                         longitude=coordinates['longitude'],
                         office_id=nearest_office['id'],
-                        distance=min_distance
+                        distance=min_distance,
+                        accuracy=coordinates.get('accuracy'),
+                        altitude=coordinates.get('altitude'),
+                        heading=coordinates.get('heading'),
+                        speed=coordinates.get('speed'),
                     )
                 else:
                     return {
@@ -630,7 +635,11 @@ def office_checkin_safe(user_id, coordinates):
                         latitude=coordinates['latitude'],
                         longitude=coordinates['longitude'],
                         office_id=nearest_office.id,
-                        distance=min_distance
+                        distance=min_distance,
+                        accuracy=coordinates.get('accuracy'),
+                        altitude=coordinates.get('altitude'),
+                        heading=coordinates.get('heading'),
+                        speed=coordinates.get('speed'),
                     )
                 else:
                     return {
@@ -662,7 +671,11 @@ def office_checkin_safe(user_id, coordinates):
                     user_id=user_id,
                     type_pointage='office',
                     latitude=coordinates['latitude'],
-                    longitude=coordinates['longitude']
+                    longitude=coordinates['longitude'],
+                    accuracy=coordinates.get('accuracy'),
+                    altitude=coordinates.get('altitude'),
+                    heading=coordinates.get('heading'),
+                    speed=coordinates.get('speed'),
                 )
         else:
             # Cas d'un utilisateur sans entreprise
@@ -670,7 +683,11 @@ def office_checkin_safe(user_id, coordinates):
                 user_id=user_id,
                 type_pointage='office',
                 latitude=coordinates['latitude'],
-                longitude=coordinates['longitude']
+                longitude=coordinates['longitude'],
+                accuracy=coordinates.get('accuracy'),
+                altitude=coordinates.get('altitude'),
+                heading=coordinates.get('heading'),
+                speed=coordinates.get('speed'),
             )
         
         # Retourner le pointage créé
@@ -697,7 +714,18 @@ def office_checkin_safe(user_id, coordinates):
             'status_code': 500
         }
 
-def create_pointage(user_id, type_pointage, latitude, longitude, office_id=None, distance=None):
+def create_pointage(
+    user_id,
+    type_pointage,
+    latitude,
+    longitude,
+    office_id=None,
+    distance=None,
+    accuracy=None,
+    altitude=None,
+    heading=None,
+    speed=None,
+):
     """
     Crée un nouveau pointage avec gestion des erreurs
     """
@@ -760,6 +788,10 @@ def create_pointage(user_id, type_pointage, latitude, longitude, office_id=None,
                 type=type_pointage,
                 latitude=latitude,
                 longitude=longitude,
+                accuracy=accuracy,
+                altitude=altitude,
+                heading=heading,
+                speed=speed,
                 date_pointage=today,
                 heure_arrivee=now_utc.time()
             )
@@ -780,7 +812,14 @@ def create_pointage(user_id, type_pointage, latitude, longitude, office_id=None,
                     resource_type='Pointage',
                     resource_id=pointage.id,
                     details={
-                        'coordinates': {'latitude': latitude, 'longitude': longitude},
+                        'coordinates': {
+                            'latitude': latitude,
+                            'longitude': longitude,
+                            'accuracy': accuracy,
+                            'altitude': altitude,
+                            'heading': heading,
+                            'speed': speed,
+                        },
                         'status': pointage.statut,
                         'office_id': getattr(pointage, 'office_id', None),
                         'distance': getattr(pointage, 'distance', None)
@@ -800,7 +839,11 @@ def create_pointage(user_id, type_pointage, latitude, longitude, office_id=None,
                         'pointage_id': pointage.id,
                         'office_id': getattr(pointage, 'office_id', None),
                         'status': pointage.statut,
-                        'time': pointage.heure_arrivee.strftime('%H:%M:%S')
+                        'time': pointage.heure_arrivee.strftime('%H:%M:%S'),
+                        'accuracy': accuracy,
+                        'altitude': altitude,
+                        'heading': heading,
+                        'speed': speed,
                     }
                 )
             except:

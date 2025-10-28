@@ -215,12 +215,32 @@ export default function AttendanceHome() {
       })
       
       // Faire le pointage mission
+      const coordinates: {
+        latitude: number
+        longitude: number
+        accuracy: number
+        altitude?: number
+        heading?: number
+        speed?: number
+      } = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
+      }
+
+      if (position.coords.altitude != null) {
+        coordinates.altitude = position.coords.altitude
+      }
+      if (position.coords.heading != null) {
+        coordinates.heading = position.coords.heading
+      }
+      if (position.coords.speed != null) {
+        coordinates.speed = position.coords.speed
+      }
+
       await attendanceService.checkInMission(
         mission.order_number,
-        {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude
-        }
+        coordinates
       )
       
       toast.success('Pointage mission effectué')

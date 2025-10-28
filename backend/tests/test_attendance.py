@@ -27,6 +27,9 @@ def test_office_checkin(client):
     body = resp.get_json()
     assert body['pointage']['type'] == 'office'
     assert 'is_equalized' in body['pointage']
+    with client.application.app_context():
+        created_pointage = Pointage.query.get(body['pointage']['id'])
+        assert created_pointage.accuracy == data['coordinates']['accuracy']
 
 
 def test_office_checkin_respects_company_accuracy(client):
@@ -145,6 +148,10 @@ def test_mission_checkin_accepts_within_radius(client):
         headers=headers,
     )
     assert resp.status_code == 201
+    with client.application.app_context():
+        mission_pointage = Pointage.query.filter_by(mission_id=mission_id).order_by(Pointage.id.desc()).first()
+        assert mission_pointage is not None
+        assert mission_pointage.accuracy == 10
 
 
 def test_mission_checkin_rejects_outside_radius(client):
@@ -218,6 +225,7 @@ def test_mission_checkin_rejects_when_accuracy_too_high(client):
     assert 'Précision de localisation insuffisante' in resp.get_json()['message']
 
 
+
 def test_mission_checkin_uses_company_accuracy_when_missing_on_mission(client):
     token = login_employee(client)
     headers = {'Authorization': f'Bearer {token}'}
@@ -254,6 +262,7 @@ def test_mission_checkin_uses_company_accuracy_when_missing_on_mission(client):
     assert resp.status_code == 400
     body = resp.get_json()
     assert str(25) in body['message']
+
 
 
 

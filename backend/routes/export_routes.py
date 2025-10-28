@@ -124,6 +124,10 @@ def get_attendance_data(company_id):
             'statut': p.status,
             'latitude': p.latitude,
             'longitude': p.longitude,
+            'accuracy': getattr(p, 'accuracy', None),
+            'altitude': getattr(p, 'altitude', None),
+            'heading': getattr(p, 'heading', None),
+            'speed': getattr(p, 'speed', None),
             'ip_address': p.ip_address,
             'device_info': p.device_info
         })

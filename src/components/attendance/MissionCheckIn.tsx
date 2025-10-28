@@ -39,9 +39,6 @@ export default function MissionCheckIn() {
       throw new Error('Composant démonté')
     }
 
-    setSearchingPosition(true)
-    setCurrentAccuracy(null)
-
     try {
       return await watchPositionUntilAccurate({
         onUpdate: (pos) => {
@@ -71,10 +68,7 @@ export default function MissionCheckIn() {
     setLoading(true)
     try {
       const position = await getPrecisePosition()
-      const coordinates = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        accuracy: position.coords.accuracy
+
       }
 
       const { data } = await attendanceService.checkInMission(
