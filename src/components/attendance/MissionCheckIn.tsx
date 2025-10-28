@@ -1,9 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { attendanceService, missionService } from '../../services/api'
 import { Briefcase, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+import CheckInGuidance from './CheckInGuidance'
+import CheckInZoneMap from './CheckInZoneMap'
+import { useGeofencingContext } from '../../hooks/useGeofencingContext'
+import { attendanceService, missionService } from '../../services/api'
 import { watchPositionUntilAccurate } from '../../utils/geolocation'
 
+interface Coordinates {
+  latitude: number
+  longitude: number
+  accuracy: number
+  altitude?: number
+  heading?: number
+  speed?: number
+}
 
 interface Mission {
   id: number
@@ -18,6 +30,12 @@ export default function MissionCheckIn() {
   const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null)
   const [searchingPosition, setSearchingPosition] = useState(false)
   const isMountedRef = useRef(true)
+
+  const {
+    context: geofencingContext,
+    loading: geofencingLoading,
+    error: geofencingError,
+  } = useGeofencingContext()
 
 
   useEffect(() => {
@@ -41,6 +59,9 @@ export default function MissionCheckIn() {
       throw new Error('Composant démonté')
     }
 
+
+    setSearchingPosition(true)
+    setCurrentAccuracy(null)
 
     try {
       return await watchPositionUntilAccurate({
@@ -72,6 +93,20 @@ export default function MissionCheckIn() {
     try {
       const position = await getPrecisePosition()
 
+      const coordinates: Coordinates = {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
+      }
+
+      if (position.coords.altitude != null) {
+        coordinates.altitude = position.coords.altitude
+      }
+      if (position.coords.heading != null) {
+        coordinates.heading = position.coords.heading
+      }
+      if (position.coords.speed != null) {
+        coordinates.speed = position.coords.speed
       }
 
       const { data } = await attendanceService.checkInMission(

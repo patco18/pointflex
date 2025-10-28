@@ -1,9 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { attendanceService } from '../services/api'
 import { MapPin, Clock, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
+
+import CheckInGuidance from '../components/attendance/CheckInGuidance'
+import CheckInZoneMap from '../components/attendance/CheckInZoneMap'
+import { useGeofencingContext } from '../hooks/useGeofencingContext'
+import { attendanceService } from '../services/api'
 import { watchPositionUntilAccurate } from '../utils/geolocation'
 
+interface Coordinates {
+  latitude: number
+  longitude: number
+  accuracy: number
+  altitude?: number
+  heading?: number
+  speed?: number
+}
 
 export default function CheckIn() {
   const [activeTab, setActiveTab] = useState<'office' | 'mission'>('office')
@@ -12,6 +24,12 @@ export default function CheckIn() {
   const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null)
   const [searchingPosition, setSearchingPosition] = useState(false)
   const isMountedRef = useRef(true)
+
+  const {
+    context: geofencingContext,
+    loading: geofencingLoading,
+    error: geofencingError,
+  } = useGeofencingContext()
 
 
   useEffect(() => {
@@ -25,6 +43,9 @@ export default function CheckIn() {
       throw new Error('Composant démonté')
     }
 
+
+    setSearchingPosition(true)
+    setCurrentAccuracy(null)
 
     try {
       return await watchPositionUntilAccurate({
@@ -42,9 +63,11 @@ export default function CheckIn() {
 
   const handleOfficeCheckIn = async () => {
     setLoading(true)
+
     try {
       const position = await getPrecisePosition()
 
+      const coordinates: Coordinates = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy
@@ -91,9 +114,11 @@ export default function CheckIn() {
     }
 
     setLoading(true)
+
     try {
       const position = await getPrecisePosition()
 
+      const coordinates: Coordinates = {
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy
