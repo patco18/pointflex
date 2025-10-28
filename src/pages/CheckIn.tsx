@@ -23,9 +23,6 @@ export default function CheckIn() {
       throw new Error('Composant démonté')
     }
 
-    setSearchingPosition(true)
-    setCurrentAccuracy(null)
-
     try {
       return await watchPositionUntilAccurate({
         onUpdate: (pos) => {
@@ -44,14 +41,7 @@ export default function CheckIn() {
     setLoading(true)
     try {
       const position = await getPrecisePosition()
-      const coordinates: {
-        latitude: number
-        longitude: number
-        accuracy: number
-        altitude?: number
-        heading?: number
-        speed?: number
-      } = {
+
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy
@@ -100,14 +90,7 @@ export default function CheckIn() {
     setLoading(true)
     try {
       const position = await getPrecisePosition()
-      const coordinates: {
-        latitude: number
-        longitude: number
-        accuracy: number
-        altitude?: number
-        heading?: number
-        speed?: number
-      } = {
+
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy: position.coords.accuracy

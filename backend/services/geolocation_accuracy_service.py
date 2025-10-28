@@ -8,7 +8,7 @@ from typing import Optional
 
 from backend.database import db
 from backend.models.geolocation_accuracy_stats import GeolocationAccuracyStats
-from backend.utils.attendance_logger import log_accuracy_alert
+
 
 
 @dataclass
@@ -42,7 +42,7 @@ class GeolocationAccuracyService:
     MAX_THRESHOLD = 300
     SUCCESS_STREAK_FOR_IMPROVEMENT = 3
     FAILURE_STREAK_FOR_RELAXATION = 2
-    ALERT_FAILURE_STREAK = 2
+
     IMPROVEMENT_STEP = 5
     RELAXATION_STEP = 15
     RELAXATION_DURATION = timedelta(hours=6)
@@ -96,21 +96,6 @@ class GeolocationAccuracyService:
         stats.failure_streak = (stats.failure_streak or 0) + 1
         stats.success_streak = 0
 
-        if stats.failure_streak == self.ALERT_FAILURE_STREAK:
-            log_accuracy_alert(
-                user_id=self.user_id,
-                context={
-                    'type': self.context.context_type,
-                    'id': self.context.context_id,
-                },
-                failure_streak=stats.failure_streak,
-                reported_accuracy=accuracy,
-                threshold=applied_threshold,
-                extra={
-                    'baseline_accuracy': stats.baseline_accuracy,
-                    'temporary_accuracy': stats.temporary_accuracy,
-                },
-            )
 
         if stats.failure_streak >= self.FAILURE_STREAK_FOR_RELAXATION:
             current_threshold = self.context.get_threshold(applied_threshold)
