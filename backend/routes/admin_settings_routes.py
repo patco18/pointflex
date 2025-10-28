@@ -4,7 +4,7 @@ from backend.middleware.auth import require_admin
 from backend.database import db
 from backend.models.user import User
 from backend.models.company import Company
-from backend.models.notification_setting import NotificationSetting
+from backend.models.notification_settings import NotificationSettings
 from backend.models.integration_setting import IntegrationSetting
 import json
 import secrets
@@ -61,14 +61,14 @@ def get_notification_settings():
         return error_response
     
     # Rechercher les paramètres existants ou créer des paramètres par défaut
-    settings = NotificationSetting.query.filter_by(company_id=company.id).first()
-    
+    settings = NotificationSettings.query.filter_by(company_id=company.id).first()
+
     if not settings:
         # Créer des paramètres par défaut
-        settings = NotificationSetting(company_id=company.id)
+        settings = NotificationSettings(company_id=company.id)
         db.session.add(settings)
         db.session.commit()
-    
+
     return jsonify({"settings": settings.to_dict()}), 200
 
 @admin_settings_bp.route('/company/notification-settings', methods=['PUT'])
@@ -84,18 +84,19 @@ def update_notification_settings():
     if not data:
         return jsonify(message="Données manquantes"), 400
     
-    settings = NotificationSetting.query.filter_by(company_id=company.id).first()
-    
+    settings = NotificationSettings.query.filter_by(company_id=company.id).first()
+
     if not settings:
-        settings = NotificationSetting(company_id=company.id)
+        settings = NotificationSettings(company_id=company.id)
         db.session.add(settings)
-    
+        db.session.flush()
+
+    old_values = settings.to_dict()
+
     # Mettre à jour les paramètres
     for key, value in data.items():
         if hasattr(settings, key):
             setattr(settings, key, value)
-    
-    old_values = settings.to_dict() if settings else {}
     
     try:
         db.session.commit()

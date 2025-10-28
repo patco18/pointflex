@@ -163,18 +163,24 @@ from backend.database import db
 from datetime import datetime
 
 class NotificationSettings(db.Model):
+    __tablename__ = 'notification_settings'
+
     id = db.Column(db.Integer, primary_key=True)
-    company_id = db.Column(db.Integer, db.ForeignKey('company.id'), nullable=False)
-    
-    email_notifications = db.Column(db.Boolean, default=True)
-    push_notifications = db.Column(db.Boolean, default=True)
-    attendance_alerts = db.Column(db.Boolean, default=True)
-    leave_alerts = db.Column(db.Boolean, default=True)
-    system_notifications = db.Column(db.Boolean, default=True)
-    
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False, unique=True)
+
+    email_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    sms_notifications = db.Column(db.Boolean, default=False, nullable=False)
+    push_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    daily_summary = db.Column(db.Boolean, default=True, nullable=False)
+    attendance_alerts = db.Column(db.Boolean, default=True, nullable=False)
+    leave_alerts = db.Column(db.Boolean, default=True, nullable=False)
+    system_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    invoice_notifications = db.Column(db.Boolean, default=True, nullable=False)
+    subscription_alerts = db.Column(db.Boolean, default=True, nullable=False)
+
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
     company = db.relationship('Company', backref=db.backref('notification_settings', lazy=True, uselist=False))
 ```
 

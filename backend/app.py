@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 # Import configuration
-from backend.config import Config
+from backend.config import Config, config as config_map
 
 # Import database
 from backend.database import db, init_db
@@ -53,15 +53,38 @@ from backend.extensions import limiter
 
 def create_app():
     app = Flask(__name__)
-    
-    # Load configuration
-    app.config.from_object(Config)
+
+    # Load configuration based on environment variable hints.
+    config_name = (
+        os.environ.get('FLASK_CONFIG')
+        or os.environ.get('POINTFLEX_ENV')
+        or os.environ.get('FLASK_ENV')
+        or 'default'
+    )
+    config_class = config_map.get(config_name, Config)
+    app.config.from_object(config_class)
+    # Ensure Flask's ENV reflects the selected configuration for downstream checks.
+    if 'ENV' in dir(config_class):
+        app.config['ENV'] = getattr(config_class, 'ENV')
 
     # Warn if critical environment variables are missing
     if not app.config.get('FCM_SERVER_KEY'):
         app.logger.warning('FCM_SERVER_KEY is not set. Push notifications will be disabled.')
-    if not app.config.get('TWO_FACTOR_ENCRYPTION_KEY'):
-        app.logger.warning('TWO_FACTOR_ENCRYPTION_KEY is not configured. 2FA encryption will fail.')
+
+    two_factor_key = app.config.get('TWO_FACTOR_ENCRYPTION_KEY')
+    if not two_factor_key:
+        fallback_key = app.config.get('TWO_FACTOR_DEV_FALLBACK_KEY')
+        require_key = app.config.get('TWO_FACTOR_REQUIRE_KEY')
+        if require_key or not fallback_key:
+            raise RuntimeError('TWO_FACTOR_ENCRYPTION_KEY is not configured. Set it before starting the app.')
+
+        app.logger.warning(
+            'TWO_FACTOR_ENCRYPTION_KEY is not configured. Using development fallback key; '
+            'never use this value in production.'
+        )
+        app.config['TWO_FACTOR_ENCRYPTION_KEY'] = fallback_key
+        os.environ.setdefault('TWO_FACTOR_ENCRYPTION_KEY', fallback_key)
+
     if app.config.get('RATELIMIT_STORAGE_URL', '').startswith('memory'):
         app.logger.warning('RATELIMIT_STORAGE_URL uses local memory. Configure Redis for production use.')
     
