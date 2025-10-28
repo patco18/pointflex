@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { MapPin, Loader } from 'lucide-react';
 import Button from '../ui/button';
 import Card from '../ui/card';
 import { attendanceService } from '../../services/api';
 import { toast } from 'react-hot-toast';
+import { watchPositionUntilAccurate } from '../../utils/geolocation';
 
 interface CheckInProps {
   onCheckInSuccess?: () => void;
@@ -12,30 +13,38 @@ interface CheckInProps {
 const CheckIn: React.FC<CheckInProps> = ({ onCheckInSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null);
+  const [searchingPosition, setSearchingPosition] = useState(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handleCheckIn = async () => {
     setLoading(true);
     setError(null);
-    
+    setSearchingPosition(true);
+    setCurrentAccuracy(null);
+
     try {
-      // Obtenir la position actuelle
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        });
+      const position = await watchPositionUntilAccurate({
+        onUpdate: (pos) => {
+          if (!isMountedRef.current) return;
+          setCurrentAccuracy(Math.round(pos.coords.accuracy));
+        }
       });
-      
+
       const { latitude, longitude, accuracy } = position.coords;
-      
-      // Envoyer la position au serveur
+
       await attendanceService.checkInOffice({
         latitude,
         longitude,
         accuracy
       });
-      
+
       toast.success('Pointage effectué avec succès!');
       if (onCheckInSuccess) {
         onCheckInSuccess();
@@ -60,7 +69,10 @@ const CheckIn: React.FC<CheckInProps> = ({ onCheckInSuccess }) => {
         setError('Erreur lors du pointage. Veuillez vérifier que vous êtes dans la zone autorisée.');
       }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+        setSearchingPosition(false);
+      }
     }
   };
 
@@ -78,11 +90,25 @@ const CheckIn: React.FC<CheckInProps> = ({ onCheckInSuccess }) => {
             {error}
           </div>
         )}
-        
-        <Button 
-          onClick={handleCheckIn} 
-          disabled={loading} 
-          color="primary" 
+
+        {searchingPosition && (
+          <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-4 text-sm">
+            Obtention d'une position précise...
+            {currentAccuracy !== null && (
+              <div className="mt-2 text-blue-800">
+                Précision actuelle : <span className="font-semibold">~{currentAccuracy} m</span>
+              </div>
+            )}
+            <div className="mt-1 text-xs text-blue-600">
+              Restez immobile et assurez-vous que le GPS est activé pour accélérer la mesure.
+            </div>
+          </div>
+        )}
+
+        <Button
+          onClick={handleCheckIn}
+          disabled={loading}
+          color="primary"
           size="lg"
           className="w-full"
           icon={loading ? <Loader className="mr-2 h-4 w-4 animate-spin" /> : <MapPin className="mr-2 h-4 w-4" />}
