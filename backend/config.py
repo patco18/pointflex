@@ -85,8 +85,7 @@ class Config:
 
     # 2FA
     TWO_FACTOR_ENCRYPTION_KEY = os.environ.get('TWO_FACTOR_ENCRYPTION_KEY') # Loaded in security_utils directly
-    TWO_FACTOR_DEV_FALLBACK_KEY = os.environ.get('TWO_FACTOR_DEV_FALLBACK_KEY') or "1fkbhlkVxkA2sHQ1NblCLZApgu12YTtyjhHCcFtLeSY="
-    TWO_FACTOR_REQUIRE_KEY = os.environ.get('TWO_FACTOR_REQUIRE_KEY', 'false').lower() in ['true', 'on', '1']
+
 
     # Rate Limiting (Flask-Limiter)
     RATELIMIT_ENABLED = os.environ.get('RATELIMIT_ENABLED', 'true').lower() in ['true', 'on', '1']

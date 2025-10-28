@@ -73,16 +73,6 @@ def create_app():
 
     two_factor_key = app.config.get('TWO_FACTOR_ENCRYPTION_KEY')
     if not two_factor_key:
-        fallback_key = app.config.get('TWO_FACTOR_DEV_FALLBACK_KEY')
-        if app.config.get('TWO_FACTOR_REQUIRE_KEY') or not fallback_key:
-            raise RuntimeError('TWO_FACTOR_ENCRYPTION_KEY is not configured. Set it before starting the app.')
-
-        app.logger.warning(
-            'TWO_FACTOR_ENCRYPTION_KEY is not configured. Using development fallback key; '
-            'never use this value in production.'
-        )
-        app.config['TWO_FACTOR_ENCRYPTION_KEY'] = fallback_key
-        os.environ.setdefault('TWO_FACTOR_ENCRYPTION_KEY', fallback_key)
 
     if app.config.get('RATELIMIT_STORAGE_URL', '').startswith('memory'):
         app.logger.warning('RATELIMIT_STORAGE_URL uses local memory. Configure Redis for production use.')
