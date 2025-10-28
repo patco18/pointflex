@@ -88,6 +88,7 @@ class Config:
     TWO_FACTOR_DEV_FALLBACK_KEY = os.environ.get('TWO_FACTOR_DEV_FALLBACK_KEY') or "1fkbhlkVxkA2sHQ1NblCLZApgu12YTtyjhHCcFtLeSY="
     TWO_FACTOR_REQUIRE_KEY = os.environ.get('TWO_FACTOR_REQUIRE_KEY', 'false').lower() in ['true', 'on', '1']
 
+
     # Rate Limiting (Flask-Limiter)
     RATELIMIT_ENABLED = os.environ.get('RATELIMIT_ENABLED', 'true').lower() in ['true', 'on', '1']
     RATELIMIT_STORAGE_URL = os.environ.get('RATELIMIT_STORAGE_URL') or "memory://" # Default to memory, recommend Redis for production
