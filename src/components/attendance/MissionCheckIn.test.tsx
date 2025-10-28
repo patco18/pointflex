@@ -10,21 +10,31 @@ jest.mock('../../services/api', () => ({
   }
 }))
 
-const mockGeolocation = () => {
-  const mockGetCurrentPosition = jest.fn().mockImplementation((success) => {
-    success({ coords: { latitude: 1, longitude: 2 } })
+jest.mock('../../utils/geolocation', () => ({
+  watchPositionUntilAccurate: jest.fn()
+}))
+
+beforeEach(() => {
+  const { watchPositionUntilAccurate } = require('../../utils/geolocation')
+  watchPositionUntilAccurate.mockResolvedValue({
+    coords: { latitude: 1, longitude: 2, accuracy: 10 }
   })
-  // @ts-ignore
-  global.navigator.geolocation = { getCurrentPosition: mockGetCurrentPosition }
-}
+})
+
+afterEach(() => {
+  jest.clearAllMocks()
+})
 
 test('check-in with accepted mission', async () => {
   const { missionService, attendanceService } = require('../../services/api')
+  const { watchPositionUntilAccurate } = require('../../utils/geolocation')
   missionService.getActiveMissions.mockResolvedValue({ data: { missions: [
     { id: 1, order_number: 'M1', status: 'accepted' }
   ] } })
   attendanceService.checkInMission.mockResolvedValue({})
-  mockGeolocation()
+  watchPositionUntilAccurate.mockResolvedValue({
+    coords: { latitude: 1, longitude: 2, accuracy: 10 }
+  })
 
   render(<MissionCheckIn />)
   const select = await screen.findByLabelText('Mission')
@@ -35,10 +45,13 @@ test('check-in with accepted mission', async () => {
 
 test('prevents check-in for non accepted mission', async () => {
   const { missionService, attendanceService } = require('../../services/api')
+  const { watchPositionUntilAccurate } = require('../../utils/geolocation')
   missionService.getActiveMissions.mockResolvedValue({ data: { missions: [
     { id: 1, order_number: 'M1', status: 'pending' }
   ] } })
-  mockGeolocation()
+  watchPositionUntilAccurate.mockResolvedValue({
+    coords: { latitude: 1, longitude: 2, accuracy: 10 }
+  })
 
   render(<MissionCheckIn />)
   const select = await screen.findByLabelText('Mission')
