@@ -6,6 +6,7 @@ import { attendanceService } from '../../services/api';
 import { toast } from 'react-hot-toast';
 import { watchPositionUntilAccurate } from '../../utils/geolocation';
 
+
 interface CheckInProps {
   onCheckInSuccess?: () => void;
 }
@@ -16,6 +17,7 @@ const CheckIn: React.FC<CheckInProps> = ({ onCheckInSuccess }) => {
   const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null);
   const [searchingPosition, setSearchingPosition] = useState(false);
   const isMountedRef = useRef(true);
+
 
   useEffect(() => {
     return () => {
@@ -36,6 +38,7 @@ const CheckIn: React.FC<CheckInProps> = ({ onCheckInSuccess }) => {
           setCurrentAccuracy(Math.round(pos.coords.accuracy));
         }
       });
+
 
 
       toast.success('Pointage effectué avec succès!');
@@ -74,10 +77,19 @@ const CheckIn: React.FC<CheckInProps> = ({ onCheckInSuccess }) => {
       <div className="p-6">
         <h3 className="text-xl font-semibold mb-4">Effectuer un pointage</h3>
         <p className="text-gray-600 mb-4">
-          Cliquez sur le bouton ci-dessous pour effectuer votre pointage d'arrivée. 
+          Cliquez sur le bouton ci-dessous pour effectuer votre pointage d'arrivée.
           Assurez-vous d'être dans la zone de travail autorisée.
         </p>
-        
+
+        <CheckInGuidance className="mb-4" />
+        <CheckInZoneMap
+          context={geofencingContext}
+          loading={geofencingLoading}
+          error={geofencingError}
+          mode="office"
+          className="mb-6"
+        />
+
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
             {error}

@@ -6,7 +6,10 @@ jest.mock('../../services/api', () => ({
     getActiveMissions: jest.fn()
   },
   attendanceService: {
-    checkInMission: jest.fn()
+    checkInMission: jest.fn(),
+    getGeofencingContext: jest.fn().mockResolvedValue({
+      data: { context: { offices: [], missions: [], fallback: null } }
+    })
   }
 }))
 
@@ -18,11 +21,13 @@ beforeEach(() => {
   const { watchPositionUntilAccurate } = require('../../utils/geolocation')
   watchPositionUntilAccurate.mockResolvedValue({
     coords: { latitude: 1, longitude: 2, accuracy: 10 }
+
   })
 })
 
 afterEach(() => {
   jest.clearAllMocks()
+
 })
 
 test('check-in with accepted mission', async () => {

@@ -4,6 +4,7 @@ import { MapPin, Clock, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { watchPositionUntilAccurate } from '../utils/geolocation'
 
+
 export default function CheckIn() {
   const [activeTab, setActiveTab] = useState<'office' | 'mission'>('office')
   const [loading, setLoading] = useState(false)
@@ -11,6 +12,7 @@ export default function CheckIn() {
   const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null)
   const [searchingPosition, setSearchingPosition] = useState(false)
   const isMountedRef = useRef(true)
+
 
   useEffect(() => {
     return () => {
@@ -22,6 +24,7 @@ export default function CheckIn() {
     if (!isMountedRef.current) {
       throw new Error('Composant démonté')
     }
+
 
     try {
       return await watchPositionUntilAccurate({
@@ -185,6 +188,7 @@ export default function CheckIn() {
               Cliquez sur le bouton ci-dessous pour enregistrer votre arrivée au bureau.
               Votre position sera automatiquement détectée.
             </p>
+
             {searchingPosition && (
               <div className="bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 rounded mb-4 text-sm">
                 Obtention d'une position précise...
@@ -229,7 +233,17 @@ export default function CheckIn() {
             <p className="text-gray-600 mb-6">
               Saisissez le numéro d'ordre de mission pour enregistrer votre pointage.
             </p>
-            
+
+            <CheckInGuidance className="mb-4 text-left" />
+            <CheckInZoneMap
+              context={geofencingContext}
+              loading={geofencingLoading}
+              error={geofencingError}
+              mode="mission"
+              missionOrderNumber={missionOrderNumber.trim() || undefined}
+              className="mb-6"
+            />
+
             <div className="max-w-sm mx-auto mb-6">
               <label htmlFor="missionOrder" className="block text-sm font-medium text-gray-700 mb-2">
                 Numéro d'ordre de mission

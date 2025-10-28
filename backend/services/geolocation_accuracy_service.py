@@ -97,6 +97,7 @@ class GeolocationAccuracyService:
         stats.success_streak = 0
 
 
+
         if stats.failure_streak >= self.FAILURE_STREAK_FOR_RELAXATION:
             current_threshold = self.context.get_threshold(applied_threshold)
             new_threshold = min(current_threshold + self.RELAXATION_STEP, self.MAX_THRESHOLD)

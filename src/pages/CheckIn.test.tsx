@@ -4,7 +4,10 @@ import CheckIn from './CheckIn';
 jest.mock('../services/api', () => ({
   attendanceService: {
     checkInOffice: jest.fn(),
-    checkInMission: jest.fn().mockResolvedValue({})
+    checkInMission: jest.fn().mockResolvedValue({}),
+    getGeofencingContext: jest.fn().mockResolvedValue({
+      data: { context: { offices: [], missions: [], fallback: null } }
+    })
   }
 }));
 
@@ -17,10 +20,12 @@ beforeEach(() => {
   watchPositionUntilAccurate.mockResolvedValue({
     coords: { latitude: 1, longitude: 2, accuracy: 5 }
   });
+
 });
 
 afterEach(() => {
   jest.clearAllMocks();
+
 });
 
 test('switch to mission tab displays input', () => {

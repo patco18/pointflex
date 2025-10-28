@@ -226,6 +226,7 @@ def test_mission_checkin_rejects_when_accuracy_too_high(client):
 
 
 
+
 def test_mission_checkin_uses_company_accuracy_when_missing_on_mission(client):
     token = login_employee(client)
     headers = {'Authorization': f'Bearer {token}'}
@@ -262,6 +263,7 @@ def test_mission_checkin_uses_company_accuracy_when_missing_on_mission(client):
     assert resp.status_code == 400
     body = resp.get_json()
     assert str(25) in body['message']
+
 
 
 
@@ -318,6 +320,65 @@ def test_get_attendance_stats(client):
     assert resp.status_code == 200
     data = resp.get_json()
     assert 'stats' in data
+
+
+def test_geofencing_context_returns_company_data(client):
+    token = login_employee(client)
+    headers = {'Authorization': f'Bearer {token}'}
+
+    from backend.models.user import User
+    from backend.models.company import Company
+    from backend.models.office import Office
+    from backend.models.mission import Mission
+    from backend.models.mission_user import MissionUser
+
+    with client.application.app_context():
+        user = User.query.filter_by(email="employee@pointflex.com").first()
+        company = Company.query.get(user.company_id)
+        company.office_latitude = 48.8566
+        company.office_longitude = 2.3522
+        company.office_radius = 150
+        db.session.add(company)
+
+        office = Office(
+            company_id=company.id,
+            name='Siège',
+            address='Adresse',
+            city='Paris',
+            country='FR',
+            latitude=48.8566,
+            longitude=2.3522,
+            radius=120,
+            geolocation_max_accuracy=25,
+            is_active=True,
+        )
+        db.session.add(office)
+        db.session.flush()
+
+        mission = Mission(
+            company_id=company.id,
+            order_number='MISSION-CONTEXT',
+            title='Mission Contexte',
+            latitude=48.857,
+            longitude=2.353,
+            radius=300,
+            geolocation_max_accuracy=35,
+        )
+        db.session.add(mission)
+        db.session.flush()
+
+        mission_link = MissionUser(mission_id=mission.id, user_id=user.id, status='accepted')
+        db.session.add(mission_link)
+        db.session.commit()
+
+    resp = client.get('/api/attendance/geofencing/context', headers=headers)
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert 'context' in body
+    context = body['context']
+    assert context['offices'], 'Expected at least one office in context'
+    assert context['fallback'] is not None
+    assert any(m['order_number'] == 'MISSION-CONTEXT' for m in context['missions'])
 
 
 

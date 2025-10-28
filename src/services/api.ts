@@ -183,12 +183,12 @@ export const attendanceService = {
       // Ne pas logger les informations de mission et coordonnées en production
       // console.log('🚀 Pointage mission:', missionOrderNumber, coordinates ? 'avec coordonnées' : 'sans coordonnées')
       const data: any = { mission_order_number: missionOrderNumber }
-      
+
       // Ajouter les coordonnées si disponibles
       if (coordinates) {
         data.coordinates = coordinates
       }
-      
+
       return await api.post('/attendance/checkin/mission', data)
     } catch (error: any) {
       if (error.response?.data?.message) {
@@ -199,7 +199,16 @@ export const attendanceService = {
       throw error
     }
   },
-  
+
+  getGeofencingContext: async () => {
+    try {
+      return await api.get('/attendance/geofencing/context')
+    } catch (error) {
+      console.error('Geofencing context service error:', error)
+      throw error
+    }
+  },
+
   // Méthode de pointage QR code
   checkInQr: async (qrData: string) => {
     try {

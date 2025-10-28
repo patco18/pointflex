@@ -4,6 +4,7 @@ import { Briefcase, Loader } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { watchPositionUntilAccurate } from '../../utils/geolocation'
 
+
 interface Mission {
   id: number
   order_number: string
@@ -17,6 +18,7 @@ export default function MissionCheckIn() {
   const [currentAccuracy, setCurrentAccuracy] = useState<number | null>(null)
   const [searchingPosition, setSearchingPosition] = useState(false)
   const isMountedRef = useRef(true)
+
 
   useEffect(() => {
     const loadMissions = async () => {
@@ -38,6 +40,7 @@ export default function MissionCheckIn() {
     if (!isMountedRef.current) {
       throw new Error('Composant démonté')
     }
+
 
     try {
       return await watchPositionUntilAccurate({
@@ -118,6 +121,16 @@ export default function MissionCheckIn() {
         <p className="text-gray-600 mb-6">
           Sélectionnez la mission acceptée pour enregistrer votre pointage.
         </p>
+
+        <CheckInGuidance className="mb-4" />
+        <CheckInZoneMap
+          context={geofencingContext}
+          loading={geofencingLoading}
+          error={geofencingError}
+          mode="mission"
+          missionOrderNumber={missionOrderNumber.trim() || undefined}
+          className="mb-6"
+        />
 
         <div className="max-w-sm mx-auto mb-6">
           <label htmlFor="missionOrder" className="block text-sm font-medium text-gray-700 mb-2">
