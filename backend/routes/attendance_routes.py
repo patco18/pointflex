@@ -120,11 +120,7 @@ def mission_checkin():
         if mission_accuracy is not None:
             max_accuracy = mission_accuracy
 
-        adjuster = GeolocationAccuracyService.for_mission(mission, current_user.id)
 
-        if coordinates['accuracy'] > max_accuracy:
-            adjuster.record_failure(coordinates['accuracy'], max_accuracy)
-            db.session.commit()
             log_attendance_error(
                 'mission_checkin_accuracy_rejected',
                 current_user.id,

@@ -493,11 +493,7 @@ def office_checkin_safe(user_id, coordinates):
         
         # Paramètres par défaut
         max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
-        threshold_entity = None
-        company = getattr(user, 'company', None)
-        if company and getattr(company, 'geolocation_max_accuracy', None) is not None:
-            max_accuracy = company.geolocation_max_accuracy
-            threshold_entity = company
+
         min_distance = float('inf')
         nearest_office = None
         
