@@ -8,6 +8,21 @@ jest.mock('../services/api', () => ({
   }
 }));
 
+jest.mock('../utils/geolocation', () => ({
+  watchPositionUntilAccurate: jest.fn()
+}));
+
+beforeEach(() => {
+  const { watchPositionUntilAccurate } = require('../utils/geolocation');
+  watchPositionUntilAccurate.mockResolvedValue({
+    coords: { latitude: 1, longitude: 2, accuracy: 5 }
+  });
+});
+
+afterEach(() => {
+  jest.clearAllMocks();
+});
+
 test('switch to mission tab displays input', () => {
   render(<CheckIn />);
   fireEvent.click(screen.getByText('Pointage Mission'));
@@ -16,12 +31,10 @@ test('switch to mission tab displays input', () => {
 
 test('mission checkin calls service', async () => {
   const { attendanceService } = require('../services/api');
-  // mock geolocation
-  const mockGetCurrentPosition = jest.fn().mockImplementation((success) => {
-    success({ coords: { latitude: 1, longitude: 2, accuracy: 5 } });
+  const { watchPositionUntilAccurate } = require('../utils/geolocation');
+  watchPositionUntilAccurate.mockResolvedValue({
+    coords: { latitude: 1, longitude: 2, accuracy: 5 }
   });
-  // @ts-ignore
-  global.navigator.geolocation = { getCurrentPosition: mockGetCurrentPosition };
 
   render(<CheckIn />);
   fireEvent.click(screen.getByText('Pointage Mission'));

@@ -104,8 +104,37 @@ def mission_checkin():
         if not mu:
             return jsonify(message="Mission non acceptée"), 403
 
-        if coordinates.get('latitude') is None or coordinates.get('longitude') is None:
+        if (
+            coordinates.get('latitude') is None
+            or coordinates.get('longitude') is None
+            or coordinates.get('accuracy') is None
+        ):
             return jsonify(message="Coordonnées GPS requises"), 400
+
+        max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
+        company = mission.company
+        if company and getattr(company, 'geolocation_max_accuracy', None) is not None:
+            max_accuracy = company.geolocation_max_accuracy
+        mission_accuracy = getattr(mission, 'geolocation_max_accuracy', None)
+        if mission_accuracy is not None:
+            max_accuracy = mission_accuracy
+
+        if coordinates['accuracy'] > max_accuracy:
+            log_attendance_error(
+                'mission_checkin_accuracy_rejected',
+                current_user.id,
+                {
+                    'mission_id': mission.id,
+                    'reported_accuracy': coordinates['accuracy'],
+                    'allowed_accuracy': max_accuracy,
+                },
+            )
+            return jsonify(
+                message=(
+                    f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). "
+                    f"Maximum autorisé: {max_accuracy}m"
+                )
+            ), 400
 
         # Utiliser la date actuelle
         today_date = datetime.now().date()
@@ -122,13 +151,35 @@ def mission_checkin():
             return jsonify(message="Vous avez déjà pointé pour cette mission aujourd'hui"), 409
 
         # Calcul de distance par rapport au lieu de mission si disponible
-        mission_distance = 0.0
-        if mission.latitude and mission.longitude:
+        mission_distance = None
+        if mission.latitude is not None and mission.longitude is not None:
             mission_distance = calculate_distance(
                 coordinates['latitude'], coordinates['longitude'],
                 mission.latitude, mission.longitude
             )
             
+        if (
+            mission.radius is not None
+            and mission.latitude is not None
+            and mission.longitude is not None
+            and mission_distance > mission.radius
+        ):
+            log_attendance_error(
+                'mission_checkin_out_of_bounds',
+                current_user.id,
+                {
+                    'mission_id': mission.id,
+                    'distance': mission_distance,
+                    'allowed_radius': mission.radius,
+                },
+            )
+            return jsonify(
+                message=(
+                    f"Vous êtes trop loin du lieu de mission ({int(mission_distance)}m). "
+                    f"Rayon autorisé: {mission.radius}m"
+                )
+            ), 403
+
         pointage = Pointage(
             user_id=current_user.id,
             type='mission',
@@ -157,6 +208,18 @@ def mission_checkin():
         )
 
         db.session.commit()
+
+        log_attendance_event(
+            event_type='mission_checkin',
+            user_id=current_user.id,
+            details={
+                'pointage_id': pointage.id,
+                'mission_id': mission.id,
+                'accuracy': coordinates['accuracy'],
+                'max_accuracy': max_accuracy,
+                'distance': mission_distance,
+            },
+        )
 
         # Dispatch webhook for pointage creation (mission type)
         try:
