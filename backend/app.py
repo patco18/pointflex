@@ -74,6 +74,7 @@ def create_app():
     two_factor_key = app.config.get('TWO_FACTOR_ENCRYPTION_KEY')
     if not two_factor_key:
 
+
     if app.config.get('RATELIMIT_STORAGE_URL', '').startswith('memory'):
         app.logger.warning('RATELIMIT_STORAGE_URL uses local memory. Configure Redis for production use.')
     
