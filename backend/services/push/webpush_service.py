@@ -5,11 +5,23 @@ Service pour l'envoi de notifications push via Web Push API
 import json
 import logging
 from typing import Dict, Any, Optional, List
-from pywebpush import webpush, WebPushException
 from flask import current_app
 
 from backend.models.push_subscription import PushSubscription
 from backend.database import db
+
+try:  # pragma: no cover - behaviour verified via send_web_push guard
+    from pywebpush import webpush as _webpush, WebPushException as _WebPushException
+except Exception:  # ImportError, ModuleNotFoundError, etc.
+    _webpush = None
+
+    class _WebPushException(Exception):
+        """Fallback exception used when pywebpush isn't available."""
+
+
+def _webpush_available() -> bool:
+    """Return True if pywebpush could be imported."""
+    return _webpush is not None
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +36,10 @@ def send_web_push(subscription_info: Dict[str, Any], data: Dict[str, Any]) -> bo
     Returns:
         bool: True si l'envoi a réussi, False sinon
     """
+    if not _webpush_available():
+        logger.error("pywebpush n'est pas disponible. Impossible d'envoyer une notification Web Push.")
+        return False
+
     try:
         # Vérifier si les clés VAPID sont configurées
         if not current_app.config.get('VAPID_PRIVATE_KEY'):
@@ -35,16 +51,16 @@ def send_web_push(subscription_info: Dict[str, Any], data: Dict[str, Any]) -> bo
             return False
         
         # Envoyer la notification
-        response = webpush(
+        response = _webpush(
             subscription_info=subscription_info,
             data=json.dumps(data),
             vapid_private_key=current_app.config['VAPID_PRIVATE_KEY'],
             vapid_claims=current_app.config['VAPID_CLAIMS']
         )
-        
+
         logger.info(f"Notification push envoyée avec succès: {response.status_code}")
         return True
-    except WebPushException as e:
+    except _WebPushException as e:
         logger.error(f"Erreur lors de l'envoi de notification push: {e}")
         
         # Si l'erreur est due à une expiration de l'abonnement, le marquer comme inactif

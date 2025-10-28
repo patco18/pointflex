@@ -7,7 +7,8 @@ from datetime import timedelta
 
 class Config:
     """Configuration de base"""
-    
+
+    ENV = os.environ.get('FLASK_ENV') or os.environ.get('POINTFLEX_ENV') or 'development'
     # Base de données
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///pointflex.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
@@ -84,6 +85,8 @@ class Config:
 
     # 2FA
     TWO_FACTOR_ENCRYPTION_KEY = os.environ.get('TWO_FACTOR_ENCRYPTION_KEY') # Loaded in security_utils directly
+    TWO_FACTOR_DEV_FALLBACK_KEY = os.environ.get('TWO_FACTOR_DEV_FALLBACK_KEY') or "1fkbhlkVxkA2sHQ1NblCLZApgu12YTtyjhHCcFtLeSY="
+    TWO_FACTOR_REQUIRE_KEY = os.environ.get('TWO_FACTOR_REQUIRE_KEY', 'false').lower() in ['true', 'on', '1']
 
     # Rate Limiting (Flask-Limiter)
     RATELIMIT_ENABLED = os.environ.get('RATELIMIT_ENABLED', 'true').lower() in ['true', 'on', '1']
@@ -96,22 +99,26 @@ class Config:
 class DevelopmentConfig(Config):
     """Configuration pour le développement"""
     DEBUG = True
+    ENV = 'development'
     SQLALCHEMY_ECHO = False  # Mettre à True pour voir les requêtes SQL
 
 class ProductionConfig(Config):
     """Configuration pour la production"""
     DEBUG = False
+    ENV = 'production'
     SQLALCHEMY_ECHO = False
-    
+
     # Sécurité renforcée en production
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
+    TWO_FACTOR_REQUIRE_KEY = True
 
 class TestingConfig(Config):
     """Configuration pour les tests"""
     TESTING = True
     DEBUG = True
+    ENV = 'testing'
     # Utiliser une base de données en mémoire pour les tests
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     
