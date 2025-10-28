@@ -1,5 +1,9 @@
 import pytest
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+
+from backend.database import db
+from backend.models.geolocation_accuracy_stats import GeolocationAccuracyStats
+from backend.models.pointage import Pointage
 
 
 def login_employee(client):
@@ -221,7 +225,7 @@ def test_mission_checkin_uses_company_accuracy_when_missing_on_mission(client):
     from backend.models.user import User
     from backend.models.mission import Mission
     from backend.models.mission_user import MissionUser
-    from backend.database import db
+
 
     with client.application.app_context():
         user = User.query.filter_by(email="employee@pointflex.com").first()
@@ -252,6 +256,7 @@ def test_mission_checkin_uses_company_accuracy_when_missing_on_mission(client):
     assert str(25) in body['message']
 
 
+
 def test_multiple_checkins_same_day(client):
     token = login_employee(client)
     headers = {'Authorization': f'Bearer {token}'}
@@ -261,8 +266,6 @@ def test_multiple_checkins_same_day(client):
     from backend.models.mission_user import MissionUser
     from backend.models.pointage import Pointage
     from backend.database import db
-    from datetime import date
-
     with client.application.app_context():
         user = User.query.filter_by(email="employee@pointflex.com").first()
         mission = Mission(company_id=user.company_id, order_number='MISSION-MULTI', title='Mission Multi')

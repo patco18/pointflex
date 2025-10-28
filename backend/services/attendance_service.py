@@ -6,11 +6,13 @@ from flask import current_app
 from backend.models.pointage import Pointage
 from backend.models.user import User
 from backend.models.office import Office
+from backend.models.company import Company
 from backend.models.system_settings import SystemSettings
 from backend.database import db
 from backend.utils.notification_utils import send_notification
 from backend.middleware.audit import log_user_action
 from backend.utils.attendance_logger import log_attendance_event, log_attendance_error
+from backend.services.geolocation_accuracy_service import GeolocationAccuracyService
 from datetime import datetime, date, timedelta
 from zoneinfo import ZoneInfo
 from sqlalchemy.exc import SQLAlchemyError
@@ -491,8 +493,7 @@ def office_checkin_safe(user_id, coordinates):
         
         # Paramètres par défaut
         max_accuracy = current_app.config.get('GEOLOCATION_MAX_ACCURACY', 100)
-        if user.company and getattr(user.company, 'geolocation_max_accuracy', None) is not None:
-            max_accuracy = user.company.geolocation_max_accuracy
+
         min_distance = float('inf')
         nearest_office = None
         
@@ -521,6 +522,7 @@ def office_checkin_safe(user_id, coordinates):
                     try:
                         if hasattr(nearest_office, 'geolocation_max_accuracy') and nearest_office.geolocation_max_accuracy is not None:
                             max_accuracy = nearest_office.geolocation_max_accuracy
+                            threshold_entity = nearest_office
                     except:
                         pass  # Utiliser la valeur par défaut si la colonne n'existe pas
             
@@ -579,12 +581,23 @@ def office_checkin_safe(user_id, coordinates):
                     max_accuracy = nearest_office['geolocation_max_accuracy']
             
             cursor.close()
-        
+
+        adjuster = None
+        if isinstance(threshold_entity, Office):
+            adjuster = GeolocationAccuracyService.for_office(threshold_entity, user_id)
+        elif isinstance(threshold_entity, Company):
+            adjuster = GeolocationAccuracyService.for_company(threshold_entity, user_id)
+
+        applied_threshold = max_accuracy
+
         # Vérifier la précision GPS
         if coordinates['accuracy'] > max_accuracy:
+            if adjuster:
+                adjuster.record_failure(coordinates['accuracy'], applied_threshold)
+                db.session.commit()
             return {
                 'error': True,
-                'message': f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). Maximum autorisé: {max_accuracy}m",
+                'message': f"Précision de localisation insuffisante ({int(coordinates['accuracy'])}m). Maximum autorisé: {applied_threshold}m",
                 'status_code': 400
             }
         
@@ -663,7 +676,11 @@ def office_checkin_safe(user_id, coordinates):
         # Retourner le pointage créé
         if pointage.get('error'):
             return pointage
-            
+
+        if adjuster:
+            adjuster.record_success(coordinates['accuracy'], applied_threshold)
+            db.session.commit()
+
         return {
             'error': False,
             'message': 'Pointage bureau enregistré avec succès',

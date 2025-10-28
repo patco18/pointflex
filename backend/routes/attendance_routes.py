@@ -19,6 +19,7 @@ from zoneinfo import ZoneInfo
 from backend.models.system_settings import SystemSettings
 import math
 from sqlalchemy.exc import SQLAlchemyError
+from backend.services.geolocation_accuracy_service import GeolocationAccuracyService
 
 attendance_bp = Blueprint('attendance', __name__)
 
@@ -119,7 +120,7 @@ def mission_checkin():
         if mission_accuracy is not None:
             max_accuracy = mission_accuracy
 
-        if coordinates['accuracy'] > max_accuracy:
+
             log_attendance_error(
                 'mission_checkin_accuracy_rejected',
                 current_user.id,
@@ -192,6 +193,8 @@ def mission_checkin():
 
         db.session.add(pointage)
         db.session.flush()
+
+        adjuster.record_success(coordinates['accuracy'], max_accuracy)
 
         # Logger l'action
         log_user_action(
