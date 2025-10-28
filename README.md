@@ -375,6 +375,18 @@ REDIS_URL=redis://localhost:6379/0
 RATELIMIT_STORAGE_URL=redis://localhost:6379/2  # Configurez Redis pour Flask-Limiter
 ```
 
+#### Générer une clé 2FA pour le chiffrement
+
+Utilisez la commande suivante pour générer une clé Fernet conforme (32 bytes encodés base64) :
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Copiez ensuite la valeur retournée dans `TWO_FACTOR_ENCRYPTION_KEY`. En développement, l'application utilisera
+automatiquement la clé d'exemple fournie dans `.env.example` si la variable n'est pas définie. **Ne réutilisez jamais
+cette clé en production.**
+
 ### CI/CD avec GitHub Actions
 
 Le projet inclut une pipeline CI/CD qui :

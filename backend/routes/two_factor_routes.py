@@ -14,23 +14,15 @@ from backend.database import db
 from backend.utils.security_utils import encrypt_data, decrypt_data
 from backend.utils.notification_utils import send_notification # Optional: notify user on 2FA changes
 from backend.middleware.audit import log_user_action
+from backend.extensions import limiter
 
 two_factor_bp = Blueprint('two_factor_bp', __name__)
-
-# USER ACTION: Import your initialized 'limiter' instance here.
-# Example: from ..extensions import limiter # User needs to ensure 'limiter' is their Flask-Limiter instance
 
 # Helper to generate backup codes
 def generate_backup_codes(count=10, length=8):
     import secrets
     import string
     return [''.join(secrets.choice(string.digits) for _ in range(length)) for _ in range(count)]
-
-# USER ACTION: Decorate routes below with appropriate limits from your 'limiter' instance
-# Example:
-# @limiter.limit(lambda: current_app.config.get('RATELIMIT_SENSITIVE_ACTIONS'))
-# @two_factor_bp.route('/setup', methods=['POST'])
-# ...
 
 # Helper to hash backup codes (using werkzeug for consistency with password hashing if desired, or simple SHA256)
 def hash_backup_code(code):
@@ -63,6 +55,7 @@ def remove_used_backup_code(user: User, used_code: str):
 
 
 @two_factor_bp.route('/setup', methods=['POST'])
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_SENSITIVE_ACTIONS', '10 per hour'))
 @jwt_required()
 def setup_2fa():
     current_user = get_current_user()
@@ -108,6 +101,7 @@ def setup_2fa():
 
 
 @two_factor_bp.route('/verify-and-enable', methods=['POST'])
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_SENSITIVE_ACTIONS', '10 per hour'))
 @jwt_required()
 def verify_and_enable_2fa():
     current_user = get_current_user()
@@ -162,6 +156,7 @@ def verify_and_enable_2fa():
 
 
 @two_factor_bp.route('/verify-login', methods=['POST'])
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_SENSITIVE_ACTIONS', '10 per hour'))
 # No @jwt_required here as this is part of the login flow *before* full JWT is granted
 def verify_login_2fa():
     data = request.get_json()
@@ -219,6 +214,7 @@ def verify_login_2fa():
 
 
 @two_factor_bp.route('/disable', methods=['POST'])
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_SENSITIVE_ACTIONS', '10 per hour'))
 @jwt_required()
 def disable_2fa():
     current_user = get_current_user()
@@ -261,6 +257,7 @@ def disable_2fa():
         return jsonify(message="Failed to disable 2FA due to a server error."), 500
 
 @two_factor_bp.route('/backup-codes', methods=['POST']) # Regenerate
+@limiter.limit(lambda: current_app.config.get('RATELIMIT_SENSITIVE_ACTIONS', '10 per hour'))
 @jwt_required()
 def regenerate_backup_codes():
     current_user = get_current_user()
