@@ -1,38 +1,71 @@
-"""
-Security related utility functions, e.g., for encryption/decryption.
-"""
+"""Security related utility functions, e.g., for encryption/decryption."""
+
 import os
 from cryptography.fernet import Fernet, InvalidToken
-from flask import current_app
+from flask import current_app, has_app_context
 
-# Load the encryption key for 2FA secrets
-# This key MUST be kept secret and be consistent across application restarts.
-# It should be a 32-byte URL-safe base64-encoded string.
-# Generate one using: Fernet.generate_key().decode()
-TWO_FACTOR_ENCRYPTION_KEY_ENV = os.environ.get('TWO_FACTOR_ENCRYPTION_KEY')
+_cipher_suite = None
+_cipher_source = None
 
-if not TWO_FACTOR_ENCRYPTION_KEY_ENV:
-    print("WARNING: TWO_FACTOR_ENCRYPTION_KEY is not set. 2FA secret encryption will fail.")
-    # In a real app, you might want to raise an error or have a default dev key,
-    # but for security, it's better to require it to be explicitly set.
-    _cipher_suite = None
-else:
-    try:
-        _cipher_suite = Fernet(TWO_FACTOR_ENCRYPTION_KEY_ENV.encode())
-    except Exception as e:
-        print(f"ERROR: Invalid TWO_FACTOR_ENCRYPTION_KEY. It must be a URL-safe base64-encoded 32-byte key. Error: {e}")
+
+def _get_encryption_key() -> str | None:
+    """Return the configured TWO_FACTOR_ENCRYPTION_KEY."""
+    key = os.environ.get('TWO_FACTOR_ENCRYPTION_KEY')
+    if key:
+        return key
+
+    if has_app_context():  # Prefer Flask config when available
+        return current_app.config.get('TWO_FACTOR_ENCRYPTION_KEY')
+
+    return None
+
+
+def _load_cipher_suite():
+    """Ensure the Fernet cipher suite is initialised and return it."""
+    global _cipher_suite, _cipher_source
+
+    key = _get_encryption_key()
+    if not key:
+        message = "TWO_FACTOR_ENCRYPTION_KEY is not set. 2FA secret encryption will fail."
+        if has_app_context():
+            current_app.logger.error(message)
+        else:
+            print(f"WARNING: {message}")
         _cipher_suite = None
+        _cipher_source = None
+        return None
+
+    if _cipher_suite and _cipher_source == key:
+        return _cipher_suite
+
+    try:
+        _cipher_suite = Fernet(key.encode())
+        _cipher_source = key
+    except Exception as e:  # pragma: no cover - depends on invalid config
+        error_message = (
+            "Invalid TWO_FACTOR_ENCRYPTION_KEY. It must be a URL-safe base64-encoded 32-byte key."
+        )
+        if has_app_context():
+            current_app.logger.error(f"{error_message} Error: {e}")
+        else:
+            print(f"ERROR: {error_message} Error: {e}")
+        _cipher_suite = None
+        _cipher_source = None
+
+    return _cipher_suite
 
 
 def encrypt_data(data: str) -> str | None:
     """Encrypts a string using Fernet symmetric encryption."""
-    if not _cipher_suite:
-        current_app.logger.error("2FA Encryption key not available or invalid. Cannot encrypt data.")
+    cipher_suite = _load_cipher_suite()
+    if not cipher_suite:
+        if has_app_context():
+            current_app.logger.error("2FA Encryption key not available or invalid. Cannot encrypt data.")
         return None
     if not data:
         return None
     try:
-        encrypted_text = _cipher_suite.encrypt(data.encode('utf-8'))
+        encrypted_text = cipher_suite.encrypt(data.encode('utf-8'))
         return encrypted_text.decode('utf-8')
     except Exception as e:
         current_app.logger.error(f"Error during data encryption: {e}")
@@ -40,13 +73,15 @@ def encrypt_data(data: str) -> str | None:
 
 def decrypt_data(encrypted_data: str) -> str | None:
     """Decrypts a string using Fernet symmetric encryption."""
-    if not _cipher_suite:
-        current_app.logger.error("2FA Encryption key not available or invalid. Cannot decrypt data.")
+    cipher_suite = _load_cipher_suite()
+    if not cipher_suite:
+        if has_app_context():
+            current_app.logger.error("2FA Encryption key not available or invalid. Cannot decrypt data.")
         return None
     if not encrypted_data:
         return None
     try:
-        decrypted_text = _cipher_suite.decrypt(encrypted_data.encode('utf-8'))
+        decrypted_text = cipher_suite.decrypt(encrypted_data.encode('utf-8'))
         return decrypted_text.decode('utf-8')
     except InvalidToken:
         current_app.logger.error("Invalid token or key for decryption (InvalidToken).")
@@ -63,8 +98,9 @@ if __name__ == '__main__':
     # print(f"Generated Fernet Key: {key.decode()}") # Store this in your .env as TWO_FACTOR_ENCRYPTION_KEY
 
     # --- Test Encryption/Decryption (requires TWO_FACTOR_ENCRYPTION_KEY to be set in env for testing) ---
-    if TWO_FACTOR_ENCRYPTION_KEY_ENV:
-        print(f"Testing with key: {TWO_FACTOR_ENCRYPTION_KEY_ENV[:5]}...")
+    key = _get_encryption_key()
+    if key:
+        print(f"Testing with key: {key[:5]}...")
         original_text = "mysecret_totp_key_string_12345"
         print(f"Original: {original_text}")
 

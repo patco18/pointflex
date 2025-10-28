@@ -81,10 +81,15 @@ def check_expiring_subscriptions():
                     notifications_created += 1
                     
                     # Vérifier les préférences de notification par email
-                    notification_settings = NotificationSettings.query.filter_by(user_id=admin.id).first()
-                    
-                    # Envoyer un email si l'utilisateur a activé les notifications par email
-                    if notification_settings and notification_settings.email_notifications:
+                    notification_settings = NotificationSettings.query.filter_by(company_id=company.id).first()
+                    email_notifications_enabled = (
+                        notification_settings.email_notifications
+                        if notification_settings
+                        else True
+                    )
+
+                    # Envoyer un email si l'entreprise a activé les notifications par email
+                    if email_notifications_enabled:
                         user_name = f"{admin.prenom} {admin.nom}"
                         plan_name = company.subscription_plan or "Standard"
                         
@@ -154,11 +159,16 @@ def check_expiring_subscriptions():
                     notifications_created += 1
                     
                     # Vérifier les préférences de notification par email
-                    notification_settings = NotificationSettings.query.filter_by(user_id=admin.id).first()
-                    
-                    # Envoyer un email si l'utilisateur a activé les notifications par email
+                    notification_settings = NotificationSettings.query.filter_by(company_id=company.id).first()
+                    email_notifications_enabled = (
+                        notification_settings.email_notifications
+                        if notification_settings
+                        else True
+                    )
+
+                    # Envoyer un email si l'entreprise a activé les notifications par email
                     # et si l'expiration est dans 30, 14, 7 ou 1 jour(s)
-                    if notification_settings and notification_settings.email_notifications:
+                    if email_notifications_enabled:
                         # Envoyer des emails uniquement pour certains seuils
                         if days_remaining in [30, 14, 7, 1]:
                             user_name = f"{admin.prenom} {admin.nom}"

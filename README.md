@@ -364,6 +364,7 @@ Cette configuration inclut également un service **redis** nécessaire au bon fo
 
 #### Variables d'environnement production
 ```env
+FLASK_CONFIG=production
 FLASK_ENV=production
 SECRET_KEY=votre-cle-secrete-unique-et-longue
 JWT_SECRET_KEY=votre-cle-jwt-secrete-unique
@@ -371,9 +372,22 @@ DATABASE_URL=sqlite:///instance/pointflex.db
 CORS_ORIGINS=https://votre-domaine.com
 FCM_SERVER_KEY=votre-cle-fcm  # Necessaire pour les notifications push
 TWO_FACTOR_ENCRYPTION_KEY=votre-cle-fernet-32-bytes  # Obligatoire pour le chiffrement 2FA
+TWO_FACTOR_REQUIRE_KEY=true
 REDIS_URL=redis://localhost:6379/0
 RATELIMIT_STORAGE_URL=redis://localhost:6379/2  # Configurez Redis pour Flask-Limiter
 ```
+
+#### Générer une clé 2FA pour le chiffrement
+
+Utilisez la commande suivante pour générer une clé Fernet conforme (32 bytes encodés base64) :
+
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Copiez ensuite la valeur retournée dans `TWO_FACTOR_ENCRYPTION_KEY`. En développement, l'application utilisera
+automatiquement la clé d'exemple fournie dans `.env.example` si la variable n'est pas définie. **Ne réutilisez jamais
+cette clé en production.**
 
 ### CI/CD avec GitHub Actions
 
