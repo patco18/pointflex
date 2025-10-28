@@ -364,6 +364,7 @@ Cette configuration inclut également un service **redis** nécessaire au bon fo
 
 #### Variables d'environnement production
 ```env
+FLASK_CONFIG=production
 FLASK_ENV=production
 SECRET_KEY=votre-cle-secrete-unique-et-longue
 JWT_SECRET_KEY=votre-cle-jwt-secrete-unique
@@ -371,6 +372,7 @@ DATABASE_URL=sqlite:///instance/pointflex.db
 CORS_ORIGINS=https://votre-domaine.com
 FCM_SERVER_KEY=votre-cle-fcm  # Necessaire pour les notifications push
 TWO_FACTOR_ENCRYPTION_KEY=votre-cle-fernet-32-bytes  # Obligatoire pour le chiffrement 2FA
+TWO_FACTOR_REQUIRE_KEY=true
 REDIS_URL=redis://localhost:6379/0
 RATELIMIT_STORAGE_URL=redis://localhost:6379/2  # Configurez Redis pour Flask-Limiter
 ```
