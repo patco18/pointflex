@@ -31,7 +31,11 @@ sys.modules["cryptography.fernet"] = fernet_mod
 
 # Ensure encryption key and database URL are set before importing the app
 os.environ.setdefault('TWO_FACTOR_ENCRYPTION_KEY', Fernet.generate_key().decode())
-os.environ.setdefault('DATABASE_URL', 'sqlite:///:memory:')
+test_db_url = (
+    os.environ.get('TEST_DATABASE_URL')
+    or 'postgresql+psycopg://pointflex:pointflex@localhost:5432/pointflex_test'
+)
+os.environ['DATABASE_URL'] = test_db_url
 
 from backend.app import create_app
 

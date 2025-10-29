@@ -10,7 +10,10 @@ class Config:
 
     ENV = os.environ.get('FLASK_ENV') or os.environ.get('POINTFLEX_ENV') or 'development'
     # Base de données
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///pointflex.db'
+    SQLALCHEMY_DATABASE_URI = (
+        os.environ.get('DATABASE_URL')
+        or 'postgresql+psycopg://pointflex:pointflex@localhost:5432/pointflex'
+    )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
     # Sécurité
@@ -120,8 +123,11 @@ class TestingConfig(Config):
     TESTING = True
     DEBUG = True
     ENV = 'testing'
-    # Utiliser une base de données en mémoire pour les tests
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    SQLALCHEMY_DATABASE_URI = (
+        os.environ.get('TEST_DATABASE_URL')
+        or os.environ.get('DATABASE_URL')
+        or 'postgresql+psycopg://pointflex:pointflex@localhost:5432/pointflex_test'
+    )
     
     # Configuration pour les tests d'email
     MAIL_SERVER = 'localhost'

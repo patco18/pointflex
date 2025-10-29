@@ -16,10 +16,34 @@ services:
       - "5000:5000"
     environment:
       - FLASK_ENV=production
-      - DATABASE_URL=sqlite:///instance/pointflex.db
+      - DATABASE_URL=postgresql+psycopg://pointflex:pointflex@postgres:5432/pointflex
+      - TEST_DATABASE_URL=postgresql+psycopg://pointflex:pointflex@postgres:5432/pointflex_test
       - REDIS_URL=redis://redis:6379/0
     volumes:
       - ./backend/instance:/app/instance
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pointflex-network
+
+  postgres:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_DB: pointflex
+      POSTGRES_USER: pointflex
+      POSTGRES_PASSWORD: pointflex
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pointflex"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
     networks:
       - pointflex-network
 
@@ -37,3 +61,4 @@ networks:
 
 volumes:
   db_data:
+  postgres_data:

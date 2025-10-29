@@ -9,7 +9,8 @@ if not exist .env (
     echo FLASK_ENV=development >> .env
     echo SECRET_KEY=test-secret-key-for-demo >> .env
     echo JWT_SECRET_KEY=test-jwt-secret-key-for-demo >> .env
-    echo DATABASE_URL=sqlite:///instance/pointflex.db >> .env
+    echo DATABASE_URL=postgresql+psycopg://pointflex:pointflex@localhost:5432/pointflex >> .env
+    echo TEST_DATABASE_URL=postgresql+psycopg://pointflex:pointflex@localhost:5432/pointflex_test >> .env
     echo CORS_ORIGINS=http://localhost:3000,http://localhost:5173 >> .env
 )
 

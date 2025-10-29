@@ -284,17 +284,17 @@ chmod +x deploy.sh
 #### Commandes utiles Docker
 ```bash
 # Voir les logs
-docker-compose logs -f
+docker compose logs -f
 
 # Arrêter les services
-docker-compose down
+docker compose down
 
 # Redémarrer
-docker-compose restart
+docker compose restart
 
 # Mise à jour
 git pull
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
 ### Déploiement en Développement
@@ -310,11 +310,30 @@ cd backend && python app.py  # Backend sur :5000
 python run_worker.py         # Worker RQ pour les webhooks
 ```
 
-#### Ou avec Docker
+#### Ou avec Docker (PostgreSQL, Redis, Frontend & Backend)
 ```bash
-docker-compose -f docker-compose.dev.yml up
+docker compose -f docker-compose.dev.yml up --build
 ```
-Ce fichier compose lance désormais un service **redis** indispensable pour les notifications en temps réel (SSE) et la limitation de débit.
+Ce fichier compose lance désormais automatiquement PostgreSQL (bases `pointflex` et `pointflex_test`), Redis, le backend Flask et le frontend Vite. La première exécution peut prendre quelques minutes le temps que l'image PostgreSQL initialise les bases.
+
+Une fois les services démarrés :
+
+1. Accédez au frontend sur http://localhost:3000
+2. L'API Flask est exposée sur http://localhost:5000
+3. PostgreSQL est disponible sur `localhost:5432` avec l'utilisateur `pointflex` et le mot de passe `pointflex`
+
+Pour initialiser des données de développement supplémentaires ou exécuter des commandes Flask dans le conteneur backend :
+
+```bash
+docker compose -f docker-compose.dev.yml exec backend flask shell
+```
+
+Le conteneur Postgres crée également une base `pointflex_test` pour l'exécution des tests automatisés. Si vous souhaitez la recréer manuellement, utilisez :
+
+```bash
+docker compose -f docker-compose.dev.yml exec postgres psql -U pointflex -c 'DROP DATABASE IF EXISTS pointflex_test;'
+docker compose -f docker-compose.dev.yml exec postgres psql -U pointflex -c 'CREATE DATABASE pointflex_test;'
+```
 
 ### Variables d'Environnement
 
@@ -328,7 +347,8 @@ VITE_API_URL=http://localhost:5000/api
 FLASK_ENV=production
 SECRET_KEY=your-secret-key-here
 JWT_SECRET_KEY=your-jwt-secret-key-here
-DATABASE_URL=sqlite:///instance/pointflex.db
+DATABASE_URL=postgresql+psycopg://pointflex:pointflex@localhost:5432/pointflex
+TEST_DATABASE_URL=postgresql+psycopg://pointflex:pointflex@localhost:5432/pointflex_test
 CORS_ORIGINS=http://localhost,https://yourdomain.com
 REDIS_URL=redis://localhost:6379/0
 GEOLOCATION_MAX_ACCURACY=100  # Précision GPS maximale (en mètres)
@@ -338,6 +358,22 @@ STRIPE_PRICE_MAP={"price_basic_monthly_test":{"name":"basic","max_employees":10,
 ```
 `STRIPE_PRICE_MAP` doit être un objet JSON mapant les identifiants de tarifs Stripe
 aux informations de vos plans (nom, montant, durée, etc.).
+
+### Exécuter les tests avec PostgreSQL
+
+1. Démarrez uniquement les services nécessaires :
+   ```bash
+   docker compose -f docker-compose.dev.yml up -d postgres
+   ```
+2. Exportez l'URL de test si vous lancez les tests en dehors de Docker :
+   ```bash
+   export TEST_DATABASE_URL=postgresql+psycopg://pointflex:pointflex@localhost:5432/pointflex_test
+   ```
+3. Exécutez la suite de tests :
+   ```bash
+   cd backend && pytest
+   ```
+Le script d'initialisation PostgreSQL crée automatiquement la base `pointflex_test`. Réexécutez l'étape 1 si vous avez supprimé le volume Docker.
 
 ### Production (Serveur)
 
@@ -352,10 +388,10 @@ cp .env.example .env
 nano .env  # Modifier les clés secrètes
 
 # Déployer
-docker-compose up -d
+docker compose up -d
 
 # Démarrer ensuite le worker RQ pour les webhooks
-docker-compose exec backend python run_worker.py
+docker compose exec backend python run_worker.py
 
 Cette configuration inclut également un service **redis** nécessaire au bon fonctionnement des notifications SSE et du système de tâches.
 
@@ -368,7 +404,8 @@ FLASK_CONFIG=production
 FLASK_ENV=production
 SECRET_KEY=votre-cle-secrete-unique-et-longue
 JWT_SECRET_KEY=votre-cle-jwt-secrete-unique
-DATABASE_URL=sqlite:///instance/pointflex.db
+DATABASE_URL=postgresql+psycopg://pointflex:pointflex@postgres:5432/pointflex
+TEST_DATABASE_URL=postgresql+psycopg://pointflex:pointflex@postgres:5432/pointflex_test
 CORS_ORIGINS=https://votre-domaine.com
 FCM_SERVER_KEY=votre-cle-fcm  # Necessaire pour les notifications push
 TWO_FACTOR_ENCRYPTION_KEY=votre-cle-fernet-32-bytes  # Obligatoire pour le chiffrement 2FA
