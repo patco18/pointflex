@@ -30,6 +30,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from backend.config import Config, config as config_map  # noqa: E402
 from backend.database import db, init_db  # noqa: E402
+from backend.migrations.runtime_schema_checks import ensure_schema_columns  # noqa: E402
 from backend.extensions import limiter  # noqa: E402
 from backend.middleware.auth import init_auth_middleware  # noqa: E402
 from backend.middleware.audit import init_audit_middleware  # noqa: E402
@@ -146,6 +147,7 @@ def _init_database(app: Flask) -> None:
     db.init_app(app)
     with app.app_context():
         init_db()
+        ensure_schema_columns()
 
 
 def _init_rate_limiter(app: Flask) -> None:
