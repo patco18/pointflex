@@ -133,67 +133,10 @@ export default function Layout({ children }: LayoutProps) {
       { name: 'Accueil', href: '/', icon: Home, priority: true }
     ]
 
-    // SUPERADMIN - Administration globale, configuration système, gestion des comptes entreprises
-    if (permissions.canGlobalManagement) {
-      categories.push({
-        title: 'Super Admin',
-        items: [
-          { name: 'Dashboard SuperAdmin', href: '/superadmin', icon: Crown },
-          { name: 'Gestion Entreprises', href: '/superadmin/companies', icon: Building },
-          { name: 'Gestion Abonnements', href: '/superadmin/subscription', icon: CreditCard },
-          { name: 'Demandes Abonnement', href: '/superadmin/extension-requests', icon: Clock },
-          { name: 'Facturation', href: '/superadmin/billing', icon: DollarSign },
-          { name: 'Configuration Système', href: '/settings', icon: Settings },
-          { name: 'Rôles & Privilèges', href: '/roles', icon: Shield },
-          { name: 'Analytics Globales', href: '/reports', icon: BarChart3 }
-        ]
-      })
-    }
-
-    // ADMINISTRATEUR ENTREPRISE - Gestion globale de l'entreprise
-    else if (permissions.canManageCompanySettings || permissions.canManageTeam) {
-      categories.push({
-        title: 'Administration',
-        items: [
-          { name: 'Tableau de Bord', href: '/admin', icon: BarChart3, priority: true },
-          { name: 'Gestion Employés', href: '/admin/employees', icon: Users },
-          { name: 'Organisation', href: '/admin/organization', icon: Layers },
-          { name: 'Calendrier Équipe', href: '/admin/team-calendar', icon: Calendar },
-          { name: 'Gestion Bureaux', href: '/admin/offices', icon: Building },
-          { name: 'Géofencing', href: '/admin/geofencing', icon: MapPin },
-          { name: 'Pointage QR Code', href: '/admin/qr-code', icon: Target },
-          { name: 'Historique Pointages', href: '/admin/attendance-history', icon: History },
-          { name: 'Rapports Entreprise', href: '/admin/reports', icon: FileText },
-          { name: 'Webhooks', href: '/admin/webhooks', icon: Globe },
-          { name: 'Paramètres Entreprise', href: '/admin/settings', icon: Cog }
-        ]
-      })
-    }
-
-    // AUTRES RÔLES - Fonctionnalités selon permissions
-    else {
-      const teamItems: NavItem[] = []
-
-      if (permissions.canManageTeam || permissions.canViewTeamAttendance) {
-        teamItems.push({ name: 'Gestion Équipe', href: '/admin/employees', icon: Users })
-      }
-
-      if (permissions.canCreateMissions || permissions.canTrackMissions) {
-        teamItems.push({ name: 'Missions', href: '/missions', icon: Target })
-      }
-
-      if (permissions.canViewTeamAttendance) {
-        teamItems.push({ name: 'Calendrier Équipe', href: '/team-calendar', icon: Calendar })
-      }
-
-      if (permissions.canViewTeamReports || permissions.canViewDepartmentReports) {
-        teamItems.push({ name: 'Rapports', href: '/reports', icon: FileText })
-      }
-
-      if (teamItems.length > 0) {
-        categories.push({ title: 'Équipe', items: teamItems })
-      }
-    }
+    const activityItems: NavItem[] = []
+    const analysisItems: NavItem[] = []
+    const reportingItems: NavItem[] = []
+    const toolsItems: NavItem[] = []
 
     if (permissions.canSelfCheckIn) {
       generalItems.push({ name: 'Pointage', href: '/attendance/home', icon: Clock, priority: true })
@@ -205,16 +148,137 @@ export default function Layout({ children }: LayoutProps) {
       generalItems.push({ name: 'Congés', href: '/leave', icon: Calendar, priority: true })
     }
 
-    if (checkPermission('analytics.access_basic')) {
-      generalItems.push({ name: 'Tableau de Bord', href: '/analytics', icon: BarChart3, priority: true })
+    const showGeneralTeamSections =
+      !permissions.canGlobalManagement &&
+      !(permissions.canManageCompanySettings || permissions.canManageTeam)
+
+    if (showGeneralTeamSections) {
+      if (permissions.canCreateMissions || permissions.canTrackMissions) {
+        activityItems.push({ name: 'Missions', href: '/missions', icon: Target })
+      }
+
+      if (permissions.canManageTeam || permissions.canViewTeamAttendance) {
+        activityItems.push({ name: 'Gestion Équipe', href: '/admin/employees', icon: Users })
+      }
+
+      if (permissions.canViewTeamAttendance) {
+        activityItems.push({ name: 'Calendrier Équipe', href: '/team-calendar', icon: Calendar })
+      }
     }
 
-    generalItems.push({ name: 'Fonctionnalités Avancées', href: '/advanced', icon: Zap })
+    if (!permissions.canGlobalManagement && !(permissions.canManageCompanySettings || permissions.canManageTeam)) {
+      if (
+        permissions.canViewPersonalReports ||
+        permissions.canViewTeamReports ||
+        permissions.canViewDepartmentReports ||
+        permissions.canViewCompanyReports ||
+        permissions.canViewAdvancedReports
+      ) {
+        reportingItems.push({ name: 'Rapports', href: '/reports', icon: FileText })
+      }
+    }
+
+    if (checkPermission('analytics.access_basic')) {
+      analysisItems.push({ name: 'Tableau de Bord', href: '/analytics', icon: BarChart3, priority: true })
+    }
+
+    toolsItems.push({ name: 'Fonctionnalités Avancées', href: '/advanced', icon: Zap })
+
     generalItems.push({ name: 'Profil', href: '/profile', icon: User })
 
-    categories.unshift({ title: 'Général', items: generalItems })
+    if (generalItems.length > 0) {
+      categories.push({ title: 'Général', items: generalItems })
+    }
 
-    return categories
+    if (activityItems.length > 0) {
+      categories.push({ title: 'Activités', items: activityItems })
+    }
+
+    if (analysisItems.length > 0) {
+      categories.push({ title: 'Analyse', items: analysisItems })
+    }
+
+    if (reportingItems.length > 0) {
+      categories.push({ title: 'Rapports', items: reportingItems })
+    }
+
+    if (toolsItems.length > 0) {
+      categories.push({ title: 'Outils', items: toolsItems })
+    }
+
+    if (permissions.canGlobalManagement) {
+      categories.push(
+        {
+          title: 'Supervision',
+          items: [
+            { name: 'Dashboard SuperAdmin', href: '/superadmin', icon: Crown },
+            { name: 'Analytics Globales', href: '/reports', icon: BarChart3 }
+          ]
+        },
+        {
+          title: 'Clients & Abonnements',
+          items: [
+            { name: 'Gestion Entreprises', href: '/superadmin/companies', icon: Building },
+            { name: 'Gestion Abonnements', href: '/superadmin/subscription', icon: CreditCard },
+            { name: 'Demandes Abonnement', href: '/superadmin/extension-requests', icon: Clock },
+            { name: 'Facturation', href: '/superadmin/billing', icon: DollarSign }
+          ]
+        },
+        {
+          title: 'Configuration Système',
+          items: [
+            { name: 'Configuration Système', href: '/settings', icon: Settings },
+            { name: 'Rôles & Privilèges', href: '/roles', icon: Shield }
+          ]
+        }
+      )
+    } else if (permissions.canManageCompanySettings || permissions.canManageTeam) {
+      const adminOverview: NavItem[] = [
+        { name: 'Tableau de Bord Entreprise', href: '/admin', icon: BarChart3, priority: true },
+        { name: 'Historique Pointages', href: '/admin/attendance-history', icon: History },
+        { name: 'Rapports Entreprise', href: '/admin/reports', icon: FileText }
+      ]
+
+      const adminTeam: NavItem[] = [
+        { name: 'Gestion Employés', href: '/admin/employees', icon: Users },
+        { name: 'Organisation', href: '/admin/organization', icon: Layers },
+        { name: 'Calendrier Équipe', href: '/admin/team-calendar', icon: Calendar }
+      ]
+
+      const adminOperations: NavItem[] = [
+        { name: 'Gestion Bureaux', href: '/admin/offices', icon: Building },
+        { name: 'Géofencing', href: '/admin/geofencing', icon: MapPin },
+        { name: 'Pointage QR Code', href: '/admin/qr-code', icon: Target }
+      ]
+
+      const adminConfiguration: NavItem[] = [
+        { name: 'Webhooks', href: '/admin/webhooks', icon: Globe },
+        { name: 'Paramètres Entreprise', href: '/admin/settings', icon: Cog }
+      ]
+
+      categories.push(
+        { title: 'Pilotage', items: adminOverview },
+        { title: 'Ressources Humaines', items: adminTeam },
+        { title: 'Opérations', items: adminOperations },
+        { title: 'Configuration', items: adminConfiguration }
+      )
+    }
+
+    const seenHrefs = new Set<string>()
+    const deduplicated = categories
+      .map((category) => {
+        const uniqueItems = category.items.filter((item) => {
+          if (seenHrefs.has(item.href)) {
+            return false
+          }
+          seenHrefs.add(item.href)
+          return true
+        })
+        return { ...category, items: uniqueItems }
+      })
+      .filter((category) => category.items.length > 0)
+
+    return deduplicated
   }
 
   const navigation = getNavigation()
