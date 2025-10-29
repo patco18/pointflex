@@ -96,7 +96,8 @@ VITE_API_URL=http://localhost:5000/api
 FLASK_CONFIG=production
 SECRET_KEY=your-secret-key-change-in-production
 JWT_SECRET_KEY=your-jwt-secret-change-in-production
-DATABASE_URL=sqlite:///instance/pointflex.db
+DATABASE_URL=postgresql+psycopg://pointflex:pointflex@postgres:5432/pointflex
+TEST_DATABASE_URL=postgresql+psycopg://pointflex:pointflex@postgres:5432/pointflex_test
 CORS_ORIGINS=http://localhost:3000,http://localhost:5173
 REDIS_URL=redis://localhost:6379/0
 FCM_SERVER_KEY=your_fcm_server_key
@@ -124,10 +125,10 @@ cp .env.example .env
 nano .env  # Modifier les clés secrètes
 
 # Déployer
-docker-compose up -d
+docker compose up -d
 
 # Démarrer ensuite le worker RQ pour les webhooks
-docker-compose exec backend python run_worker.py
+docker compose exec backend python run_worker.py
 ```
 
 ### Option 2: Hébergement Gratuit
@@ -150,7 +151,7 @@ docker-compose exec backend python run_worker.py
 git pull origin main
 npm install  # Si nouvelles dépendances
 pip install -r backend/requirements.txt  # Si nouvelles dépendances
-docker-compose up --build -d  # Pour Docker
+docker compose up --build -d  # Pour Docker
 ```
 
 ## 🆘 Support

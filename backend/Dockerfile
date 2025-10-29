@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create instance directory for SQLite
+# Create instance directory for runtime state (migrations, uploads, etc.)
 RUN mkdir -p instance
 
 # Expose port

@@ -12,7 +12,8 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 # Configuration pour que l'app soit chargée correctement
 from flask import Flask
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///backend/instance/pointflex.db'
+default_db_url = 'postgresql+psycopg://pointflex:pointflex@localhost:5432/pointflex'
+app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', default_db_url)
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 # Initialiser la base de données
