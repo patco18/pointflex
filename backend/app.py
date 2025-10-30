@@ -14,15 +14,14 @@ modify without breaking unrelated behaviour.
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import sys
+import types
+from pathlib import Path
 from typing import Iterable, Tuple
 
 
-# Ensure the repository root is importable when running ``python app.py`` from
-# the backend directory.  This mirrors the behaviour of ``flask --app`` and
-# keeps legacy scripts working.
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS
