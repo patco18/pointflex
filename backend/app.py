@@ -21,27 +21,7 @@ import types
 from pathlib import Path
 from typing import Iterable, Tuple
 
-# Ensure the ``backend`` package can be imported even when this script is run
-# directly from a bind-mounted directory (e.g. ``/app`` in Docker) where the
-# parent folder does not contain the package name.  We synthesise the package
-# module manually so that absolute imports such as ``backend.config`` keep
-# working regardless of how the code is executed.
-_PACKAGE_NAME = "backend"
-_PACKAGE_DIR = Path(__file__).resolve().parent
 
-if _PACKAGE_NAME not in sys.modules:
-    init_file = _PACKAGE_DIR / "__init__.py"
-    if init_file.exists():
-        spec = importlib.util.spec_from_file_location(_PACKAGE_NAME, init_file)
-        module = importlib.util.module_from_spec(spec) if spec else types.ModuleType(_PACKAGE_NAME)
-        module.__path__ = [str(_PACKAGE_DIR)]
-        sys.modules[_PACKAGE_NAME] = module
-        if spec and spec.loader is not None:
-            spec.loader.exec_module(module)  # type: ignore[union-attr]
-    else:
-        module = types.ModuleType(_PACKAGE_NAME)
-        module.__path__ = [str(_PACKAGE_DIR)]
-        sys.modules[_PACKAGE_NAME] = module
 
 from flask import Flask, send_from_directory
 from flask_cors import CORS
