@@ -18,6 +18,7 @@ import os
 import sys
 from typing import Iterable, Tuple
 
+
 # Ensure the repository root is importable when running ``python app.py`` from
 # the backend directory.  This mirrors the behaviour of ``flask --app`` and
 # keeps legacy scripts working.
