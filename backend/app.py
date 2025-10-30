@@ -18,15 +18,19 @@ import os
 import sys
 from typing import Iterable, Tuple
 
-from flask import Flask, send_from_directory
-from flask_cors import CORS
-from flask_jwt_extended import JWTManager
-from flask_sse import sse
-
 # Ensure the repository root is importable when running ``python app.py`` from
 # the backend directory.  This mirrors the behaviour of ``flask --app`` and
 # keeps legacy scripts working.
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from flask import Flask, send_from_directory
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager
+# The SSE extension is optional in some deployments.  ``backend.sse`` provides
+# a thin compatibility layer that either exposes the real extension (if
+# installed) or a no-op stub so the rest of the code can keep using the same
+# interface without special casing.
+from backend.sse import sse
 
 from backend.config import Config, config as config_map  # noqa: E402
 from backend.database import db, init_db  # noqa: E402
