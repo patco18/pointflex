@@ -7,7 +7,7 @@ from pyfcm import FCMNotification # type: ignore
 from backend.models.notification import Notification
 from backend.models.push_subscription import PushSubscription
 from backend.database import db
-from flask_sse import sse
+from backend.sse import sse
 
 # Initialize FCM
 # The API key should be stored in an environment variable
